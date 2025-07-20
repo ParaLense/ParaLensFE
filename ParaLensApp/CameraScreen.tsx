@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView } from 'react-native';
-import { Camera, useCameraDevice, useCameraDevices, CameraPermissionStatus } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
+
+type CameraPermissionStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'granted';
 
 const CameraScreen = () => {
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
@@ -16,9 +18,14 @@ const CameraScreen = () => {
     })();
   }, []);
 
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    console.log('Frame:', frame.width, frame.height);
+  }, []);
+
   const sixtyFpsFormat = device?.formats?.find(f => f?.maxFps >= 60);
 
-  if (hasPermission !== 'authorized' && hasPermission !== 'granted') {
+  if (!['authorized', 'granted'].includes(hasPermission)) {
     return (
       <View style={styles.center}>
         <Text style={styles.text}>No camera permission ({hasPermission})</Text>
@@ -52,6 +59,7 @@ const CameraScreen = () => {
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={true}
+        frameProcessor={frameProcessor}
         {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps: 60 } : {})}
       />
       {!sixtyFpsFormat && (
