@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, ScrollView } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
+import CanvasOverlay, { Box } from '../Components/CanvasOverlay';
 
 type CameraPermissionStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'granted';
 
 const CameraScreen = () => {
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
   const [debugStatus, setDebugStatus] = useState<string>('');
+  const [boxes, setBoxes] = useState<Box[]>([]);
   const devices = useCameraDevices();
   const device = useCameraDevice('back');
 
@@ -62,6 +64,12 @@ const CameraScreen = () => {
         frameProcessor={frameProcessor}
         {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps: 60 } : {})}
       />
+
+      <CanvasOverlay
+        onBoxesChange={setBoxes}
+        isActive={true}
+      />
+
       {!sixtyFpsFormat && (
         <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
           <Text style={{ color: '#fff', backgroundColor: '#222a', padding: 8, borderRadius: 8 }}>
@@ -89,6 +97,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     marginTop: 16,
+  },
+  controls: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    flexDirection: 'column',
+    gap: 10,
+  },
+  button: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 
