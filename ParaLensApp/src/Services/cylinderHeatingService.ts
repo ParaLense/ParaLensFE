@@ -8,7 +8,6 @@ import {
 } from '../types/api';
 
 export class CylinderHeatingService {
-  // Main cylinder heating operations
   async getCylinderHeating(scanId: number): Promise<CylinderHeatingDto> {
     return httpClient.get<CylinderHeatingDto>(`${API_ENDPOINTS.CYLINDER_HEATING.replace('{scanId}', scanId.toString())}`);
   }

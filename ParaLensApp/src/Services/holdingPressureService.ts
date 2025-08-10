@@ -10,7 +10,6 @@ import {
 } from '../types/api';
 
 export class HoldingPressureService {
-  // Main holding pressure operations
   async getHoldingPressure(scanId: number): Promise<HoldingPressureDto> {
     return httpClient.get<HoldingPressureDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}`);
   }
@@ -23,7 +22,6 @@ export class HoldingPressureService {
     return httpClient.delete(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}`);
   }
 
-  // Main menu operations
   async getMainMenu(scanId: number): Promise<HoldingPressureMainMenuDto> {
     return httpClient.get<HoldingPressureMainMenuDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/mainmenu`);
   }
@@ -36,7 +34,6 @@ export class HoldingPressureService {
     return httpClient.put<HoldingPressureMainMenuDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/mainmenu`, request);
   }
 
-  // Sub menu operations
   async getSubMenu(scanId: number): Promise<HoldingPressureSubMenuScrollDto> {
     return httpClient.get<HoldingPressureSubMenuScrollDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/submenu`);
   }

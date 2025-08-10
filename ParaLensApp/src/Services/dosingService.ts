@@ -12,7 +12,6 @@ import {
 } from '../types/api';
 
 export class DosingService {
-  // Main dosing operations
   async getDosing(scanId: number): Promise<DosingDto> {
     return httpClient.get<DosingDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}`);
   }
@@ -25,7 +24,6 @@ export class DosingService {
     return httpClient.delete(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}`);
   }
 
-  // Main menu operations
   async getMainMenu(scanId: number): Promise<DosingMainMenuDto> {
     return httpClient.get<DosingMainMenuDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/mainmenu`);
   }
@@ -38,7 +36,6 @@ export class DosingService {
     return httpClient.put<DosingMainMenuDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/mainmenu`, request);
   }
 
-  // Dosing speed operations
   async getDosingSpeed(scanId: number): Promise<DosingSubMenuDosingSpeedScrollDto> {
     return httpClient.get<DosingSubMenuDosingSpeedScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingSpeed`);
   }
@@ -51,7 +48,6 @@ export class DosingService {
     return httpClient.put<DosingSubMenuDosingSpeedScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingSpeed`, request);
   }
 
-  // Dosing pressure operations
   async getDosingPressure(scanId: number): Promise<DosingSubMenuDosingPressureScrollDto> {
     return httpClient.get<DosingSubMenuDosingPressureScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingPressure`);
   }

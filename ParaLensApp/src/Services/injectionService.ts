@@ -12,7 +12,6 @@ import {
 } from '../types/api';
 
 export class InjectionService {
-  // Main injection operations
   async getInjection(scanId: number): Promise<InjectionDto> {
     return httpClient.get<InjectionDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}`);
   }
@@ -25,7 +24,6 @@ export class InjectionService {
     return httpClient.delete(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}`);
   }
 
-  // Main menu operations
   async getMainMenu(scanId: number): Promise<InjectionMainMenuDto> {
     return httpClient.get<InjectionMainMenuDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}/mainmenu`);
   }
@@ -38,7 +36,6 @@ export class InjectionService {
     return httpClient.put<InjectionMainMenuDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}/mainmenu`, request);
   }
 
-  // Sub menu scroll operations
   async getSubMenuScroll(scanId: number): Promise<InjectionSubMenuScrollDto> {
     return httpClient.get<InjectionSubMenuScrollDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}/submenuscroll`);
   }
@@ -51,7 +48,6 @@ export class InjectionService {
     return httpClient.put<InjectionSubMenuScrollDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}/submenuscroll`, request);
   }
 
-  // Switch type operations
   async getSwitchType(scanId: number): Promise<InjectionSubMenuSwitchTypeDto> {
     return httpClient.get<InjectionSubMenuSwitchTypeDto>(`${API_ENDPOINTS.INJECTION.replace('{scanId}', scanId.toString())}/switchtype`);
   }
