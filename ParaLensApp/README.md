@@ -1,97 +1,310 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ParaLens Frontend Foundation
 
-# Getting Started
+A clean, well-structured React Native frontend foundation for consuming endpoints from a .NET backend. This project provides a robust API integration layer with TypeScript support, comprehensive validation, and a maintainable architecture.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 🏗️ Project Structure
 
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+```
+src/
+├── config/           # API configuration and endpoints
+├── types/            # TypeScript interfaces matching backend DTOs
+├── services/         # API service classes for each domain
+├── hooks/            # Custom React hooks for API state management
+├── contexts/         # React Context for dependency injection
+├── utils/            # Utility functions for validation and date handling
+└── Components/       # Example React Native components
 ```
 
-## Step 2: Build and run your app
+## ✨ Features
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### 🎯 Complete API Coverage
+- **Scans**: Full CRUD operations with nested data support
+- **Injection**: Complete injection management with main menu, sub menu scroll, and switch type operations
+- **Dosing**: Comprehensive dosing control with main menu, speed, and pressure management
+- **Holding Pressure**: Full holding pressure control with main menu and sub menu operations
+- **Cylinder Heating**: Complete cylinder heating management with main menu operations
 
-### Android
+### 🔧 Technical Features
+- **TypeScript**: Fully typed interfaces matching backend C# models exactly
+- **HTTP Client**: Generic HTTP client with timeout handling and error management
+- **State Management**: Custom `useApi` hook for simplified API state management
+- **Validation**: Comprehensive frontend validation matching backend rules
+- **Date Handling**: Consistent date formatting utilities (YYYY-MM-DD)
+- **Error Handling**: Robust error handling with detailed error information
+- **Dependency Injection**: React Context for global service access
 
-```sh
-# Using npm
-npm run android
+## 🚀 Getting Started
 
-# OR using Yarn
-yarn android
+### Prerequisites
+- Node.js 18+
+- React Native development environment
+- .NET backend running on `http://localhost:5200`
+
+### Installation
+```bash
+npm install
 ```
 
-### iOS
+### Configuration
+The API configuration is centralized in `src/config/api.ts`:
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```typescript
+export const API_CONFIG = {
+  BASE_URL: 'http://localhost:5200',
+  TIMEOUT: 10000,
+  HEADERS: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+};
 ```
 
-Then, and every time you update your native dependencies, run:
+## 📖 Usage Examples
 
-```sh
-bundle exec pod install
+### Basic API Call
+```typescript
+import { useApi } from '../hooks/useApi';
+import { scanService } from '../services';
+
+function ScanList() {
+  const { data: scans, loading, error, execute: fetchScans } = useApi(scanService.getScans);
+
+  useEffect(() => {
+    fetchScans();
+  }, []);
+
+  // ... render logic
+}
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### Creating a Scan
+```typescript
+import { scanService } from '../services';
+import { validateCreateScanRequest } from '../utils/validationUtils';
 
-```sh
-# Using npm
-npm run ios
+const createScan = async () => {
+  const request = { author: 'John Doe', date: '2025-01-15' };
+  
+  // Validate before sending
+  const validation = validateCreateScanRequest(request);
+  if (!validation.isValid) {
+    console.error('Validation errors:', validation.errors);
+    return;
+  }
 
-# OR using Yarn
-yarn ios
+  try {
+    const newScan = await scanService.createScan(request);
+    console.log('Scan created:', newScan);
+  } catch (error) {
+    console.error('Failed to create scan:', error);
+  }
+};
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Working with Nested Data
+```typescript
+import { injectionService } from '../services';
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+// Create injection with main menu
+const createInjectionWithMainMenu = async (scanId: number) => {
+  const request = {
+    mainMenu: {
+      sprayPressureLimit: 150.0,
+      increasedSpecificPointPrinter: 1
+    }
+  };
 
-## Step 3: Modify your app
+  const injection = await injectionService.createInjection(scanId, request);
+  console.log('Injection created:', injection);
+};
 
-Now that you have successfully run the app, let's make changes!
+// Create injection with sub menu values
+const createInjectionWithSubMenu = async (scanId: number) => {
+  const request = {
+    subMenuValues: {
+      values: [
+        { index: 0, v: 10.5, v2: 20.0 },
+        { index: 1, v: 15.0, v2: 25.5 }
+      ]
+    }
+  };
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+  const injection = await injectionService.createInjection(scanId, request);
+  console.log('Injection with sub menu created:', injection);
+};
+```
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## 🔍 API Endpoints Covered
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### Scans
+- `GET /api/scans` - Get all scans
+- `GET /api/scans/{id}` - Get scan by ID
+- `GET /api/scans/{id}/full` - Get full scan with all nested data
+- `POST /api/scans` - Create new scan
+- `DELETE /api/scans/{id}` - Delete scan
+- `DELETE /api/scans` - Delete all scans
 
-## Congratulations! :tada:
+### Injection
+- `GET /api/scans/{scanId}/injection` - Get injection data
+- `POST /api/scans/{scanId}/injection` - Create injection
+- `DELETE /api/scans/{scanId}/injection` - Delete injection
+- `GET /api/scans/{scanId}/injection/mainmenu` - Get main menu
+- `POST /api/scans/{scanId}/injection/mainmenu` - Create main menu
+- `PUT /api/scans/{scanId}/injection/mainmenu` - Update main menu
+- `GET /api/scans/{scanId}/injection/submenuscroll` - Get sub menu scroll
+- `POST /api/scans/{scanId}/injection/submenuscroll` - Create sub menu scroll
+- `PUT /api/scans/{scanId}/injection/submenuscroll` - Update sub menu scroll
+- `GET /api/scans/{scanId}/injection/switchtype` - Get switch type
+- `POST /api/scans/{scanId}/injection/switchtype` - Create switch type
+- `PUT /api/scans/{scanId}/injection/switchtype` - Update switch type
 
-You've successfully run and modified your React Native App. :partying_face:
+### Dosing
+- `GET /api/scans/{scanId}/dosing` - Get dosing data
+- `POST /api/scans/{scanId}/dosing` - Create dosing
+- `DELETE /api/scans/{scanId}/dosing` - Delete dosing
+- `GET /api/scans/{scanId}/dosing/mainmenu` - Get main menu
+- `POST /api/scans/{scanId}/dosing/mainmenu` - Create main menu
+- `PUT /api/scans/{scanId}/dosing/mainmenu` - Update main menu
+- `GET /api/scans/{scanId}/dosing/dosingSpeed` - Get dosing speed
+- `POST /api/scans/{scanId}/dosing/dosingSpeed` - Create dosing speed
+- `PUT /api/scans/{scanId}/dosing/dosingSpeed` - Update dosing speed
+- `GET /api/scans/{scanId}/dosing/dosingPressure` - Get dosing pressure
+- `POST /api/scans/{scanId}/dosing/dosingPressure` - Create dosing pressure
+- `PUT /api/scans/{scanId}/dosing/dosingPressure` - Update dosing pressure
 
-### Now what?
+### Holding Pressure
+- `GET /api/scans/{scanId}/holdingpressure` - Get holding pressure data
+- `POST /api/scans/{scanId}/holdingpressure` - Create holding pressure
+- `DELETE /api/scans/{scanId}/holdingpressure` - Delete holding pressure
+- `GET /api/scans/{scanId}/holdingpressure/mainmenu` - Get main menu
+- `POST /api/scans/{scanId}/holdingpressure/mainmenu` - Create main menu
+- `PUT /api/scans/{scanId}/holdingpressure/mainmenu` - Update main menu
+- `GET /api/scans/{scanId}/holdingpressure/submenu` - Get sub menu
+- `POST /api/scans/{scanId}/holdingpressure/submenu` - Create sub menu
+- `PUT /api/scans/{scanId}/holdingpressure/submenu` - Update sub menu
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+### Cylinder Heating
+- `GET /api/scans/{scanId}/cylinderheating` - Get cylinder heating data
+- `POST /api/scans/{scanId}/cylinderheating` - Create cylinder heating
+- `DELETE /api/scans/{scanId}/cylinderheating` - Delete cylinder heating
+- `GET /api/scans/{scanId}/cylinderheating/mainmenu` - Get main menu
+- `POST /api/scans/{scanId}/cylinderheating/mainmenu` - Create main menu
+- `PUT /api/scans/{scanId}/cylinderheating/mainmenu` - Update main menu
 
-# Troubleshooting
+## 🧪 Validation
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+The frontend includes comprehensive validation that mirrors backend validation rules:
 
-# Learn More
+- **Scan Creation**: Author required, date in YYYY-MM-DD format
+- **Injection**: Non-negative values, boolean flags (0/1)
+- **Dosing**: Non-negative values for all parameters
+- **Holding Pressure**: Non-negative values, positive screw diameter
+- **Cylinder Heating**: Non-negative setpoint values
 
-To learn more about React Native, take a look at the following resources:
+## 📅 Date Handling
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+All dates are handled in `YYYY-MM-DD` format to match backend expectations:
+
+```typescript
+import { formatDateForApi, parseDateFromApi } from '../utils/dateUtils';
+
+// Format date for API
+const apiDate = formatDateForApi(new Date()); // Returns "2025-01-15"
+
+// Parse date from API
+const jsDate = parseDateFromApi('2025-01-15'); // Returns Date object
+```
+
+## 🚨 Error Handling
+
+The foundation includes robust error handling:
+
+```typescript
+import { useApi } from '../hooks/useApi';
+
+function MyComponent() {
+  const { data, loading, error, execute } = useApi(myApiCall);
+
+  if (error) {
+    return <Text>Error: {error.message}</Text>;
+  }
+
+  if (loading) {
+    return <ActivityIndicator />;
+  }
+
+  // ... render data
+}
+```
+
+## 🔧 State Management
+
+The `useApi` hook provides a clean interface for API state management:
+
+```typescript
+const { data, loading, error, execute, reset } = useApi(apiFunction);
+
+// Execute API call
+execute(params);
+
+// Reset state
+reset();
+
+// Access current state
+console.log('Data:', data);
+console.log('Loading:', loading);
+console.log('Error:', error);
+```
+
+## 🧪 Testing
+
+The foundation is designed with testing in mind:
+
+```typescript
+// Test validation
+import { validateCreateScanRequest } from '../utils/validationUtils';
+
+test('should validate scan request', () => {
+  const validRequest = { author: 'Test', date: '2025-01-15' };
+  const result = validateCreateScanRequest(validRequest);
+  expect(result.isValid).toBe(true);
+});
+
+// Test API calls
+import { scanService } from '../services';
+
+test('should create scan', async () => {
+  const request = { author: 'Test', date: '2025-01-15' };
+  const result = await scanService.createScan(request);
+  expect(result.author).toBe('Test');
+});
+```
+
+## 📚 Dependencies
+
+- **React Native**: Mobile app framework
+- **TypeScript**: Type safety and development experience
+- **React Context**: State management and dependency injection
+- **Custom Hooks**: Reusable API state management
+
+## 🎯 Backend Integration
+
+This foundation is designed to work seamlessly with the ParaLens .NET backend:
+
+- **Base URL**: `http://localhost:5200`
+- **API Version**: Follows backend routing conventions
+- **Data Types**: Exact TypeScript mappings of C# DTOs
+- **Validation**: Frontend validation matching backend rules
+- **Error Handling**: Consistent error response handling
+
+## 🚀 Next Steps
+
+1. **Customize API Configuration**: Update `src/config/api.ts` for your environment
+2. **Add Authentication**: Implement auth headers in the HTTP client
+3. **Create UI Components**: Build React Native components using the provided services
+4. **Add Offline Support**: Implement caching and offline-first features
+5. **Performance Optimization**: Add request deduplication and caching strategies
+
+## 📄 License
+
+This project is part of a school final project and is designed for educational purposes.
