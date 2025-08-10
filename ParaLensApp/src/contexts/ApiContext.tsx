@@ -5,7 +5,7 @@ import {
   dosingService,
   holdingPressureService,
   cylinderHeatingService,
-} from '../services';
+} from '../Services';
 
 interface ApiContextType {
   scanService: typeof scanService;
