@@ -1,14 +1,15 @@
-import React from "react";
+import React, { memo } from "react";
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/Feather';
 import { useColorScheme } from "react-native";
-import HistoryScreen from "../Screens/HistoryScreen.tsx";
-import SettingsScreen from "../Screens/SettingsScreen.tsx";
-import CameraScreen from "../Screens/CameraScreen.tsx";
+import HistoryScreen from "@/screens/HistoryScreen";
+import SettingsScreen from "@/screens/SettingsScreen";
+import CameraScreen from "@/screens/CameraScreen";
+import { COLORS, SIZES } from '@/constants';
 
 const Tab = createBottomTabNavigator();
 
-export const AppNavigator = () => {
+export const AppNavigator = memo(() => {
     const isDarkMode = useColorScheme() === 'dark';
 
     return (
@@ -17,7 +18,7 @@ export const AppNavigator = () => {
                 headerShown: false,
                 tabBarShowLabel: false,
                 tabBarStyle: {
-                    backgroundColor: isDarkMode ? '#181818' : '#fff',
+                    backgroundColor: isDarkMode ? COLORS.background.dark : COLORS.background.light,
                     borderTopWidth: 0,
                     elevation: 10,
                     height: 60,
@@ -27,10 +28,10 @@ export const AppNavigator = () => {
                     if (route.name === 'History') iconName = 'clock';
                     else if (route.name === 'Camera') iconName = 'camera';
                     else if (route.name === 'Settings') iconName = 'settings';
-                    return <Icon name={iconName} size={28} color={focused ? '#4F8EF7' : color || '#888'} />;
+                    return <Icon name={iconName} size={SIZES.icon.large} color={focused ? COLORS.primary : color || COLORS.secondary} />;
                 },
-                tabBarActiveTintColor: '#4F8EF7',
-                tabBarInactiveTintColor: isDarkMode ? '#aaa' : '#888',
+                tabBarActiveTintColor: COLORS.primary,
+                tabBarInactiveTintColor: isDarkMode ? '#aaa' : COLORS.secondary,
             })}
         >
             <Tab.Screen name="History" component={HistoryScreen} />
@@ -38,4 +39,6 @@ export const AppNavigator = () => {
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );
-};
+});
+
+AppNavigator.displayName = 'AppNavigator';

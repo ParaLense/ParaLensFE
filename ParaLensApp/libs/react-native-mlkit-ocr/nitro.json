@@ -1,0 +1,17 @@
+{
+  "cxxNamespace": ["mlkitocr"],
+  "ios": {
+    "iosModuleName": "MlkitOcr"
+  },
+  "android": {
+    "androidNamespace": ["mlkitocr"],
+    "androidCxxLibName": "mlkitocr"
+  },
+  "autolinking": {
+    "MlkitOcr": {
+      "swift": "MlkitOcr",
+      "kotlin": "MlkitOcr"
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

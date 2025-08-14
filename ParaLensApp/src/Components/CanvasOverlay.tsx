@@ -1,83 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Text,
 } from 'react-native';
+import { Box, CanvasOverlayProps } from '@/types';
+import { COLORS, SPACING, SIZES } from '@/constants';
 
-interface Box {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-}
-
-interface CanvasOverlayProps {
-  onBoxesChange?: (boxes: Box[]) => void;
-  isActive?: boolean;
-}
-
-const PRESET_BOXES: Box[] = [
-  {
-    id: 'preset_1',
-    x: 50,
-    y: 100,
-    width: 120,
-    height: 80,
-    color: '#FF0000',
-  },
-  {
-    id: 'preset_2',
-    x: 200,
-    y: 150,
-    width: 100,
-    height: 60,
-    color: '#00FF00',
-  },
-  {
-    id: 'preset_3',
-    x: 100,
-    y: 300,
-    width: 150,
-    height: 90,
-    color: '#0000FF',
-  },
-  {
-    id: 'preset_4',
-    x: 250,
-    y: 400,
-    width: 80,
-    height: 120,
-    color: '#FFFF00',
-  },
-];
-
-const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
+const CanvasOverlay: React.FC<CanvasOverlayProps> = memo(({
   onBoxesChange,
   isActive = false,
+  selectedBoxId,
+  onBoxSelect,
 }) => {
   const [boxes, setBoxes] = useState<Box[]>([]);
-  const [selectedBox, setSelectedBox] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isActive) {
-      setBoxes(PRESET_BOXES);
-      onBoxesChange?.(PRESET_BOXES);
-    } else {
-      setBoxes([]);
-      onBoxesChange?.([]);
+    try {
+      if (isActive) {
+        // Import preset boxes dynamically to avoid circular dependencies
+        const { PRESET_BOXES } = require('@constants/index');
+        setBoxes(PRESET_BOXES);
+        onBoxesChange?.(PRESET_BOXES);
+      } else {
+        setBoxes([]);
+        onBoxesChange?.([]);
+      }
+    } catch (err) {
+      console.error('Error setting up canvas overlay:', err);
+      setError('Failed to initialize canvas overlay');
     }
   }, [isActive, onBoxesChange]);
 
-  const handleBoxPress = (boxId: string) => {
-    setSelectedBox(selectedBox === boxId ? null : boxId);
-  };
+  const handleBoxPress = useCallback((boxId: string) => {
+    try {
+      const newSelectedBoxId = selectedBoxId === boxId ? null : boxId;
+      onBoxSelect?.(newSelectedBoxId);
+    } catch (err) {
+      console.error('Error handling box press:', err);
+      setError('Failed to select box');
+    }
+  }, [selectedBoxId, onBoxSelect]);
+
+  const handleDeleteBox = useCallback((boxId: string) => {
+    try {
+      const updatedBoxes = boxes.filter(box => box.id !== boxId);
+      setBoxes(updatedBoxes);
+      onBoxesChange?.(updatedBoxes);
+      onBoxSelect?.(null);
+    } catch (err) {
+      console.error('Error deleting box:', err);
+      setError('Failed to delete box');
+    }
+  }, [boxes, onBoxesChange, onBoxSelect]);
 
   if (!isActive) {
     return null;
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={() => setError(null)}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
@@ -92,23 +86,30 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
               top: box.y,
               width: box.width,
               height: box.height,
-              borderColor: selectedBox === box.id ? '#FFFFFF' : box.color,
-              borderWidth: selectedBox === box.id ? 3 : 2,
+              borderColor: selectedBoxId === box.id ? '#FFFFFF' : box.color,
+              borderWidth: selectedBoxId === box.id ? 3 : 2,
             },
           ]}
           onPress={() => handleBoxPress(box.id)}
           activeOpacity={0.8}
+          accessibilityLabel={`Box ${box.id}`}
+          accessibilityHint="Double tap to select or deselect this box"
         >
-          {selectedBox === box.id && (
-            <View style={styles.deleteButton}>
+          {selectedBoxId === box.id && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteBox(box.id)}
+              accessibilityLabel="Delete box"
+              accessibilityHint="Tap to delete this box"
+            >
               <Text style={styles.deleteButtonText}>×</Text>
-            </View>
+            </TouchableOpacity>
           )}
         </TouchableOpacity>
       ))}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   box: {
@@ -116,31 +117,38 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: 'transparent',
   },
-  controls: {
+  errorContainer: {
     position: 'absolute',
-    bottom: 100,
-    left: 20,
-    flexDirection: 'column',
-    gap: 10,
+    top: SPACING.lg,
+    left: SPACING.lg,
+    right: SPACING.lg,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    padding: SPACING.md,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  controlButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  controlButtonText: {
+  errorText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: SIZES.text.small,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  retryButton: {
+    backgroundColor: '#fff',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: COLORS.error,
+    fontSize: SIZES.text.small,
     fontWeight: 'bold',
   },
   deleteButton: {
     position: 'absolute',
     top: -10,
     right: -10,
-    backgroundColor: '#FF0000',
+    backgroundColor: COLORS.error,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -154,5 +162,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CanvasOverlay;
-export type { Box }; 
+CanvasOverlay.displayName = 'CanvasOverlay';
+
+export default CanvasOverlay; 
