@@ -6,21 +6,15 @@ import {
   Text,
 } from 'react-native';
 
-interface Box {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-}
+import { OverlayBox, ScanMenu } from '../types/common';
 
 interface CanvasOverlayProps {
-  onBoxesChange?: (boxes: Box[]) => void;
+  menu: ScanMenu | null;
+  onBoxesChange?: (boxes: OverlayBox[]) => void;
   isActive?: boolean;
 }
 
-const PRESET_BOXES: Box[] = [
+const PRESET_BOXES: OverlayBox[] = [
   {
     id: 'preset_1',
     x: 50,
@@ -55,22 +49,42 @@ const PRESET_BOXES: Box[] = [
   },
 ];
 
+const MENU_PRESETS: Record<ScanMenu, OverlayBox[]> = {
+  injection: [
+    { id: 'inj_1', x: 40, y: 120, width: 140, height: 90, color: '#FF6B6B' },
+    { id: 'inj_2', x: 210, y: 220, width: 110, height: 70, color: '#FF6B6B' },
+  ],
+  dosing: [
+    { id: 'dos_1', x: 60, y: 80, width: 100, height: 60, color: '#4ECDC4' },
+    { id: 'dos_2', x: 180, y: 160, width: 150, height: 100, color: '#4ECDC4' },
+  ],
+  holdingPressure: [
+    { id: 'hp_1', x: 100, y: 140, width: 160, height: 100, color: '#FFE66D' },
+  ],
+  cylinderHeating: [
+    { id: 'ch_1', x: 80, y: 260, width: 120, height: 80, color: '#5DA3FA' },
+    { id: 'ch_2', x: 240, y: 360, width: 100, height: 120, color: '#5DA3FA' },
+  ],
+};
+
 const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
+  menu,
   onBoxesChange,
   isActive = false,
 }) => {
-  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [boxes, setBoxes] = useState<OverlayBox[]>([]);
   const [selectedBox, setSelectedBox] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isActive) {
-      setBoxes(PRESET_BOXES);
-      onBoxesChange?.(PRESET_BOXES);
+    if (isActive && menu) {
+      const preset = MENU_PRESETS[menu] ?? PRESET_BOXES;
+      setBoxes(preset);
+      onBoxesChange?.(preset);
     } else {
       setBoxes([]);
       onBoxesChange?.([]);
     }
-  }, [isActive, onBoxesChange]);
+  }, [isActive, menu, onBoxesChange]);
 
   const handleBoxPress = (boxId: string) => {
     setSelectedBox(selectedBox === boxId ? null : boxId);
@@ -155,4 +169,4 @@ const styles = StyleSheet.create({
 });
 
 export default CanvasOverlay;
-export type { Box }; 
+export type { OverlayBox as Box };
