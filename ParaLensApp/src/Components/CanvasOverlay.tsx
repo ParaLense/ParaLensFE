@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-} from 'react-native';
+import { View } from 'react-native';
+import { Box as GSBox, Pressable as GSPressable } from '@gluestack-ui/themed';
 
 import { OverlayBox, ScanMenu } from '../types/common';
 
@@ -95,78 +91,27 @@ const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <GSBox position="absolute" top={0} left={0} right={0} bottom={0}>
       {boxes.map((box) => (
-        <TouchableOpacity
+        <GSPressable
           key={box.id}
-          style={[
-            styles.box,
-            {
-              left: box.x,
-              top: box.y,
-              width: box.width,
-              height: box.height,
-              borderColor: selectedBox === box.id ? '#FFFFFF' : box.color,
-              borderWidth: selectedBox === box.id ? 3 : 2,
-            },
-          ]}
           onPress={() => handleBoxPress(box.id)}
-          activeOpacity={0.8}
         >
-          {selectedBox === box.id && (
-            <View style={styles.deleteButton}>
-              <Text style={styles.deleteButtonText}>×</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+          <GSBox
+            position="absolute"
+            left={box.x}
+            top={box.y}
+            width={box.width}
+            height={box.height}
+            borderStyle="dashed"
+            borderColor={selectedBox === box.id ? '#FFFFFF' : box.color}
+            borderWidth={selectedBox === box.id ? 3 : 2}
+          />
+        </GSPressable>
       ))}
-    </View>
+    </GSBox>
   );
 };
-
-const styles = StyleSheet.create({
-  box: {
-    position: 'absolute',
-    borderStyle: 'dashed',
-    backgroundColor: 'transparent',
-  },
-  controls: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    flexDirection: 'column',
-    gap: 10,
-  },
-  controlButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  controlButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
-    backgroundColor: '#FF0000',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-});
 
 export default CanvasOverlay;
 export type { OverlayBox as Box };
