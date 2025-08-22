@@ -7,6 +7,4 @@ const HistoryScreen = () => (
   </Box>
 );
 
-// Styles removed in favor of Gluestack props
-
 export default HistoryScreen; 
