@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
-import { Box, Button, Heading, VStack, Text, Spinner } from '@gluestack-ui/themed';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { Box, Button, Heading, HStack, VStack, Pressable, Badge } from '@gluestack-ui/themed';
 import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
 import CanvasOverlay, { type Box as OverlayBoxType } from '../Components/CanvasOverlay';
 import { ScanMenu } from '../types/common';
@@ -41,22 +41,20 @@ const CameraScreen = () => {
 
   if (!device) {
     return (
-      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
-        <Spinner size="large" color="$primary600" />
-        <Text color="$textLight50" mt={12}>Loading camera...</Text>
-        <Text color="$textLight50" mt={8}>Gefundene Kameras:</Text>
+      <ScrollView contentContainerStyle={styles.center}>
+        <ActivityIndicator size="large" color="#4F8EF7" />
+        <Text style={styles.text}>Loading camera...</Text>
+        <Text style={styles.text}>Gefundene Kameras:</Text>
         {Object.values(devices).length === 0 ? (
-          <Text color="$textLight50" mt={8}>Keine Kameras gefunden.</Text>
+          <Text style={styles.text}>Keine Kameras gefunden.</Text>
         ) : (
-          <VStack mt={8} space="xs">
-            {Object.entries(devices).map(([key, dev]) => (
-              <Text color="$textLight50" key={key}>
-                {key}: {dev?.name || 'Unbekannt'} ({dev?.position || 'unknown'})
-              </Text>
-            ))}
-          </VStack>
+          Object.entries(devices).map(([key, dev]) => (
+            <Text style={styles.text} key={key}>
+              {key}: {dev?.name || 'Unbekannt'} ({dev?.position || 'unknown'})
+            </Text>
+          ))
         )}
-      </Box>
+      </ScrollView>
     );
   }
 
@@ -76,9 +74,9 @@ const CameraScreen = () => {
   }
 
   return (
-    <Box flex={1} bg="$backgroundDark950">
+    <View style={styles.container}>
       <Camera
-        style={{ width: '100%', height: '100%' }}
+        style={StyleSheet.absoluteFill}
         device={device}
         isActive={true}
         frameProcessor={frameProcessor}
@@ -93,19 +91,110 @@ const CameraScreen = () => {
 
       <Box position="absolute" top={24} left={20}>
         <Button size="sm" variant="solid" action="secondary" onPress={() => setSelectedMenu(null)}>
-          <Text color="$textLight50" textTransform="capitalize">{selectedMenu} · Ändern</Text>
+          <Text style={{ color: '#fff', textTransform: 'capitalize' }}>{selectedMenu} · Ändern</Text>
         </Button>
       </Box>
 
       {!sixtyFpsFormat && (
-        <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
-          <Text color="$textLight50" bg="$backgroundDark700" px={8} py={6} borderRadius="$md">
+        <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', backgroundColor: '#222a', padding: 8, borderRadius: 8 }}>
             60fps not supported, using default format
           </Text>
-        </Box>
+        </View>
       )}
-    </Box>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+    padding: 24,
+  },
+  text: {
+    color: '#fff',
+    fontSize: 18,
+    marginTop: 16,
+  },
+  menuGrid: {
+    width: '90%',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  menuButton: {
+    backgroundColor: '#1f2937',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#374151',
+    alignItems: 'center',
+    width: '100%',
+  },
+  menuButtonText: {
+    color: '#e5e7eb',
+    fontSize: 16,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  controls: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    flexDirection: 'column',
+    gap: 10,
+  },
+  button: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  headerPill: {
+    position: 'absolute',
+    top: 24,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00000088',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#ffffff55',
+    gap: 10,
+  },
+  headerPillText: {
+    color: '#fff',
+    fontSize: 16,
+    textTransform: 'capitalize',
+  },
+  changeButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+  },
+  changeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});
 
 export default CameraScreen; 

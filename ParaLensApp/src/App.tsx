@@ -4,22 +4,31 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { GluestackUIProvider } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import {AppNavigator} from "./Nagivation/AppNavigator.tsx";
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ApiProvider } from "./contexts/ApiContext";
+import {AppNavigator} from "./Nagivation/AppNavigator.tsx";
 
 export default function App() {
     const isDarkMode = useColorScheme() === 'dark';
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <ApiProvider>
-                <GluestackUIProvider config={config}>
-                    <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
-                        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-                        <AppNavigator />
-                    </NavigationContainer>
-                </GluestackUIProvider>
-            </ApiProvider>
-        </GestureHandlerRootView>
+        <SafeAreaProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <ApiProvider>
+                    <GluestackUIProvider config={config}>
+                        <StatusBar 
+                            barStyle={isDarkMode ? "light-content" : "dark-content"}
+                            backgroundColor="transparent"
+                            translucent={true}
+                        />
+                        <SafeAreaView style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#fff' }}>
+                            <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
+                                <AppNavigator />
+                            </NavigationContainer>
+                        </SafeAreaView>
+                    </GluestackUIProvider>
+                </ApiProvider>
+            </GestureHandlerRootView>
+        </SafeAreaProvider>
     );
 }
