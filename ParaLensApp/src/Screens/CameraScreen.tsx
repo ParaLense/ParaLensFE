@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
-import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
+import { Camera, Frame, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
 import CanvasOverlay, { Box } from '../Components/CanvasOverlay';
+import { runOnJS } from 'react-native-reanimated';
+import { performOcr } from '@bear-block/vision-camera-ocr';
+
+// Frame rate limiting constants
+const TARGET_FPS = 5;
+const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
+
+// Extend global type for frame rate limiting
+declare global {
+  var lastFrameTime: number | undefined;
+}
 
 type CameraPermissionStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'granted';
 
 const CameraScreen = () => {
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
   const [debugStatus, setDebugStatus] = useState<string>('');
+  const [ocr, setOcr] = React.useState<string>();
   const [boxes, setBoxes] = useState<Box[]>([]);
+  const [frameProcessorError, setFrameProcessorError] = useState<string>('');
   const devices = useCameraDevices();
   const device = useCameraDevice('back');
 
@@ -22,7 +35,21 @@ const CameraScreen = () => {
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
-    console.log('Frame:', frame.width, frame.height);
+    try {
+      // Frame rate limiting - only process every 200ms (5 FPS)
+      const currentTime = Date.now();
+      if (global.lastFrameTime && (currentTime - global.lastFrameTime) < FRAME_INTERVAL_MS) {
+        return; // Skip this frame if not enough time has passed
+      }
+      global.lastFrameTime = currentTime;
+      
+      const ocrResult = performOcr(frame);
+      if (ocrResult && ocrResult.text) {
+        console.log('Detected text:', ocrResult.text);
+      }
+    } catch (error) {
+      runOnJS(setFrameProcessorError)(`Frame Processor Error: ${error}`);
+    }
   }, []);
 
   const sixtyFpsFormat = device?.formats?.find(f => f?.maxFps >= 60);
@@ -62,7 +89,8 @@ const CameraScreen = () => {
         device={device}
         isActive={true}
         frameProcessor={frameProcessor}
-        {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps: 60 } : {})}
+        enableFpsGraph={true}
+        {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps:TARGET_FPS } : {})}
       />
 
       <CanvasOverlay
@@ -70,13 +98,13 @@ const CameraScreen = () => {
         isActive={true}
       />
 
-      {!sixtyFpsFormat && (
-        <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', backgroundColor: '#222a', padding: 8, borderRadius: 8 }}>
-            60fps not supported, using default format
-          </Text>
+
+      {frameProcessorError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{frameProcessorError}</Text>
         </View>
       )}
+
     </View>
   );
 };
@@ -114,6 +142,32 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    padding: 16,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  resetButton: {
+    backgroundColor: 'rgba(255, 165, 0, 0.8)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  resetButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',

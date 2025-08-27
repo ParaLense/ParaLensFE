@@ -3,13 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
+    "android": "react-native run-android  --active-arch-only",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
   },
   "dependencies": {
+    "@bear-block/vision-camera-ocr": "file:libs/vision-camera-ocr-bb",
     "@react-native/new-app-screen": "0.80.0",
     "@react-navigation/bottom-tabs": "^7.4.2",
     "@react-navigation/native": "^7.1.14",
@@ -20,7 +21,10 @@
     "react-native-screens": "^4.13.1",
     "react-native-vector-icons": "^10.2.0",
     "react-native-vision-camera": "^4.7.1",
-    "react-native-worklets-core": "^1.6.2"
+    "react-native-worklets-core": "^1.6.2",
+
+    "react-native-nitro-modules": "^0.27.6",
+    "react-native-reanimated": "^3.19.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
