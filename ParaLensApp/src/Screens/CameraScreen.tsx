@@ -1,16 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { Box, Button, Heading, VStack, HStack, Text as GluestackText } from '@gluestack-ui/themed';
 import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
-import CanvasOverlay, { Box } from '../Components/CanvasOverlay';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import CanvasOverlay, { type Box as OverlayBoxType } from '../Components/CanvasOverlay';
+import { ScanMenu } from '../types/common';
+import ScanReviewScreen from './ScanReviewScreen';
 
+// Types for modes
 type CameraPermissionStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'granted';
+
+type InjectionMode = 'mainMenu' | 'subMenuGraphic' | 'switchType' | null;
+type HoldingPressureMode = 'mainMenu' | 'subMenuGraphic' | null;
+type DosingMode = 'mainMenu' | 'subMenuGraphic' | null;
 
 const CameraScreen = () => {
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
   const [debugStatus, setDebugStatus] = useState<string>('');
-  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [boxes, setBoxes] = useState<OverlayBoxType[]>([]);
+  const [selectedMenu, setSelectedMenu] = useState<ScanMenu | null>(null);
+  const [injectionMode, setInjectionMode] = useState<InjectionMode>(null);
+  const [holdingMode, setHoldingMode] = useState<HoldingPressureMode>(null);
+  const [dosingMode, setDosingMode] = useState<DosingMode>(null);
+  const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
+
   const devices = useCameraDevices();
   const device = useCameraDevice('back');
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     (async () => {
@@ -27,36 +43,165 @@ const CameraScreen = () => {
 
   const sixtyFpsFormat = device?.formats?.find(f => f?.maxFps >= 60);
 
+  const resetToRootMenu = () => {
+    setSelectedMenu(null);
+    setInjectionMode(null);
+    setHoldingMode(null);
+    setDosingMode(null);
+    setIsReviewOpen(false);
+  };
+
+  const headerLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (selectedMenu) parts.push(selectedMenu);
+    if (injectionMode) parts.push(injectionMode);
+    if (!injectionMode && holdingMode) parts.push(holdingMode);
+    if (!injectionMode && !holdingMode && dosingMode) parts.push(dosingMode);
+    return parts.join(' · ');
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
+
   if (!['authorized', 'granted'].includes(hasPermission)) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.text}>No camera permission ({hasPermission})</Text>
-        <Text style={styles.text}>{debugStatus}</Text>
-      </View>
+      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
+        <Heading size="md" color="$textLight50">No camera permission ({hasPermission})</Heading>
+        <Heading mt={8} size="sm" color="$textLight50">{debugStatus}</Heading>
+      </Box>
     );
   }
 
   if (!device) {
     return (
-      <ScrollView contentContainerStyle={styles.center}>
+      <ScrollView contentContainerStyle={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', padding: 24 }}>
         <ActivityIndicator size="large" color="#4F8EF7" />
-        <Text style={styles.text}>Loading camera...</Text>
-        <Text style={styles.text}>Gefundene Kameras:</Text>
+        <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Loading camera...</GluestackText>
+        <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Gefundene Kameras:</GluestackText>
         {Object.values(devices).length === 0 ? (
-          <Text style={styles.text}>Keine Kameras gefunden.</Text>
+          <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Keine Kameras gefunden.</GluestackText>
         ) : (
           Object.entries(devices).map(([key, dev]) => (
-            <Text style={styles.text} key={key}>
+            <GluestackText color="$textLight50" fontSize="$lg" mt={16} key={key}>
               {key}: {dev?.name || 'Unbekannt'} ({dev?.position || 'unknown'})
-            </Text>
+            </GluestackText>
           ))
         )}
       </ScrollView>
     );
   }
 
+  // Root selection screen
+  if (!selectedMenu) {
+    return (
+      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}> 
+        <Heading size="lg" color="$textLight50" mb={24}>Was möchten Sie scannen?</Heading>
+        <VStack space="md" w="$5/6">
+          {(['injection','dosing','holdingPressure','cylinderHeating'] as ScanMenu[]).map((menu) => (
+            <Button 
+              key={menu} 
+              onPress={() => {
+                if (menu === 'injection') {
+                  setSelectedMenu('injection');
+                  setInjectionMode(null); // show injection mode selection next
+                } else if (menu === 'holdingPressure') {
+                  setSelectedMenu('holdingPressure');
+                  setHoldingMode(null); // show holding pressure selection next
+                } else if (menu === 'dosing') {
+                  setSelectedMenu('dosing');
+                  setDosingMode(null); // show dosing selection next
+                } else {
+                  setSelectedMenu(menu);
+                }
+              }} 
+              action="primary" 
+              variant="solid"
+            >
+              <GluestackText color="$textLight50" textTransform="capitalize">{menu}</GluestackText>
+            </Button>
+          ))}
+        </VStack>
+      </Box>
+    );
+  }
+
+  // Injection single-step mode selection
+  if (selectedMenu === 'injection' && injectionMode === null) {
+    return (
+      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
+        <Heading size="lg" color="$textLight50" mb={24}>Injection · Auswahl</Heading>
+        <VStack space="md" w="$5/6">
+          <Button action="primary" variant="solid" onPress={() => setInjectionMode('mainMenu')}>
+            <GluestackText color="$textLight50">Main Menu</GluestackText>
+          </Button>
+          <Button action="primary" variant="solid" onPress={() => setInjectionMode('subMenuGraphic')}>
+            <GluestackText color="$textLight50">Sub Menu Graphic</GluestackText>
+          </Button>
+          <Button action="primary" variant="solid" onPress={() => setInjectionMode('switchType')}>
+            <GluestackText color="$textLight50">Switch Type</GluestackText>
+          </Button>
+        </VStack>
+        <Button mt={24} variant="outline" action="secondary" onPress={resetToRootMenu}>
+          <GluestackText color="$textLight50">Zurück</GluestackText>
+        </Button>
+      </Box>
+    );
+  }
+
+  // Holding Pressure (Nachdruck) single-step mode selection
+  if (selectedMenu === 'holdingPressure' && holdingMode === null) {
+    return (
+      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
+        <Heading size="lg" color="$textLight50" mb={24}>Nachdruck · Auswahl</Heading>
+        <VStack space="md" w="$5/6">
+          <Button action="primary" variant="solid" onPress={() => setHoldingMode('mainMenu')}>
+            <GluestackText color="$textLight50">Main Menu</GluestackText>
+          </Button>
+          <Button action="primary" variant="solid" onPress={() => setHoldingMode('subMenuGraphic')}>
+            <GluestackText color="$textLight50">Sub Menu Graphic</GluestackText>
+          </Button>
+        </VStack>
+        <Button mt={24} variant="outline" action="secondary" onPress={resetToRootMenu}>
+          <GluestackText color="$textLight50">Zurück</GluestackText>
+        </Button>
+      </Box>
+    );
+  }
+
+  // Dosing single-step mode selection
+  if (selectedMenu === 'dosing' && dosingMode === null) {
+    return (
+      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
+        <Heading size="lg" color="$textLight50" mb={24}>Dosing · Auswahl</Heading>
+        <VStack space="md" w="$5/6">
+          <Button action="primary" variant="solid" onPress={() => setDosingMode('mainMenu')}>
+            <GluestackText color="$textLight50">Main Menu</GluestackText>
+          </Button>
+          <Button action="primary" variant="solid" onPress={() => setDosingMode('subMenuGraphic')}>
+            <GluestackText color="$textLight50">Sub Menu Graphic</GluestackText>
+          </Button>
+        </VStack>
+        <Button mt={24} variant="outline" action="secondary" onPress={resetToRootMenu}>
+          <GluestackText color="$textLight50">Zurück</GluestackText>
+        </Button>
+      </Box>
+    );
+  }
+
+  // Externalized review screen
+  if (isReviewOpen) {
+    return (
+      <ScanReviewScreen
+        selectedMenu={selectedMenu}
+        injectionMode={injectionMode}
+        holdingMode={holdingMode}
+        dosingMode={dosingMode}
+        onBack={() => setIsReviewOpen(false)}
+        onSave={() => { resetToRootMenu(); }}
+      />
+    );
+  }
+
+  // Camera experience (default and after selection)
   return (
-    <View style={styles.container}>
+    <Box flex={1} bg="$backgroundDark950">
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
@@ -66,58 +211,40 @@ const CameraScreen = () => {
       />
 
       <CanvasOverlay
+        menu={selectedMenu}
         onBoxesChange={setBoxes}
         isActive={true}
       />
 
-      {!sixtyFpsFormat && (
-        <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', backgroundColor: '#222a', padding: 8, borderRadius: 8 }}>
-            60fps not supported, using default format
-          </Text>
-        </View>
+      <Box position="absolute" top={24 + insets.top} left={20}>
+        <Button size="sm" variant="solid" action="secondary" onPress={resetToRootMenu}>
+          <GluestackText color="$textLight50" textTransform="capitalize">
+            {headerLabel ? `${headerLabel} · Ändern` : 'Ändern'}
+          </GluestackText>
+        </Button>
+      </Box>
+
+      {(injectionMode || holdingMode || dosingMode || selectedMenu === 'cylinderHeating') && (
+        <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
+          <HStack space="md">
+            <Button variant="outline" action="secondary" onPress={() => setIsReviewOpen(true)}>
+              <GluestackText color="$textLight50">Continue</GluestackText>
+            </Button>
+          </HStack>
+        </Box>
       )}
-    </View>
+
+      {!sixtyFpsFormat && (
+        <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
+          <Box bg="$backgroundDark800" px={8} py={8} borderRadius="$md">
+            <GluestackText color="$textLight50">
+              60fps not supported, using default format
+            </GluestackText>
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000',
-    padding: 24,
-  },
-  text: {
-    color: '#fff',
-    fontSize: 18,
-    marginTop: 16,
-  },
-  controls: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    flexDirection: 'column',
-    gap: 10,
-  },
-  button: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-});
-
-export default CameraScreen; 
+export default CameraScreen;
