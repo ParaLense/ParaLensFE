@@ -5,6 +5,7 @@ import { useColorScheme } from "react-native";
 import { Box, HStack, Pressable } from '@gluestack-ui/themed';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HistoryScreen from "../Screens/HistoryScreen.tsx";
+import HistoryDetailScreen from "../Screens/ScanReviewScreen.tsx";
 import SettingsScreen from "../Screens/SettingsScreen.tsx";
 import CameraScreen from "../Screens/CameraScreen.tsx";
 

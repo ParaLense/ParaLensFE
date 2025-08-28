@@ -3,6 +3,7 @@ import { ScrollView } from 'react-native';
 import { Box, Button, Heading, VStack, HStack, Text as GluestackText, Input, InputField } from '@gluestack-ui/themed';
 import type { ScanMenu } from '../types/common';
 import DynamicValueList, { IndexValuePair } from '../Components/DynamicValueList';
+import { useApiContext } from '../contexts/ApiContext';
 
 type InjectionMode = 'mainMenu' | 'subMenuGraphic' | 'switchType' | null;
 type HoldingPressureMode = 'mainMenu' | 'subMenuGraphic' | null;
@@ -13,12 +14,16 @@ interface Props {
   injectionMode: InjectionMode;
   holdingMode: HoldingPressureMode;
   dosingMode: DosingMode;
+  scanId: number | null;
   payload?: any;
   onBack: () => void;
   onSave: () => void;
 }
 
-const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdingMode, dosingMode, onBack, onSave }) => {
+const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdingMode, dosingMode, scanId, onBack, onSave }) => {
+  const { injectionService, holdingPressureService, dosingService, cylinderHeatingService } = useApiContext();
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
     if (selectedMenu) parts.push(selectedMenu);
@@ -40,6 +45,97 @@ const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdin
   const [holdGraphicValues, setHoldGraphicValues] = useState<IndexValuePair[]>([{ index: '1', t: '', p: '' }]);
 
   const [cylinderForm, setCylinderForm] = useState({ setpoint1: '', setpoint2: '', setpoint3: '', setpoint4: '', setpoint5: '' });
+
+  const toNumber = (v: string) => Number(String(v).replace(',', '.'));
+
+  const handleSave = async () => {
+    if (!scanId) { setError('Kein FullScan ausgewählt'); return; }
+    setError(null);
+    setSaving(true);
+    try {
+      if (selectedMenu === 'injection') {
+        if (injectionMode === 'mainMenu') {
+          await injectionService.createMainMenu(scanId, {
+            sprayPressureLimit: toNumber(injMainForm.sprayPressureLimit),
+            increasedSpecificPointPrinter: toNumber(injMainForm.increasedSpecificPointPrinter),
+          });
+        } else if (injectionMode === 'subMenuGraphic') {
+          await injectionService.createSubMenuScroll(scanId, {
+            values: injGraphicValues.filter(r => r.index).map(r => ({
+              index: toNumber(r.index),
+              v: toNumber(r.v || '0'),
+              v2: toNumber(r.v2 || '0'),
+            })),
+          });
+        } else if (injectionMode === 'switchType') {
+          await injectionService.createSwitchType(scanId, {
+            transshipmentPosition: toNumber(injSwitchForm.transshipmentPosition),
+            switchOverTime: toNumber(injSwitchForm.switchOverTime),
+            switchingPressure: toNumber(injSwitchForm.switchingPressure),
+          });
+        }
+      } else if (selectedMenu === 'holdingPressure') {
+        if (holdingMode === 'mainMenu') {
+          await holdingPressureService.createMainMenu(scanId, {
+            holdingTime: toNumber(holdMainForm.holdingTime),
+            coolTime: toNumber(holdMainForm.coolTime),
+            screwDiameter: toNumber(holdMainForm.screwDiameter),
+          });
+        } else if (holdingMode === 'subMenuGraphic') {
+          await holdingPressureService.createSubMenu(scanId, {
+            values: holdGraphicValues.filter(r => r.index).map(r => ({
+              index: toNumber(r.index),
+              t: toNumber(r.t || '0'),
+              p: toNumber(r.p || '0'),
+            })),
+          });
+        }
+      } else if (selectedMenu === 'dosing') {
+        if (dosingMode === 'mainMenu') {
+          await dosingService.createMainMenu(scanId, {
+            dosingStroke: toNumber(doseMainForm.dosingStroke),
+            dosingDelayTime: toNumber(doseMainForm.dosingDelayTime),
+            relieveDosing: toNumber(doseMainForm.relieveDosing),
+            relieveAfterDosing: toNumber(doseMainForm.relieveAfterDosing),
+            dischargeSpeedBeforeDosing: toNumber(doseMainForm.dischargeSpeedBeforeDosing),
+            dischargeSpeedAfterDosing: toNumber(doseMainForm.dischargeSpeedAfterDosing),
+          });
+        } else if (dosingMode === 'subMenuGraphic') {
+          if (doseSpeedValues.length) {
+            await dosingService.createDosingSpeed(scanId, {
+              values: doseSpeedValues.filter(r => r.index).map(r => ({
+                index: toNumber(r.index),
+                v: toNumber(r.v || '0'),
+                v2: toNumber(r.v2 || '0'),
+              })),
+            });
+          }
+          if (dosePressureValues.length) {
+            await dosingService.createDosingPressure(scanId, {
+              values: dosePressureValues.filter(r => r.index).map(r => ({
+                index: toNumber(r.index),
+                v: toNumber(r.v || '0'),
+                v2: toNumber(r.v2 || '0'),
+              })),
+            });
+          }
+        }
+      } else if (selectedMenu === 'cylinderHeating') {
+        await cylinderHeatingService.createMainMenu(scanId, {
+          setpoint1: toNumber(cylinderForm.setpoint1),
+          setpoint2: toNumber(cylinderForm.setpoint2),
+          setpoint3: toNumber(cylinderForm.setpoint3),
+          setpoint4: toNumber(cylinderForm.setpoint4),
+          setpoint5: toNumber(cylinderForm.setpoint5),
+        });
+      }
+      onSave();
+    } catch (e) {
+      setError('Speichern fehlgeschlagen. Bitte überprüfen.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <ScrollView style={{ backgroundColor: '#000' }} contentContainerStyle={{ padding: 20 }}>
@@ -120,8 +216,11 @@ const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdin
         <Button variant="outline" action="secondary" onPress={onBack}>
           <GluestackText color="$textLight50">Zurück</GluestackText>
         </Button>
-        <Button action="primary" variant="solid" onPress={onSave}>
-          <GluestackText color="$textLight50">Speichern</GluestackText>
+        {error && (
+          <GluestackText color="$red600">{error}</GluestackText>
+        )}
+        <Button action="primary" variant="solid" onPress={handleSave} isDisabled={saving || !scanId}>
+          <GluestackText color="$textLight50">{saving ? 'Speichere…' : 'Speichern'}</GluestackText>
         </Button>
       </HStack>
     </ScrollView>

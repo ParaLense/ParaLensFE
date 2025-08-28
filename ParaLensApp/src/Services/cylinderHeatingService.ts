@@ -6,6 +6,7 @@ import {
   CylinderHeatingMainMenuDto,
   CreateCylinderHeatingMainMenuRequest
 } from '../types/api';
+import { offlineMergeDetails } from './offlineStore';
 
 export class CylinderHeatingService {
   async getCylinderHeating(scanId: number): Promise<CylinderHeatingDto> {
@@ -26,7 +27,21 @@ export class CylinderHeatingService {
   }
 
   async createMainMenu(scanId: number, request: CreateCylinderHeatingMainMenuRequest): Promise<CylinderHeatingMainMenuDto> {
-    return httpClient.post<CylinderHeatingMainMenuDto>(`${API_ENDPOINTS.CYLINDER_HEATING.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    try {
+      return await httpClient.post<CylinderHeatingMainMenuDto>(`${API_ENDPOINTS.CYLINDER_HEATING.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    } catch {
+      const dto: CylinderHeatingMainMenuDto = {
+        id: Date.now(),
+        cylinderHeatingId: scanId,
+        setpoint1: request.setpoint1,
+        setpoint2: request.setpoint2,
+        setpoint3: request.setpoint3,
+        setpoint4: request.setpoint4,
+        setpoint5: request.setpoint5,
+      };
+      offlineMergeDetails(scanId, { cylinderHeating: { mainMenu: dto } });
+      return dto;
+    }
   }
 
   async updateMainMenu(scanId: number, request: CreateCylinderHeatingMainMenuRequest): Promise<CylinderHeatingMainMenuDto> {

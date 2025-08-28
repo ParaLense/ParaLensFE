@@ -10,6 +10,7 @@ import {
   DosingSubMenuDosingPressureScrollDto,
   CreateDosingSubMenuDosingPressureScrollRequest
 } from '../types/api';
+import { offlineMergeDetails } from './offlineStore';
 
 export class DosingService {
   async getDosing(scanId: number): Promise<DosingDto> {
@@ -29,7 +30,22 @@ export class DosingService {
   }
 
   async createMainMenu(scanId: number, request: CreateDosingMainMenuRequest): Promise<DosingMainMenuDto> {
-    return httpClient.post<DosingMainMenuDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    try {
+      return await httpClient.post<DosingMainMenuDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    } catch {
+      const dto: DosingMainMenuDto = {
+        id: Date.now(),
+        dosingId: scanId,
+        dosingStroke: request.dosingStroke,
+        dosingDelayTime: request.dosingDelayTime,
+        relieveDosing: request.relieveDosing,
+        relieveAfterDosing: request.relieveAfterDosing,
+        dischargeSpeedBeforeDosing: request.dischargeSpeedBeforeDosing,
+        dischargeSpeedAfterDosing: request.dischargeSpeedAfterDosing,
+      };
+      offlineMergeDetails(scanId, { dosing: { mainMenu: dto } });
+      return dto;
+    }
   }
 
   async updateMainMenu(scanId: number, request: CreateDosingMainMenuRequest): Promise<DosingMainMenuDto> {
@@ -41,7 +57,17 @@ export class DosingService {
   }
 
   async createDosingSpeed(scanId: number, request: CreateDosingSubMenuDosingSpeedScrollRequest): Promise<DosingSubMenuDosingSpeedScrollDto> {
-    return httpClient.post<DosingSubMenuDosingSpeedScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingSpeed`, request);
+    try {
+      return await httpClient.post<DosingSubMenuDosingSpeedScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingSpeed`, request);
+    } catch {
+      const dto: DosingSubMenuDosingSpeedScrollDto = {
+        id: Date.now(),
+        dosingId: scanId,
+        values: request.values.map((v, idx) => ({ id: Date.now() + idx, dosing_SubMenu_DosingSpeed_ScrollId: Date.now(), index: v.index, v: v.v, v2: v.v2 }))
+      };
+      offlineMergeDetails(scanId, { dosing: { dosingSpeedsValues: dto } });
+      return dto;
+    }
   }
 
   async updateDosingSpeed(scanId: number, request: CreateDosingSubMenuDosingSpeedScrollRequest): Promise<DosingSubMenuDosingSpeedScrollDto> {
@@ -53,7 +79,17 @@ export class DosingService {
   }
 
   async createDosingPressure(scanId: number, request: CreateDosingSubMenuDosingPressureScrollRequest): Promise<DosingSubMenuDosingPressureScrollDto> {
-    return httpClient.post<DosingSubMenuDosingPressureScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingPressure`, request);
+    try {
+      return await httpClient.post<DosingSubMenuDosingPressureScrollDto>(`${API_ENDPOINTS.DOSING.replace('{scanId}', scanId.toString())}/dosingPressure`, request);
+    } catch {
+      const dto: DosingSubMenuDosingPressureScrollDto = {
+        id: Date.now(),
+        dosingId: scanId,
+        values: request.values.map((v, idx) => ({ id: Date.now() + idx, dosing_SubMenu_DosingPressure_ScrollId: Date.now(), index: v.index, v: v.v, v2: v.v2 }))
+      };
+      offlineMergeDetails(scanId, { dosing: { dosingPressuresValues: dto } });
+      return dto;
+    }
   }
 
   async updateDosingPressure(scanId: number, request: CreateDosingSubMenuDosingPressureScrollRequest): Promise<DosingSubMenuDosingPressureScrollDto> {

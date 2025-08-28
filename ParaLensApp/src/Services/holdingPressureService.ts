@@ -8,6 +8,7 @@ import {
   HoldingPressureSubMenuScrollDto,
   CreateHoldingPressureSubMenuScrollRequest
 } from '../types/api';
+import { offlineMergeDetails } from './offlineStore';
 
 export class HoldingPressureService {
   async getHoldingPressure(scanId: number): Promise<HoldingPressureDto> {
@@ -27,7 +28,19 @@ export class HoldingPressureService {
   }
 
   async createMainMenu(scanId: number, request: CreateHoldingPressureMainMenuRequest): Promise<HoldingPressureMainMenuDto> {
-    return httpClient.post<HoldingPressureMainMenuDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    try {
+      return await httpClient.post<HoldingPressureMainMenuDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/mainmenu`, request);
+    } catch {
+      const dto: HoldingPressureMainMenuDto = {
+        id: Date.now(),
+        holdingPressureId: scanId,
+        holdingTime: request.holdingTime,
+        coolTime: request.coolTime,
+        screwDiameter: request.screwDiameter,
+      };
+      offlineMergeDetails(scanId, { holdingPressure: { mainMenu: dto } });
+      return dto;
+    }
   }
 
   async updateMainMenu(scanId: number, request: CreateHoldingPressureMainMenuRequest): Promise<HoldingPressureMainMenuDto> {
@@ -39,7 +52,17 @@ export class HoldingPressureService {
   }
 
   async createSubMenu(scanId: number, request: CreateHoldingPressureSubMenuScrollRequest): Promise<HoldingPressureSubMenuScrollDto> {
-    return httpClient.post<HoldingPressureSubMenuScrollDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/submenu`, request);
+    try {
+      return await httpClient.post<HoldingPressureSubMenuScrollDto>(`${API_ENDPOINTS.HOLDING_PRESSURE.replace('{scanId}', scanId.toString())}/submenu`, request);
+    } catch {
+      const dto: HoldingPressureSubMenuScrollDto = {
+        id: Date.now(),
+        holdingPressureId: scanId,
+        values: request.values.map((v, idx) => ({ id: Date.now() + idx, holdingPressure_Submenu_ScrollId: Date.now(), index: v.index, t: v.t, p: v.p }))
+      };
+      offlineMergeDetails(scanId, { holdingPressure: { subMenusValues: dto } });
+      return dto;
+    }
   }
 
   async updateSubMenu(scanId: number, request: CreateHoldingPressureSubMenuScrollRequest): Promise<HoldingPressureSubMenuScrollDto> {
