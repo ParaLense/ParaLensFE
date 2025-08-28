@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { Box, Button, Heading, VStack, HStack, Text as GluestackText, Input, InputField } from '@gluestack-ui/themed';
+import { Box, Button, Heading, VStack, HStack, Text as GluestackText, Input, InputField, Pressable } from '@gluestack-ui/themed';
+import Icon from 'react-native-vector-icons/Feather';
 import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CanvasOverlay, { type Box as OverlayBoxType } from '../Components/CanvasOverlay';
@@ -16,7 +17,7 @@ type DosingMode = 'mainMenu' | 'subMenuGraphic' | null;
 // Form models (only the fields needed for Create* requests)
 interface InjectionMainMenuForm { sprayPressureLimit: string; increasedSpecificPointPrinter: string; }
 interface InjectionSwitchTypeForm { transshipmentPosition: string; switchOverTime: string; switchingPressure: string; }
-interface IndexValuePair { index: string; v: string; v2?: string; t?: string; p?: string; }
+interface IndexValuePair { index: string; v?: string; v2?: string; t?: string; p?: string; }
 
 interface DosingMainMenuForm {
   dosingStroke: string;
@@ -28,6 +29,7 @@ interface DosingMainMenuForm {
 }
 
 interface HoldingMainMenuForm { holdingTime: string; coolTime: string; screwDiameter: string; }
+interface CylinderHeatingMainMenuForm { setpoint1: string; setpoint2: string; setpoint3: string; setpoint4: string; setpoint5: string; }
 
 const CameraScreen = () => {
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
@@ -50,6 +52,7 @@ const CameraScreen = () => {
 
   const [holdMainForm, setHoldMainForm] = useState<HoldingMainMenuForm>({ holdingTime: '', coolTime: '', screwDiameter: '' });
   const [holdGraphicValues, setHoldGraphicValues] = useState<IndexValuePair[]>([{ index: '1', t: '', p: '' }]);
+  const [cylinderForm, setCylinderForm] = useState<CylinderHeatingMainMenuForm>({ setpoint1: '', setpoint2: '', setpoint3: '', setpoint4: '', setpoint5: '' });
 
   const devices = useCameraDevices();
   const device = useCameraDevice('back');
@@ -81,6 +84,7 @@ const CameraScreen = () => {
 
     setHoldMainForm({ holdingTime: '', coolTime: '', screwDiameter: '' });
     setHoldGraphicValues([{ index: '1', t: '', p: '' }]);
+    setCylinderForm({ setpoint1: '', setpoint2: '', setpoint3: '', setpoint4: '', setpoint5: '' });
   };
 
   const resetToRootMenu = () => {
@@ -105,26 +109,59 @@ const CameraScreen = () => {
   const renderIndexValueRows = (rows: IndexValuePair[], setRows: (r: IndexValuePair[]) => void, labels: { v?: string; v2?: string; t?: string; p?: string }) => (
     <VStack space="sm">
       {rows.map((row, i) => (
-        <HStack key={i} space="sm" alignItems="center">
-          <Input w="$1/6"><InputField keyboardType="numeric" placeholder="#" value={row.index} onChangeText={(txt) => {
-            const copy = [...rows]; copy[i] = { ...copy[i], index: txt }; setRows(copy);
-          }} /></Input>
-          {labels.v !== undefined && (
-            <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.v} value={row.v || ''} onChangeText={(txt) => { const copy = [...rows]; copy[i] = { ...copy[i], v: txt }; setRows(copy); }} /></Input>
-          )}
-          {labels.v2 !== undefined && (
-            <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.v2} value={row.v2 || ''} onChangeText={(txt) => { const copy = [...rows]; copy[i] = { ...copy[i], v2: txt }; setRows(copy); }} /></Input>
-          )}
-          {labels.t !== undefined && (
-            <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.t} value={row.t || ''} onChangeText={(txt) => { const copy = [...rows]; copy[i] = { ...copy[i], t: txt }; setRows(copy); }} /></Input>
-          )}
-          {labels.p !== undefined && (
-            <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.p} value={row.p || ''} onChangeText={(txt) => { const copy = [...rows]; copy[i] = { ...copy[i], p: txt }; setRows(copy); }} /></Input>
-          )}
-          <Button variant="outline" action="secondary" onPress={() => { const copy = rows.filter((_, idx) => idx !== i); setRows(copy.length ? copy : [{ index: '1' } as IndexValuePair]); }}>−</Button>
+        <HStack key={i} space="sm" alignItems="center" justifyContent="space-between">
+          <HStack space="sm" alignItems="center" flex={1}>
+            <Box px={10} py={10} bg="$backgroundDark800" borderRadius="$sm">
+              <GluestackText color="$textLight50">{i + 1}</GluestackText>
+            </Box>
+            {labels.v !== undefined && (
+              <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.v} value={row.v || ''} onChangeText={(txt) => {
+                const copy = [...rows]; copy[i] = { ...copy[i], index: String(i + 1), v: txt }; setRows(copy);
+              }} /></Input>
+            )}
+            {labels.v2 !== undefined && (
+              <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.v2} value={row.v2 || ''} onChangeText={(txt) => {
+                const copy = [...rows]; copy[i] = { ...copy[i], index: String(i + 1), v2: txt }; setRows(copy);
+              }} /></Input>
+            )}
+            {labels.t !== undefined && (
+              <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.t} value={row.t || ''} onChangeText={(txt) => {
+                const copy = [...rows]; copy[i] = { ...copy[i], index: String(i + 1), t: txt }; setRows(copy);
+              }} /></Input>
+            )}
+            {labels.p !== undefined && (
+              <Input flex={1}><InputField keyboardType="numeric" placeholder={labels.p} value={row.p || ''} onChangeText={(txt) => {
+                const copy = [...rows]; copy[i] = { ...copy[i], index: String(i + 1), p: txt }; setRows(copy);
+              }} /></Input>
+            )}
+          </HStack>
+          <Pressable
+            accessibilityLabel="Zeile löschen"
+            onPress={() => {
+              const filtered = rows.filter((_, idx) => idx !== i).map((r, idx) => ({ ...r, index: String(idx + 1) }));
+              setRows(filtered.length ? filtered : [{ index: '1' } as IndexValuePair]);
+            }}
+            disabled={rows.length <= 1}
+            opacity={rows.length <= 1 ? 0.4 : 1}
+          >
+            <Icon name="trash-2" size={20} color="#fff" />
+          </Pressable>
         </HStack>
       ))}
-      <Button variant="outline" action="secondary" onPress={() => setRows([...rows, { index: String(rows.length + 1) } as IndexValuePair])}>+ Zeile</Button>
+      <HStack mt={4} alignItems="center" justifyContent="flex-start">
+        <Pressable
+          accessibilityLabel="Zeile hinzufügen"
+          onPress={() => {
+            const nextIndex = rows.length + 1;
+            setRows([...rows, { index: String(nextIndex) } as IndexValuePair]);
+          }}
+        >
+          <HStack space="sm" alignItems="center">
+            <Icon name="plus" size={20} color="#fff" />
+            <GluestackText color="$textLight50">Zeile hinzufügen</GluestackText>
+          </HStack>
+        </Pressable>
+      </HStack>
     </VStack>
   );
 
@@ -318,6 +355,16 @@ const CameraScreen = () => {
                 <Heading size="sm" color="$textLight50">Dosing Pressure (Index, v, v2)</Heading>
                 {renderIndexValueRows(dosePressureValues, setDosePressureValues, { v: 'v', v2: 'v2' })}
               </VStack>
+            </VStack>
+          )}
+
+          {selectedMenu === 'cylinderHeating' && (
+            <VStack space="md">
+              <Input><InputField keyboardType="numeric" placeholder="Setpoint 1" value={cylinderForm.setpoint1} onChangeText={(t)=>setCylinderForm({...cylinderForm, setpoint1: t})} /></Input>
+              <Input><InputField keyboardType="numeric" placeholder="Setpoint 2" value={cylinderForm.setpoint2} onChangeText={(t)=>setCylinderForm({...cylinderForm, setpoint2: t})} /></Input>
+              <Input><InputField keyboardType="numeric" placeholder="Setpoint 3" value={cylinderForm.setpoint3} onChangeText={(t)=>setCylinderForm({...cylinderForm, setpoint3: t})} /></Input>
+              <Input><InputField keyboardType="numeric" placeholder="Setpoint 4" value={cylinderForm.setpoint4} onChangeText={(t)=>setCylinderForm({...cylinderForm, setpoint4: t})} /></Input>
+              <Input><InputField keyboardType="numeric" placeholder="Setpoint 5" value={cylinderForm.setpoint5} onChangeText={(t)=>setCylinderForm({...cylinderForm, setpoint5: t})} /></Input>
             </VStack>
           )}
 
