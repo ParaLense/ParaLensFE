@@ -34,3 +34,15 @@ export interface ApiError {
   statusCode?: number;
   details?: any;
 } 
+
+// Scan selection types used by camera flow
+export type ScanMenu = 'injection' | 'dosing' | 'holdingPressure' | 'cylinderHeating';
+
+export interface OverlayBox {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+}
