@@ -64,7 +64,7 @@ const CameraScreen = () => {
         console.log('Detected text:', ocrResult.text);
       }
     } catch (error) {
-      runOnJS(setFrameProcessorError)(`Frame Processor Error: ${error}`);
+      console.log(`Frame Processor Error: ${error}`);
     }
   }, []);
 
@@ -259,16 +259,6 @@ const CameraScreen = () => {
               <GluestackText color="$textLight50">Continue</GluestackText>
             </Button>
           </HStack>
-        </Box>
-      )}
-
-      {!sixtyFpsFormat && (
-        <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
-          <Box bg="$backgroundDark800" px={8} py={8} borderRadius="$md">
-            <GluestackText color="$textLight50">
-              60fps not supported, using default format
-            </GluestackText>
-          </Box>
         </Box>
       )}
     </Box>
