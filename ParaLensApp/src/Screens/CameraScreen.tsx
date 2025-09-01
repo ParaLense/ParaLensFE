@@ -1,23 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { Box, Button, Heading, VStack, HStack, Text as GluestackText } from '@gluestack-ui/themed';
-import { Camera, useCameraDevice, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { Box, Button, Heading, HStack, Text as GluestackText, VStack } from '@gluestack-ui/themed';
+import { Camera, useCameraDevice, useCameraDevices } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import CanvasOverlay, { type Box as OverlayBoxType } from '../Components/CanvasOverlay';
+import TemplateOverlay from '../Components/TemplateOverlay';
+import { TemplateLayout } from '../hooks/useTemplateLayout';
 import { ScanMenu } from '../types/common';
 import ScanReviewScreen from './ScanReviewScreen';
 
-import { runOnJS } from 'react-native-reanimated';
-import { performOcr } from '@bear-block/vision-camera-ocr';
-
-// Frame rate limiting constants
-const TARGET_FPS = 5;
-const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
-
-// Extend global type for frame rate limiting
-declare global {
-  var lastFrameTime: number | undefined;
-}
+import UiScannerCamera from '../Components/UiScannerCamera.tsx';
 
 
 // Types for modes
@@ -28,9 +19,9 @@ type HoldingPressureMode = 'mainMenu' | 'subMenuGraphic' | null;
 type DosingMode = 'mainMenu' | 'subMenuGraphic' | null;
 
 const CameraScreen = () => {
+'worklet';
   const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
   const [debugStatus, setDebugStatus] = useState<string>('');
-  const [boxes, setBoxes] = useState<OverlayBoxType[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<ScanMenu | null>(null);
   const [injectionMode, setInjectionMode] = useState<InjectionMode>(null);
   const [holdingMode, setHoldingMode] = useState<HoldingPressureMode>(null);
@@ -49,26 +40,6 @@ const CameraScreen = () => {
     })();
   }, []);
 
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    try {
-      // Frame rate limiting - only process every 200ms (5 FPS)
-      const currentTime = Date.now();
-      if (global.lastFrameTime && (currentTime - global.lastFrameTime) < FRAME_INTERVAL_MS) {
-        return; // Skip this frame if not enough time has passed
-      }
-      global.lastFrameTime = currentTime;
-
-      const ocrResult = performOcr(frame);
-      if (ocrResult && ocrResult.text) {
-        console.log('Detected text:', ocrResult.text);
-      }
-    } catch (error) {
-      console.log(`Frame Processor Error: ${error}`);
-    }
-  }, []);
-
-  const sixtyFpsFormat = device?.formats?.find(f => f?.maxFps >= 60);
 
   const resetToRootMenu = () => {
     setSelectedMenu(null);
@@ -85,6 +56,27 @@ const CameraScreen = () => {
     if (!injectionMode && holdingMode) parts.push(holdingMode);
     if (!injectionMode && !holdingMode && dosingMode) parts.push(dosingMode);
     return parts.join(' · ');
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
+
+  const currentLayout: TemplateLayout | null = useMemo(() => {
+    if (!selectedMenu) return null;
+    if (selectedMenu === 'injection') {
+      if (injectionMode === 'subMenuGraphic') return TemplateLayout.InjectionSpeed_ScrollBar;
+      if (injectionMode === 'switchType') return TemplateLayout.Injection_SwitchType;
+      return TemplateLayout.Injection;
+    }
+    if (selectedMenu === 'holdingPressure') {
+      if (holdingMode === 'subMenuGraphic') return TemplateLayout.HoldingPressure_ScrollBar;
+      return TemplateLayout.HoldingPressure;
+    }
+    if (selectedMenu === 'dosing') {
+      if (dosingMode === 'subMenuGraphic') return TemplateLayout.Dosing_ScrollBar;
+      return TemplateLayout.Dosing;
+    }
+    if (selectedMenu === 'cylinderHeating') {
+      return TemplateLayout.CylinderHeating;
+    }
+    return null;
   }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
 
   if (!['authorized', 'granted'].includes(hasPermission)) {
@@ -229,21 +221,20 @@ const CameraScreen = () => {
   // Camera experience (default and after selection)
   return (
     <Box flex={1} bg="$backgroundDark950">
-      <Camera
+
+      <UiScannerCamera
+
+
+        //Camera props
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={true}
-        frameProcessor={frameProcessor}
         enableFpsGraph={true}
-        {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps:TARGET_FPS } : {})}
       />
 
-      <CanvasOverlay
-        menu={selectedMenu}
-        onBoxesChange={setBoxes}
-        isActive={true}
-      />
 
+      <TemplateOverlay layout={currentLayout} isActive={true} />
+      <TemplateOverlay layout={TemplateLayout.ScreenDetection} isActive={true} color="#FF0000" />
       <Box position="absolute" top={24 + insets.top} left={20}>
         <Button size="sm" variant="solid" action="secondary" onPress={resetToRootMenu}>
           <GluestackText color="$textLight50" textTransform="capitalize">
