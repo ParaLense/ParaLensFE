@@ -1,0 +1,14 @@
+# Core Dependencies
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Screenshot & Window Capture
+pyautogui>=0.9.54
+pygetwindow>=0.0.9
+pywin32>=305  # Windows-specific for window capture
+
+# Image Processing
+opencv-python>=4.8.0
+
+# Optional: For better performance
+psutil>=5.9.0
