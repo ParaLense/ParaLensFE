@@ -9,6 +9,8 @@ import ScanReviewScreen from './ScanReviewScreen';
 
 import UiScannerCamera from '../Components/UiScannerCamera.tsx';
 import { useFullScan } from '../contexts/FullScanContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { useI18n } from '../utils/i18n';
 
 
 // Types for modes
@@ -30,6 +32,9 @@ const CameraScreen = () => {
   const devices = useCameraDevices();
   const device = useCameraDevice('back');
   const insets = useSafeAreaInsets();
+  const { theme } = useSettings();
+  const isDark = theme === 'dark';
+  const { t } = useI18n();
 
 
 
@@ -85,16 +90,16 @@ const CameraScreen = () => {
 
   if (!device) {
     return (
-      <ScrollView contentContainerStyle={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', padding: 24 }}>
+      <ScrollView contentContainerStyle={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#000' : '#fff', padding: 24 }}>
         <ActivityIndicator size="large" color="#4F8EF7" />
-        <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Loading camera...</GluestackText>
-        <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Gefundene Kameras:</GluestackText>
+        <GluestackText color={isDark ? "$textLight50" : "$textDark900"} fontSize="$lg" mt={16}>{t('loadingCamera') || 'Loading camera...'}</GluestackText>
+        <GluestackText color={isDark ? "$textLight50" : "$textDark900"} fontSize="$lg" mt={16}>{t('foundCameras') || 'Gefundene Kameras:'}</GluestackText>
         {Object.values(devices).length === 0 ? (
-          <GluestackText color="$textLight50" fontSize="$lg" mt={16}>Keine Kameras gefunden.</GluestackText>
+          <GluestackText color={isDark ? "$textLight50" : "$textDark900"} fontSize="$lg" mt={16}>{t('noCameras') || 'Keine Kameras gefunden.'}</GluestackText>
         ) : (
           Object.entries(devices).map(([key, dev]) => (
-            <GluestackText color="$textLight50" fontSize="$lg" mt={16} key={key}>
-              {key}: {dev?.name || 'Unbekannt'} ({dev?.position || 'unknown'})
+            <GluestackText color={isDark ? "$textLight50" : "$textDark900"} fontSize="$lg" mt={16} key={key}>
+              {key}: {dev?.name || (t('unknown') || 'Unbekannt')} ({dev?.position || 'unknown'})
             </GluestackText>
           ))
         )}
@@ -105,13 +110,13 @@ const CameraScreen = () => {
   // Root selection screen
   if (!selectedMenu) {
     return (
-      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
-        <Heading size="lg" color="$textLight50" mb={24}>Was möchten Sie scannen?</Heading>
+      <Box flex={1} alignItems="center" justifyContent="center" bg={isDark ? "$backgroundDark950" : "$backgroundLight0"} px={24}>
+        <Heading size="lg" color={isDark ? "$textLight50" : "$textDark900"} mb={24}>{t('whatToScan') || 'Was möchten Sie scannen?'}</Heading>
         <VStack w="$5/6" mb={20} space="sm">
-          <Heading size="sm" color="$textLight50">Full Scan wählen</Heading>
+          <Heading size="sm" color={isDark ? "$textLight50" : "$textDark900"}>{t('selectFullScan') || 'Full Scan wählen'}</Heading>
           <HStack space="sm" alignItems="center">
             <Button flex={1} variant="outline" action="secondary" onPress={() => setIsPickerOpen(true)}>
-              <GluestackText color="$textLight50" numberOfLines={1}>{selectedLabel}</GluestackText>
+              <GluestackText color={isDark ? "$textLight50" : "$textDark900"} numberOfLines={1}>{selectedLabel}</GluestackText>
             </Button>
             <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>
               <GluestackText color="$textLight50" fontWeight="$bold">+</GluestackText>
@@ -124,18 +129,18 @@ const CameraScreen = () => {
           <ModalBackdrop />
           <ModalContent>
             <ModalHeader>
-              <Heading size="md">Full Scan auswählen</Heading>
+              <Heading size="md">{t('chooseFullScan') || 'Full Scan auswählen'}</Heading>
             </ModalHeader>
             <ModalBody>
               <VStack space="sm">
                 {fullScans.length === 0 && (
-                  <GluestackText color="$textLight500">Keine Full Scans vorhanden</GluestackText>
+                  <GluestackText color="$textLight500">{t('noFullScans') || 'Keine Full Scans vorhanden'}</GluestackText>
                 )}
                 {fullScans.map((fs) => {
                   const isSelected = selectedFullScanId === fs.id;
                   return (
                     <Button key={fs.id} variant={isSelected ? 'solid' : 'outline'} action={isSelected ? 'primary' : 'secondary'} onPress={() => { selectFullScan(fs.id); setIsPickerOpen(false); }}>
-                      <GluestackText color={isSelected ? '$textLight50' : '$textDark900'}>{fs.author || 'Unbekannt'} · {new Date(fs.date).toLocaleString()}</GluestackText>
+                      <GluestackText color={isSelected ? '$textLight50' : '$textDark900'}>{fs.author || (t('unknown') || 'Unbekannt')} · {new Date(fs.date).toLocaleString()}</GluestackText>
                     </Button>
                   );
                 })}
@@ -143,7 +148,7 @@ const CameraScreen = () => {
             </ModalBody>
             <ModalFooter>
               <Button variant="outline" action="secondary" onPress={() => setIsPickerOpen(false)}>
-                <GluestackText color="$textLight50">Schließen</GluestackText>
+                <GluestackText color="$textLight50">{t('close') || 'Schließen'}</GluestackText>
               </Button>
             </ModalFooter>
           </ModalContent>
@@ -153,20 +158,20 @@ const CameraScreen = () => {
           <ModalBackdrop />
           <ModalContent>
             <ModalHeader>
-              <Heading size="md">Neuen Full Scan erstellen</Heading>
+              <Heading size="md">{t('createNewFullScan') || 'Neuen Full Scan erstellen'}</Heading>
             </ModalHeader>
             <ModalBody>
               <Input>
-                <InputField value={authorInput} onChangeText={setAuthorInput} placeholder="Autor" />
+                <InputField value={authorInput} onChangeText={setAuthorInput} placeholder={t('author') || 'Autor'} />
               </Input>
             </ModalBody>
             <ModalFooter>
               <HStack space="sm">
                 <Button variant="outline" action="secondary" onPress={() => { setIsAddOpen(false); setAuthorInput(''); }}>
-                  <GluestackText color="$textLight50">Abbrechen</GluestackText>
+                  <GluestackText color="$textLight50">{t('cancel') || 'Abbrechen'}</GluestackText>
                 </Button>
                 <Button onPress={() => { const name = authorInput.trim() || 'Unbekannt'; createFullScan(name); setAuthorInput(''); setIsAddOpen(false); }}>
-                  <GluestackText color="$textLight50">Erstellen</GluestackText>
+                  <GluestackText color="$textLight50">{t('create') || 'Erstellen'}</GluestackText>
                 </Button>
               </HStack>
             </ModalFooter>
@@ -280,7 +285,7 @@ const CameraScreen = () => {
 
   // Camera experience (default and after selection)
   return (
-    <Box flex={1} bg="$backgroundDark950">
+    <Box flex={1} bg={isDark ? "$backgroundDark950" : "$backgroundLight0"}>
 
       <UiScannerCamera
         currentLayout={currentLayout ?? TemplateLayout.ScreenDetection }
@@ -296,7 +301,7 @@ const CameraScreen = () => {
       <Box position="absolute" top={24 + insets.top} left={20}>
         <Button size="sm" variant="solid" action="secondary" onPress={resetToRootMenu}>
           <GluestackText color="$textLight50" textTransform="capitalize">
-            {headerLabel ? `${headerLabel} · Ändern` : 'Ändern'}
+            {headerLabel ? `${headerLabel} · ${t('change') || 'Ändern'}` : (t('change') || 'Ändern')}
           </GluestackText>
         </Button>
       </Box>
@@ -305,7 +310,7 @@ const CameraScreen = () => {
         <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
           <HStack space="md">
             <Button variant="outline" action="secondary" onPress={() => setIsReviewOpen(true)}>
-              <GluestackText color="$textLight50">Continue</GluestackText>
+              <GluestackText color="$textLight50">{t('continue') || 'Continue'}</GluestackText>
             </Button>
           </HStack>
         </Box>

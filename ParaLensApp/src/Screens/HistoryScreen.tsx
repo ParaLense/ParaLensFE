@@ -2,16 +2,21 @@ import React, { useMemo, useState } from 'react';
 import { FlatList } from 'react-native';
 import { Box, Heading, VStack, HStack, Text as GluestackText, Button, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@gluestack-ui/themed';
 import { useFullScan } from '../contexts/FullScanContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { useI18n } from '../utils/i18n';
 
 const HistoryScreen = () => {
   const { fullScans } = useFullScan();
+  const { theme } = useSettings();
+  const { t } = useI18n();
+  const isDark = theme === 'dark';
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const selected = useMemo(() => fullScans.find(f => f.id === selectedId) || null, [fullScans, selectedId]);
 
   return (
-    <Box flex={1} bg="$backgroundDark950" px={16} pt={16}>
-      <Heading size="lg" color="$textLight50" mb={12}>Full Scans</Heading>
+    <Box flex={1} bg={isDark ? "$backgroundDark950" : "$backgroundLight0"} px={16} pt={16}>
+      <Heading size="lg" color={isDark ? "$textLight50" : "$textDark900"} mb={12}>Full Scans</Heading>
       <FlatList
         data={fullScans}
         keyExtractor={(item) => String(item.id)}
@@ -23,20 +28,20 @@ const HistoryScreen = () => {
             cylinderHeating: !!item.cylinderHeating,
           };
           return (
-            <Box bg="$backgroundDark900" p={12} rounded="$md" mb={10} borderWidth={1} borderColor="$backgroundDark800">
+            <Box bg={isDark ? "$backgroundDark900" : "$backgroundLight100"} p={12} rounded="$md" mb={10} borderWidth={1} borderColor={isDark ? "$backgroundDark800" : "$backgroundLight200"}>
               <HStack alignItems="center" justifyContent="space-between">
                 <VStack>
-                  <GluestackText color="$textLight50" fontWeight="$bold">{item.author || 'Unbekannt'}</GluestackText>
-                  <GluestackText color="$textLight400">{new Date(item.date).toLocaleString()}</GluestackText>
+                  <GluestackText color={isDark ? "$textLight50" : "$textDark900"} fontWeight="$bold">{item.author || 'Unbekannt'}</GluestackText>
+                  <GluestackText color={isDark ? "$textLight400" : "$textDark500"}>{new Date(item.date).toLocaleString()}</GluestackText>
                 </VStack>
                 <Button variant="outline" action="secondary" onPress={() => { setSelectedId(item.id); setIsDetailsOpen(true); }}>
-                  <GluestackText color="$textLight50">Details</GluestackText>
+                  <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>{t('details') || 'Details'}</GluestackText>
                 </Button>
               </HStack>
               <HStack mt={10} space="sm" flexWrap="wrap">
                 {Object.entries(present).map(([key, val]) => (
-                  <Box key={key} px={8} py={4} rounded="$sm" bg={val ? '$green600' : '$backgroundDark800'}>
-                    <GluestackText color={val ? '$textLight50' : '$textLight400'}>{key}</GluestackText>
+                  <Box key={key} px={8} py={4} rounded="$sm" bg={val ? '$green600' : (isDark ? '$backgroundDark800' : '$backgroundLight200')}>
+                    <GluestackText color={val ? '$textLight50' : (isDark ? '$textLight400' : '$textDark500')}>{key}</GluestackText>
                   </Box>
                 ))}
               </HStack>
@@ -49,21 +54,21 @@ const HistoryScreen = () => {
         <ModalBackdrop />
         <ModalContent>
           <ModalHeader>
-            <Heading size="md">Full Scan Details</Heading>
+            <Heading size="md">{t('fullScanDetails') || 'Full Scan Details'}</Heading>
           </ModalHeader>
           <ModalBody>
             {!selected ? (
-              <GluestackText>Keine Auswahl</GluestackText>
+              <GluestackText>{t('noSelection') || 'Keine Auswahl'}</GluestackText>
             ) : (
               <VStack space="md">
-                <GluestackText>Autor: {selected.author}</GluestackText>
-                <GluestackText>Datum: {new Date(selected.date).toLocaleString()}</GluestackText>
-                <Heading size="sm">Gespeicherte Bereiche</Heading>
+                <GluestackText>{(t('author') || 'Autor') + ': '} {selected.author}</GluestackText>
+                <GluestackText>{(t('date') || 'Datum') + ': '} {new Date(selected.date).toLocaleString()}</GluestackText>
+                <Heading size="sm">{t('savedSections') || 'Gespeicherte Bereiche'}</Heading>
                 {(['injection','dosing','holdingPressure','cylinderHeating'] as const).map(key => (
                   <VStack key={key} space="xs" bg="$backgroundDark900" p={10} rounded="$sm">
                     <GluestackText fontWeight="$bold" textTransform="capitalize">{key}</GluestackText>
                     {!selected[key] ? (
-                      <GluestackText color="$textLight500">Nicht vorhanden</GluestackText>
+                      <GluestackText color="$textLight500">{t('notAvailable') || 'Nicht vorhanden'}</GluestackText>
                     ) : (
                       <VStack space="sm">
                         {/* Injection */}
