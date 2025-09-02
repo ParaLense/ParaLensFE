@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
-import { Box, Button, Heading, HStack, Input, InputField, Text as GluestackText, VStack, Select, SelectTrigger, SelectInput, SelectPortal, SelectBackdrop, SelectContent, SelectItem, SelectIcon, Icon, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@gluestack-ui/themed';
+import { Box, Button, Heading, HStack, Input, InputField, Text as GluestackText, VStack, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@gluestack-ui/themed';
 import { Camera, useCameraDevice, useCameraDevices } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TemplateLayout } from '../hooks/useTemplateLayout';
@@ -9,7 +9,6 @@ import ScanReviewScreen from './ScanReviewScreen';
 
 import UiScannerCamera from '../Components/UiScannerCamera.tsx';
 import { useFullScan } from '../contexts/FullScanContext';
-import Feather from 'react-native-vector-icons/Feather';
 
 
 // Types for modes
@@ -38,6 +37,13 @@ const CameraScreen = () => {
   const { fullScans, selectedFullScanId, selectFullScan, createFullScan } = useFullScan();
   const [authorInput, setAuthorInput] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+
+  const selectedLabel = useMemo(() => {
+    if (!selectedFullScanId) return fullScans.length ? 'Full Scan auswählen' : 'Kein Full Scan vorhanden';
+    const fs = fullScans.find(f => f.id === selectedFullScanId);
+    return fs ? `${fs.author || 'Unbekannt'} · ${new Date(fs.date).toLocaleString()}` : 'Full Scan auswählen';
+  }, [selectedFullScanId, fullScans]);
 
   const resetToRootMenu = () => {
     setSelectedMenu(null);
@@ -104,26 +110,40 @@ const CameraScreen = () => {
         <VStack w="$5/6" mb={20} space="sm">
           <Heading size="sm" color="$textLight50">Full Scan wählen</Heading>
           <HStack space="sm" alignItems="center">
-            <Box flex={1}>
-              <Select selectedValue={selectedFullScanId ? String(selectedFullScanId) : undefined} onValueChange={(v) => selectFullScan(v ? Number(v) : null)}>
-                <SelectTrigger>
-                  <SelectInput placeholder={fullScans.length ? 'Full Scan auswählen' : 'Kein Full Scan vorhanden'} />
-                </SelectTrigger>
-                <SelectPortal>
-                  <SelectBackdrop />
-                  <SelectContent>
-                    {fullScans.map(fs => (
-                      <SelectItem key={fs.id} label={`${fs.author || 'Unbekannt'} · ${new Date(fs.date).toLocaleString()}`} value={String(fs.id)} />
-                    ))}
-                  </SelectContent>
-                </SelectPortal>
-              </Select>
-            </Box>
-            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>
-              <Feather name="plus" size={18} color="#fff" />
+            <Button flex={1} variant="outline" action="secondary" onPress={() => setIsPickerOpen(true)}>
+              <GluestackText color="$textLight50" numberOfLines={1}>{selectedLabel}</GluestackText>
+            </Button>
+            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>+
             </Button>
           </HStack>
         </VStack>
+
+        {/* FullScan Picker Modal */}
+        <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)}>
+          <ModalBackdrop />
+          <ModalContent>
+            <ModalHeader>
+              <Heading size="md">Full Scan auswählen</Heading>
+            </ModalHeader>
+            <ModalBody>
+              <VStack space="sm">
+                {fullScans.length === 0 && (
+                  <GluestackText color="$textLight500">Keine Full Scans vorhanden</GluestackText>
+                )}
+                {fullScans.map((fs) => (
+                  <Button key={fs.id} variant={selectedFullScanId === fs.id ? 'solid' : 'outline'} action={selectedFullScanId === fs.id ? 'primary' : 'secondary'} onPress={() => { selectFullScan(fs.id); setIsPickerOpen(false); }}>
+                    <GluestackText color="$textLight50">{fs.author || 'Unbekannt'} · {new Date(fs.date).toLocaleString()}</GluestackText>
+                  </Button>
+                ))}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="outline" action="secondary" onPress={() => setIsPickerOpen(false)}>
+                <GluestackText color="$textLight50">Schließen</GluestackText>
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
 
         <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
           <ModalBackdrop />

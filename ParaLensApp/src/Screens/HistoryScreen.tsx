@@ -15,14 +15,34 @@ const HistoryScreen = () => {
       <FlatList
         data={fullScans}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <Button mb={10} variant="outline" action="secondary" onPress={() => { setSelectedId(item.id); setIsDetailsOpen(true); }}>
-            <VStack>
-              <GluestackText color="$textLight50" fontWeight="$bold">{item.author || 'Unbekannt'}</GluestackText>
-              <GluestackText color="$textLight400">{new Date(item.date).toLocaleString()}</GluestackText>
-            </VStack>
-          </Button>
-        )}
+        renderItem={({ item }) => {
+          const present = {
+            injection: !!item.injection,
+            holdingPressure: !!item.holdingPressure,
+            dosing: !!item.dosing,
+            cylinderHeating: !!item.cylinderHeating,
+          };
+          return (
+            <Box bg="$backgroundDark900" p={12} rounded="$md" mb={10} borderWidth={1} borderColor="$backgroundDark800">
+              <HStack alignItems="center" justifyContent="space-between">
+                <VStack>
+                  <GluestackText color="$textLight50" fontWeight="$bold">{item.author || 'Unbekannt'}</GluestackText>
+                  <GluestackText color="$textLight400">{new Date(item.date).toLocaleString()}</GluestackText>
+                </VStack>
+                <Button variant="outline" action="secondary" onPress={() => { setSelectedId(item.id); setIsDetailsOpen(true); }}>
+                  <GluestackText color="$textLight50">Details</GluestackText>
+                </Button>
+              </HStack>
+              <HStack mt={10} space="sm" flexWrap="wrap">
+                {Object.entries(present).map(([key, val]) => (
+                  <Box key={key} px={8} py={4} rounded="$sm" bg={val ? '$green600' : '$backgroundDark800'}>
+                    <GluestackText color={val ? '$textLight50' : '$textLight400'}>{key}</GluestackText>
+                  </Box>
+                ))}
+              </HStack>
+            </Box>
+          );
+        }}
       />
 
       <Modal isOpen={isDetailsOpen} onClose={() => setIsDetailsOpen(false)}>
