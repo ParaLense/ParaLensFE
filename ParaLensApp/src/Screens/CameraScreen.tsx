@@ -113,7 +113,8 @@ const CameraScreen = () => {
             <Button flex={1} variant="outline" action="secondary" onPress={() => setIsPickerOpen(true)}>
               <GluestackText color="$textLight50" numberOfLines={1}>{selectedLabel}</GluestackText>
             </Button>
-            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>+
+            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>
+              <GluestackText color="$textLight50" fontWeight="$bold">+</GluestackText>
             </Button>
           </HStack>
         </VStack>
@@ -130,11 +131,14 @@ const CameraScreen = () => {
                 {fullScans.length === 0 && (
                   <GluestackText color="$textLight500">Keine Full Scans vorhanden</GluestackText>
                 )}
-                {fullScans.map((fs) => (
-                  <Button key={fs.id} variant={selectedFullScanId === fs.id ? 'solid' : 'outline'} action={selectedFullScanId === fs.id ? 'primary' : 'secondary'} onPress={() => { selectFullScan(fs.id); setIsPickerOpen(false); }}>
-                    <GluestackText color="$textLight50">{fs.author || 'Unbekannt'} · {new Date(fs.date).toLocaleString()}</GluestackText>
-                  </Button>
-                ))}
+                {fullScans.map((fs) => {
+                  const isSelected = selectedFullScanId === fs.id;
+                  return (
+                    <Button key={fs.id} variant={isSelected ? 'solid' : 'outline'} action={isSelected ? 'primary' : 'secondary'} onPress={() => { selectFullScan(fs.id); setIsPickerOpen(false); }}>
+                      <GluestackText color={isSelected ? '$textLight50' : '$textDark900'}>{fs.author || 'Unbekannt'} · {new Date(fs.date).toLocaleString()}</GluestackText>
+                    </Button>
+                  );
+                })}
               </VStack>
             </ModalBody>
             <ModalFooter>
