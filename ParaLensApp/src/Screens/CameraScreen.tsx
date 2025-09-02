@@ -3,7 +3,6 @@ import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { Box, Button, Heading, HStack, Text as GluestackText, VStack } from '@gluestack-ui/themed';
 import { Camera, useCameraDevice, useCameraDevices } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import TemplateOverlay from '../Components/TemplateOverlay';
 import { TemplateLayout } from '../hooks/useTemplateLayout';
 import { ScanMenu } from '../types/common';
 import ScanReviewScreen from './ScanReviewScreen';
@@ -12,7 +11,7 @@ import UiScannerCamera from '../Components/UiScannerCamera.tsx';
 
 
 // Types for modes
-type CameraPermissionStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'granted';
+
 
 type InjectionMode = 'mainMenu' | 'subMenuGraphic' | 'switchType' | null;
 type HoldingPressureMode = 'mainMenu' | 'subMenuGraphic' | null;
@@ -20,8 +19,7 @@ type DosingMode = 'mainMenu' | 'subMenuGraphic' | null;
 
 const CameraScreen = () => {
 'worklet';
-  const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
-  const [debugStatus, setDebugStatus] = useState<string>('');
+
   const [selectedMenu, setSelectedMenu] = useState<ScanMenu | null>(null);
   const [injectionMode, setInjectionMode] = useState<InjectionMode>(null);
   const [holdingMode, setHoldingMode] = useState<HoldingPressureMode>(null);
@@ -32,13 +30,7 @@ const CameraScreen = () => {
   const device = useCameraDevice('back');
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    (async () => {
-      const status = await Camera.requestCameraPermission();
-      setHasPermission(status);
-      setDebugStatus(`Camera.requestCameraPermission() returned: ${status}`);
-    })();
-  }, []);
+
 
 
   const resetToRootMenu = () => {
@@ -78,15 +70,6 @@ const CameraScreen = () => {
     }
     return null;
   }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
-
-  if (!['authorized', 'granted'].includes(hasPermission)) {
-    return (
-      <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
-        <Heading size="md" color="$textLight50">No camera permission ({hasPermission})</Heading>
-        <Heading mt={8} size="sm" color="$textLight50">{debugStatus}</Heading>
-      </Box>
-    );
-  }
 
   if (!device) {
     return (
@@ -223,7 +206,7 @@ const CameraScreen = () => {
     <Box flex={1} bg="$backgroundDark950">
 
       <UiScannerCamera
-
+        currentLayout={currentLayout ?? TemplateLayout.ScreenDetection }
 
         //Camera props
         style={StyleSheet.absoluteFill}
@@ -233,8 +216,6 @@ const CameraScreen = () => {
       />
 
 
-      <TemplateOverlay layout={currentLayout} isActive={true} />
-      <TemplateOverlay layout={TemplateLayout.ScreenDetection} isActive={true} color="#FF0000" />
       <Box position="absolute" top={24 + insets.top} left={20}>
         <Button size="sm" variant="solid" action="secondary" onPress={resetToRootMenu}>
           <GluestackText color="$textLight50" textTransform="capitalize">

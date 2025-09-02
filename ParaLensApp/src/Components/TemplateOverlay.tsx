@@ -7,10 +7,14 @@ interface Props {
   isActive?: boolean;
   color?: string;
   onBoxPress?: (boxId: string) => void;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  widthPercent?: number; // 0..1, default 0.75
+  aspectRatio?: number;  // width/height, default 3/4
 }
 
-const TemplateOverlay: React.FC<Props> = ({ layout, isActive = true, color, onBoxPress }) => {
-  const boxes = useTemplateLayout({ layout, color });
+const TemplateOverlay: React.FC<Props> = ({ layout, isActive = true, color, onBoxPress, viewportHeight, viewportWidth, widthPercent, aspectRatio }) => {
+  const boxes = useTemplateLayout({ layout, color, viewportHeight, viewportWidth, widthPercent, aspectRatio });
   if (!isActive || !layout) return null;
 
   return (
