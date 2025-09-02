@@ -7,12 +7,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HistoryScreen from "../Screens/HistoryScreen.tsx";
 import SettingsScreen from "../Screens/SettingsScreen.tsx";
 import CameraScreen from "../Screens/CameraScreen.tsx";
+import { useSettings } from "../contexts/SettingsContext";
+import { useI18n } from "../utils/i18n";
 
 const Tab = createBottomTabNavigator();
 
 export const AppNavigator = () => {
-    const isDarkMode = useColorScheme() === 'dark';
+    const { theme } = useSettings();
+    const isDarkMode = theme === 'dark';
     const insets = useSafeAreaInsets();
+    const { t } = useI18n();
 
     return (
         <Tab.Navigator
@@ -67,9 +71,9 @@ export const AppNavigator = () => {
                     </HStack>
                 </Box>
             )}>
-            <Tab.Screen name="History" component={HistoryScreen} />
-            <Tab.Screen name="Camera" component={CameraScreen} />
-            <Tab.Screen name="Settings" component={SettingsScreen} />
+            <Tab.Screen name="History" component={HistoryScreen} options={{ title: t('history') }} />
+            <Tab.Screen name="Camera" component={CameraScreen} options={{ title: t('camera') }} />
+            <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: t('settings') }} />
         </Tab.Navigator>
     );
 };
