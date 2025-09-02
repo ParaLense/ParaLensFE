@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ApiProvider } from "./contexts/ApiContext";
 import {AppNavigator} from "./Nagivation/AppNavigator.tsx";
+import { FullScanProvider } from './contexts/FullScanContext';
 
 export default function App() {
     const isDarkMode = useColorScheme() === 'dark';
@@ -22,9 +23,11 @@ export default function App() {
                             translucent={true}
                         />
                         <SafeAreaView style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#fff' }}>
-                            <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
-                                <AppNavigator />
-                            </NavigationContainer>
+                            <FullScanProvider>
+                                <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
+                                    <AppNavigator />
+                                </NavigationContainer>
+                            </FullScanProvider>
                         </SafeAreaView>
                     </GluestackUIProvider>
                 </ApiProvider>

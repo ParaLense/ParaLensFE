@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
-import { Box, Button, Heading, HStack, Text as GluestackText, VStack } from '@gluestack-ui/themed';
+import { Box, Button, Heading, HStack, Input, InputField, Text as GluestackText, VStack, Select, SelectTrigger, SelectInput, SelectPortal, SelectBackdrop, SelectContent, SelectItem, SelectIcon, Icon, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@gluestack-ui/themed';
 import { Camera, useCameraDevice, useCameraDevices } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TemplateLayout } from '../hooks/useTemplateLayout';
@@ -8,6 +8,8 @@ import { ScanMenu } from '../types/common';
 import ScanReviewScreen from './ScanReviewScreen';
 
 import UiScannerCamera from '../Components/UiScannerCamera.tsx';
+import { useFullScan } from '../contexts/FullScanContext';
+import Feather from 'react-native-vector-icons/Feather';
 
 
 // Types for modes
@@ -32,6 +34,10 @@ const CameraScreen = () => {
 
 
 
+
+  const { fullScans, selectedFullScanId, selectFullScan, createFullScan } = useFullScan();
+  const [authorInput, setAuthorInput] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   const resetToRootMenu = () => {
     setSelectedMenu(null);
@@ -95,6 +101,53 @@ const CameraScreen = () => {
     return (
       <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
         <Heading size="lg" color="$textLight50" mb={24}>Was möchten Sie scannen?</Heading>
+        <VStack w="$5/6" mb={20} space="sm">
+          <Heading size="sm" color="$textLight50">Full Scan wählen</Heading>
+          <HStack space="sm" alignItems="center">
+            <Box flex={1}>
+              <Select selectedValue={selectedFullScanId ? String(selectedFullScanId) : undefined} onValueChange={(v) => selectFullScan(v ? Number(v) : null)}>
+                <SelectTrigger>
+                  <SelectInput placeholder={fullScans.length ? 'Full Scan auswählen' : 'Kein Full Scan vorhanden'} />
+                </SelectTrigger>
+                <SelectPortal>
+                  <SelectBackdrop />
+                  <SelectContent>
+                    {fullScans.map(fs => (
+                      <SelectItem key={fs.id} label={`${fs.author || 'Unbekannt'} · ${new Date(fs.date).toLocaleString()}`} value={String(fs.id)} />
+                    ))}
+                  </SelectContent>
+                </SelectPortal>
+              </Select>
+            </Box>
+            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>
+              <Feather name="plus" size={18} color="#fff" />
+            </Button>
+          </HStack>
+        </VStack>
+
+        <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
+          <ModalBackdrop />
+          <ModalContent>
+            <ModalHeader>
+              <Heading size="md">Neuen Full Scan erstellen</Heading>
+            </ModalHeader>
+            <ModalBody>
+              <Input>
+                <InputField value={authorInput} onChangeText={setAuthorInput} placeholder="Autor" />
+              </Input>
+            </ModalBody>
+            <ModalFooter>
+              <HStack space="sm">
+                <Button variant="outline" action="secondary" onPress={() => { setIsAddOpen(false); setAuthorInput(''); }}>
+                  <GluestackText color="$textLight50">Abbrechen</GluestackText>
+                </Button>
+                <Button onPress={() => { const name = authorInput.trim() || 'Unbekannt'; createFullScan(name); setAuthorInput(''); setIsAddOpen(false); }}>
+                  <GluestackText color="$textLight50">Erstellen</GluestackText>
+                </Button>
+              </HStack>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
         <VStack space="md" w="$5/6">
           {(['injection','dosing','holdingPressure','cylinderHeating'] as ScanMenu[]).map((menu) => (
             <Button
