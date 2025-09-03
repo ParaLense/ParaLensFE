@@ -17,12 +17,13 @@ const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectText', {
  * @returns Object containing recognized text or null if no text found
  */
 export type OcrCrop = { x: number; y: number; width: number; height: number };
+export type ScreenSize = { width: number; height: number };
 
-export function performOcr(frame: Frame, crop?: OcrCrop): { text: string } | null {
+export function performOcr(frame: Frame, crop?: OcrCrop, screen?: ScreenSize): { text: string } | null {
   'worklet';
   if (plugin == null)
     throw new Error('Failed to load Frame Processor Plugin "detectText"!');
   // Always pass an object as the 2nd arg to avoid "Value is undefined, expected an Object"
-  const args = crop ? { crop } : {};
+  const args = crop ? (screen ? { crop, screen } : { crop }) : {};
   return plugin.call(frame, args) as { text: string } | null;
 }

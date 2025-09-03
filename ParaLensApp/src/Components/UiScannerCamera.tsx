@@ -6,7 +6,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { Dimensions } from 'react-native';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
-import { performOcr } from '../../libs/vision-camera-ocr-bb2';
+import { performOcr } from '@bear-block/vision-camera-ocr';
 import { Box, Heading } from '@gluestack-ui/themed';
 import { Text as GluestackText } from '@gluestack-ui/themed/build/components/Text';
 import { useRunOnJS } from 'react-native-worklets-core';
@@ -31,8 +31,8 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = (props:UiScannerCameraPr
   const [debugStatus, setDebugStatus] = useState<string>('');
 
   const sixtyFpsFormat = props.device?.formats?.find(f => f?.maxFps >= 60);
-  const layout = useTemplateLayout({ layout: props.currentLayout });
-  const screenLayout = useTemplateLayout({ layout: TemplateLayout.ScreenDetection });
+  const layout = useTemplateLayout({  layout: props.currentLayout, widthPercent: 0.80 });
+  const screenLayout = useTemplateLayout({ layout: TemplateLayout.ScreenDetection, widthPercent: 0.80 });
   const screen = Dimensions.get('window');
   const screenW = screen.width;
   const screenH = screen.height;
@@ -60,12 +60,11 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = (props:UiScannerCameraPr
       lastFrameTime.value = now;
       const results: Record<string, string> = {};
       for (const box of layout) {
-        const nx = Math.max(0, Math.min(1, box.x / screenW));
-        const ny = Math.max(0, Math.min(1, box.y / screenH));
-        const nw = Math.max(0, Math.min(1, box.width / screenW));
-        const nh = Math.max(0, Math.min(1, box.height / screenH));
-
-        const result = performOcr(frame, { x: nx, y: ny, width: nw, height: nh });
+        const result = performOcr(
+          frame,
+          { x: box.x, y: box.y, width: box.width, height: box.height },
+          { width: screenW, height: screenH }
+        );
         if (result?.text) {
           results[box.id] = result.text;
         }
@@ -97,8 +96,8 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = (props:UiScannerCameraPr
         frameProcessor={frameProcessor as ReadonlyFrameProcessor}
         {...(sixtyFpsFormat ? { format: sixtyFpsFormat, fps: TARGET_FPS } : {})}
       />
-      <TemplateOverlay layout={props.currentLayout} isActive={true} color="#00FF00" />
-      <TemplateOverlay layout={TemplateLayout.ScreenDetection} isActive={true} color="#FF0000" />
+      <TemplateOverlay layout={props.currentLayout} isActive={true} color="#00FF00" widthPercent={.80}/>
+      <TemplateOverlay layout={TemplateLayout.ScreenDetection} isActive={true} color="#FF0000" widthPercent={.80} />
 
       {/* OCR per-box labels at bottom-center of each box */}
       {layout.map(box => {

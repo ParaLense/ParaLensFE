@@ -1,0 +1,98 @@
+[
+  {
+    "id": "box_1",
+    "x": 1.54,
+    "y": 4.62,
+    "width": 4.39,
+    "height": 3.48,
+    "label": "Box 1"
+  },
+  {
+    "id": "box_2",
+    "x": 1.6,
+    "y": 11.09,
+    "width": 4.22,
+    "height": 3.44,
+    "label": "Box 2"
+  },
+  {
+    "id": "box_3",
+    "x": 1.51,
+    "y": 17.56,
+    "width": 4.45,
+    "height": 3.3,
+    "label": "Box 3"
+  },
+  {
+    "id": "box_4",
+    "x": 1.62,
+    "y": 23.98,
+    "width": 4.27,
+    "height": 3.35,
+    "label": "Box 4"
+  },
+  {
+    "id": "box_5",
+    "x": 1.46,
+    "y": 36.95,
+    "width": 4.45,
+    "height": 3.26,
+    "label": "Box 5"
+  },
+  {
+    "id": "box_6",
+    "x": 1.56,
+    "y": 43.37,
+    "width": 4.33,
+    "height": 3.39,
+    "label": "Box 6"
+  },
+  {
+    "id": "box_7",
+    "x": 1.45,
+    "y": 49.83,
+    "width": 4.39,
+    "height": 3.44,
+    "label": "Box 7"
+  },
+  {
+    "id": "box_8",
+    "x": 1.56,
+    "y": 56.23,
+    "width": 4.27,
+    "height": 3.26,
+    "label": "Box 8"
+  },
+  {
+    "id": "box_9",
+    "x": 1.59,
+    "y": 62.56,
+    "width": 4.27,
+    "height": 3.26,
+    "label": "Box 9"
+  },
+  {
+    "id": "box_10",
+    "x": 1.54,
+    "y": 68.76,
+    "width": 4.33,
+    "height": 3.3,
+    "label": "Box 10"
+  },
+  {
+    "id": "box_11",
+    "x": 9.79,
+    "y": 0.04,
+    "width": 4.36,
+    "height": 3.37,
+    "label": "Box 11"
+  },
+  {
+    "id": "box_12",
+    "x": 0,
+    "y": 0,
+    "width": 100,
+    "height": 100,
+    "label": "Box 12"
+  }
+]
