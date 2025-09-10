@@ -4,7 +4,7 @@ import {
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import React, { useEffect, useState } from 'react';
-import { Dimensions } from 'react-native';
+import { Dimensions, AppState, AppStateStatus } from 'react-native';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { performOcr } from '../../libs/vision-camera-ocr-bb2';
 import { Box, Heading } from '@gluestack-ui/themed';
@@ -16,7 +16,7 @@ import {
 } from '../hooks/useTemplateLayout.ts';
 import TemplateOverlay from './TemplateOverlay.tsx';
 
-const TARGET_FPS = 1;
+const TARGET_FPS = 30;
 const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
@@ -43,11 +43,42 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = (props:UiScannerCameraPr
 
 
   useEffect(() => {
-    (async () => {
-      const status = await Camera.requestCameraPermission();
-      setHasPermission(status);
-      setDebugStatus(`Camera.requestCameraPermission() returned: ${status}`);
-    })();
+    let isMounted = true;
+
+    const checkAndRequestPermission = async () => {
+      try {
+        const current = await Camera.getCameraPermissionStatus();
+        if (!isMounted) return;
+        if (current === 'not-determined') {
+          const status = await Camera.requestCameraPermission();
+          if (!isMounted) return;
+          setHasPermission(status);
+          setDebugStatus(`Camera.requestCameraPermission() returned: ${status}`);
+        } else {
+          setHasPermission(current as CameraPermissionStatus);
+          setDebugStatus(`Camera.getCameraPermissionStatus() returned: ${current}`);
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        setDebugStatus(`Permission check error: ${String(error)}`);
+      }
+    };
+
+    // Initial check on mount
+    checkAndRequestPermission();
+
+    // Re-check when app comes back to foreground
+    const onAppStateChange = (state: AppStateStatus) => {
+      if (state === 'active') {
+        checkAndRequestPermission();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+
+    return () => {
+      isMounted = false;
+      sub.remove();
+    };
   }, []);
 
   const frameProcessor = useFrameProcessor(frame => {
