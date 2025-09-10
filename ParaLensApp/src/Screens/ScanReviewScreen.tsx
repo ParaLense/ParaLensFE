@@ -3,6 +3,7 @@ import { ScrollView } from 'react-native';
 import { Box, Button, Heading, VStack, HStack, Text as GluestackText, Input, InputField } from '@gluestack-ui/themed';
 import type { ScanMenu } from '../types/common';
 import DynamicValueList, { IndexValuePair } from '../Components/DynamicValueList';
+import { useFullScan } from '../contexts/FullScanContext';
 
 type InjectionMode = 'mainMenu' | 'subMenuGraphic' | 'switchType' | null;
 type HoldingPressureMode = 'mainMenu' | 'subMenuGraphic' | null;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdingMode, dosingMode, onBack, onSave }) => {
+  const { selectedFullScanId, upsertSection } = useFullScan();
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
     if (selectedMenu) parts.push(selectedMenu);
@@ -120,7 +122,25 @@ const ScanReviewScreen: React.FC<Props> = ({ selectedMenu, injectionMode, holdin
         <Button variant="outline" action="secondary" onPress={onBack}>
           <GluestackText color="$textLight50">Zurück</GluestackText>
         </Button>
-        <Button action="primary" variant="solid" onPress={onSave}>
+        <Button action="primary" variant="solid" onPress={() => {
+          if (!selectedMenu || !selectedFullScanId) { onSave(); return; }
+          let payload: any = {};
+          if (selectedMenu === 'injection') {
+            if (injectionMode === 'mainMenu') payload = { mainMenu: { ...injMainForm } };
+            if (injectionMode === 'subMenuGraphic') payload = { subMenuValues: { values: injGraphicValues } };
+            if (injectionMode === 'switchType') payload = { switchType: { ...injSwitchForm } };
+          } else if (selectedMenu === 'holdingPressure') {
+            if (holdingMode === 'mainMenu') payload = { mainMenu: { ...holdMainForm } };
+            if (holdingMode === 'subMenuGraphic') payload = { subMenusValues: { values: holdGraphicValues } };
+          } else if (selectedMenu === 'dosing') {
+            if (dosingMode === 'mainMenu') payload = { mainMenu: { ...doseMainForm } };
+            if (dosingMode === 'subMenuGraphic') payload = { dosingSpeedsValues: { values: doseSpeedValues }, dosingPressuresValues: { values: dosePressureValues } };
+          } else if (selectedMenu === 'cylinderHeating') {
+            payload = { ...cylinderForm };
+          }
+          upsertSection(selectedFullScanId, selectedMenu, payload);
+          onSave();
+        }}>
           <GluestackText color="$textLight50">Speichern</GluestackText>
         </Button>
       </HStack>
