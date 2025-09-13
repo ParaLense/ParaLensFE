@@ -228,9 +228,14 @@ class ScanUploadService {
   needsUpdate(localScan: FullScanDto, lastUploaded?: string): boolean {
     if (!lastUploaded) return true;
     
-    const localDate = new Date(localScan.date);
-    const uploadedDate = new Date(lastUploaded);
+    // If there's no lastUploaded timestamp, it needs update
+    if (!localScan.lastUploaded) return true;
     
+    // Compare the scan's modification time with last upload time
+    const localDate = new Date(localScan.date);
+    const uploadedDate = new Date(localScan.lastUploaded);
+    
+    // If local scan is newer than last upload, it needs update
     return localDate > uploadedDate;
   }
 }

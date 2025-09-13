@@ -26,6 +26,7 @@ export interface FullScanDto {
   uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
   uploadError?: string;
   lastUploaded?: string; // ISO date string
+  lastModified?: string; // ISO date string - tracks when scan data was last modified
 }
 
 export interface ApiResponse<T> {

@@ -31,7 +31,8 @@ export function createEmptyFullScan(author: string): FullScanRecord {
     uploadStatus: 'not_uploaded',
     uploadError: undefined,
     serverId: undefined,
-    lastUploaded: undefined
+    lastUploaded: undefined,
+    lastModified: nowIso
   };
 }
 

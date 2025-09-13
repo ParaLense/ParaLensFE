@@ -46,7 +46,14 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (fs.id !== fullScanId) return fs;
       const existingSection: any = (fs as any)[section] || {};
       const merged = { ...existingSection, ...payload };
-      return { ...fs, [section]: merged } as FullScanDto;
+      const updatedScan = { ...fs, [section]: merged, lastModified: new Date().toISOString() } as FullScanDto;
+      
+      // If this scan was previously uploaded, mark it as needing update
+      if (updatedScan.uploadStatus === 'uploaded') {
+        updatedScan.uploadStatus = 'needs_update';
+      }
+      
+      return updatedScan;
     }));
   }, []);
 
@@ -73,6 +80,7 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               uploadStatus: 'uploaded' as const, 
               serverId: result.serverId,
               lastUploaded: new Date().toISOString(),
+              lastModified: fs.lastModified || new Date().toISOString(),
               uploadError: undefined
             }
           : fs
@@ -114,6 +122,7 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               ...fs, 
               uploadStatus: 'uploaded' as const, 
               lastUploaded: new Date().toISOString(),
+              lastModified: fs.lastModified || new Date().toISOString(),
               uploadError: undefined
             }
           : fs
@@ -137,10 +146,13 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const scan = fullScans.find(fs => fs.id === scanId);
     if (!scan) return 'not_uploaded';
     
-    // Check if scan needs update
-    if (scan.uploadStatus === 'uploaded' && scan.lastUploaded) {
-      const needsUpdate = scanUploadService.needsUpdate(scan, scan.lastUploaded);
-      if (needsUpdate) {
+    // Check if scan needs update by comparing lastModified with lastUploaded
+    if (scan.uploadStatus === 'uploaded' && scan.lastModified && scan.lastUploaded) {
+      const modifiedDate = new Date(scan.lastModified);
+      const uploadedDate = new Date(scan.lastUploaded);
+      
+      // If scan was modified after last upload, it needs update
+      if (modifiedDate > uploadedDate) {
         return 'needs_update';
       }
     }
