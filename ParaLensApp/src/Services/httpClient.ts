@@ -37,7 +37,20 @@ class HttpClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage += ` - ${JSON.stringify(errorData)}`;
+        } catch (e) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage += ` - ${errorText}`;
+          } catch (e2) {
+            // Ignore if we can't read the response body
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       // Handle empty responses (like DELETE operations)

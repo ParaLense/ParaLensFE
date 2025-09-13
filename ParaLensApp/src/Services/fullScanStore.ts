@@ -24,7 +24,15 @@ export async function saveFullScans(records: FullScanRecord[]): Promise<void> {
 export function createEmptyFullScan(author: string): FullScanRecord {
   const nowIso = new Date().toISOString();
   const id = Date.now();
-  return { id, author, date: nowIso };
+  return { 
+    id, 
+    author, 
+    date: nowIso,
+    uploadStatus: 'not_uploaded',
+    uploadError: undefined,
+    serverId: undefined,
+    lastUploaded: undefined
+  };
 }
 
 

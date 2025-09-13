@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { FullScanDto, ScanMenu } from '../types/common';
 import { createEmptyFullScan, loadFullScans, saveFullScans } from '../Services/fullScanStore';
+import { scanUploadService } from '../Services/scanUploadService';
 
 interface FullScanContextValue {
   fullScans: FullScanDto[];
@@ -8,6 +9,9 @@ interface FullScanContextValue {
   selectFullScan: (id: number | null) => void;
   createFullScan: (author: string) => number; 
   upsertSection: (fullScanId: number, section: ScanMenu, payload: any) => void;
+  uploadScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
+  updateScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
+  getUploadStatus: (scanId: number) => 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
 }
 
 const FullScanContext = createContext<FullScanContextValue | undefined>(undefined);
@@ -46,7 +50,114 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   }, []);
 
-  const value = useMemo(() => ({ fullScans, selectedFullScanId, selectFullScan, createFullScan, upsertSection }), [fullScans, selectedFullScanId, selectFullScan, createFullScan, upsertSection]);
+  const uploadScan = useCallback(async (scanId: number): Promise<{ success: boolean; error?: string }> => {
+    const scan = fullScans.find(fs => fs.id === scanId);
+    if (!scan) {
+      return { success: false, error: 'Scan not found' };
+    }
+
+    // Set uploading status
+    setFullScans(prev => prev.map(fs => 
+      fs.id === scanId 
+        ? { ...fs, uploadStatus: 'uploading' as const, uploadError: undefined }
+        : fs
+    ));
+
+    const result = await scanUploadService.createScan(scan);
+    
+    if (result.success) {
+      setFullScans(prev => prev.map(fs => 
+        fs.id === scanId 
+          ? { 
+              ...fs, 
+              uploadStatus: 'uploaded' as const, 
+              serverId: result.serverId,
+              lastUploaded: new Date().toISOString(),
+              uploadError: undefined
+            }
+          : fs
+      ));
+    } else {
+      setFullScans(prev => prev.map(fs => 
+        fs.id === scanId 
+          ? { 
+              ...fs, 
+              uploadStatus: 'error' as const, 
+              uploadError: result.error
+            }
+          : fs
+      ));
+    }
+
+    return result;
+  }, [fullScans]);
+
+  const updateScan = useCallback(async (scanId: number): Promise<{ success: boolean; error?: string }> => {
+    const scan = fullScans.find(fs => fs.id === scanId);
+    if (!scan || !scan.serverId) {
+      return { success: false, error: 'Scan not found or not uploaded' };
+    }
+
+    // Set uploading status
+    setFullScans(prev => prev.map(fs => 
+      fs.id === scanId 
+        ? { ...fs, uploadStatus: 'uploading' as const, uploadError: undefined }
+        : fs
+    ));
+
+    const result = await scanUploadService.updateScan(scan, scan.serverId);
+    
+    if (result.success) {
+      setFullScans(prev => prev.map(fs => 
+        fs.id === scanId 
+          ? { 
+              ...fs, 
+              uploadStatus: 'uploaded' as const, 
+              lastUploaded: new Date().toISOString(),
+              uploadError: undefined
+            }
+          : fs
+      ));
+    } else {
+      setFullScans(prev => prev.map(fs => 
+        fs.id === scanId 
+          ? { 
+              ...fs, 
+              uploadStatus: 'error' as const, 
+              uploadError: result.error
+            }
+          : fs
+      ));
+    }
+
+    return result;
+  }, [fullScans]);
+
+  const getUploadStatus = useCallback((scanId: number) => {
+    const scan = fullScans.find(fs => fs.id === scanId);
+    if (!scan) return 'not_uploaded';
+    
+    // Check if scan needs update
+    if (scan.uploadStatus === 'uploaded' && scan.lastUploaded) {
+      const needsUpdate = scanUploadService.needsUpdate(scan, scan.lastUploaded);
+      if (needsUpdate) {
+        return 'needs_update';
+      }
+    }
+    
+    return scan.uploadStatus || 'not_uploaded';
+  }, [fullScans]);
+
+  const value = useMemo(() => ({ 
+    fullScans, 
+    selectedFullScanId, 
+    selectFullScan, 
+    createFullScan, 
+    upsertSection,
+    uploadScan,
+    updateScan,
+    getUploadStatus
+  }), [fullScans, selectedFullScanId, selectFullScan, createFullScan, upsertSection, uploadScan, updateScan, getUploadStatus]);
 
   return (
     <FullScanContext.Provider value={value}>{children}</FullScanContext.Provider>
