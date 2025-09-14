@@ -257,189 +257,313 @@ const HistoryScreen = () => {
         }}
       />
 
-      <Modal isOpen={isDetailsOpen} onClose={() => setIsDetailsOpen(false)}>
+      <Modal isOpen={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} size="lg">
         <ModalBackdrop />
-        <ModalContent>
-          <ModalHeader>
-            <Heading size="md">{t('fullScanDetails') || 'Full Scan Details'}</Heading>
+        <ModalContent maxHeight="85%" maxWidth="90%" bg={isDark ? "$backgroundDark950" : "$backgroundLight0"}>
+          <ModalHeader borderBottomWidth={1} borderBottomColor={isDark ? "$backgroundDark800" : "$backgroundLight200"} pb={16}>
+            <Heading size="lg" color={isDark ? "$textLight50" : "$textDark900"}>
+              {t('fullScanDetails') || 'Full Scan Details'}
+            </Heading>
           </ModalHeader>
-          <ModalBody>
+          <ModalBody px={16} py={16}>
             {!selected ? (
-              <GluestackText>{t('noSelection') || 'Keine Auswahl'}</GluestackText>
+              <VStack space="md" alignItems="center" py={20}>
+                <GluestackText color={isDark ? "$textLight400" : "$textDark500"}>
+                  {t('noSelection') || 'Keine Auswahl'}
+                </GluestackText>
+              </VStack>
             ) : (
               <VStack space="md">
-                <GluestackText>{(t('author') || 'Autor') + ': '} {selected.author}</GluestackText>
-                <GluestackText>{(t('date') || 'Datum') + ': '} {new Date(selected.date).toLocaleString()}</GluestackText>
-                <Heading size="sm">{t('savedSections') || 'Gespeicherte Bereiche'}</Heading>
-                {(['injection','dosing','holdingPressure','cylinderHeating'] as const).map(key => (
-                  <VStack key={key} space="xs" bg="$backgroundDark900" p={10} rounded="$sm">
-                    <GluestackText fontWeight="$bold" textTransform="capitalize">{key}</GluestackText>
-                    {!selected[key] ? (
-                      <GluestackText color="$textLight500">{t('notAvailable') || 'Nicht vorhanden'}</GluestackText>
-                    ) : (
-                      <VStack space="sm">
-                        {/* Injection */}
-                        {key === 'injection' && (
-                          <VStack space="sm">
-                            {/* Main Menu */}
-                            {(selected as any).injection?.mainMenu && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Main Menu</GluestackText>
-                                {Object.entries((selected as any).injection.mainMenu).map(([label, value]: any) => (
-                                  <HStack key={label} justifyContent="space-between">
-                                    <GluestackText color="$textLight400">{label}</GluestackText>
-                                    <GluestackText color="$textLight50">{String(value)}</GluestackText>
-                                  </HStack>
-                                ))}
-                              </VStack>
-                            )}
-                            {/* Sub Menu Graphic */}
-                            {Array.isArray((selected as any).injection?.subMenuValues?.values) && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Sub Menu · Werte</GluestackText>
-                                <VStack space="xs">
-                                  <HStack justifyContent="space-between">
-                                    <GluestackText color="$textLight500">Index</GluestackText>
-                                    <GluestackText color="$textLight500">v</GluestackText>
-                                    <GluestackText color="$textLight500">v2</GluestackText>
-                                  </HStack>
-                                  {((selected as any).injection.subMenuValues.values as any[]).map((row: any, idx: number) => (
-                                    <HStack key={idx} justifyContent="space-between">
-                                      <GluestackText color="$textLight50">{row.index ?? idx + 1}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v ?? '-'}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v2 ?? '-'}</GluestackText>
-                                    </HStack>
-                                  ))}
-                                </VStack>
-                              </VStack>
-                            )}
-                            {/* Switch Type */}
-                            {(selected as any).injection?.switchType && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Switch Type</GluestackText>
-                                {Object.entries((selected as any).injection.switchType).map(([label, value]: any) => (
-                                  <HStack key={label} justifyContent="space-between">
-                                    <GluestackText color="$textLight400">{label}</GluestackText>
-                                    <GluestackText color="$textLight50">{String(value)}</GluestackText>
-                                  </HStack>
-                                ))}
-                              </VStack>
-                            )}
-                          </VStack>
-                        )}
+                {/* Header Info */}
+                <VStack space="sm" bg={isDark ? "$backgroundDark900" : "$backgroundLight100"} p={12} rounded="$lg" borderWidth={1} borderColor={isDark ? "$backgroundDark800" : "$backgroundLight200"}>
+                  <HStack justifyContent="space-between" alignItems="center">
+                    <VStack flex={1}>
+                      <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                        {t('author') || 'Autor'}
+                      </GluestackText>
+                      <GluestackText fontSize="$lg" fontWeight="$bold" color={isDark ? "$textLight50" : "$textDark900"}>
+                        {selected.author || 'Unbekannt'}
+                      </GluestackText>
+                    </VStack>
+                    <VStack alignItems="flex-end">
+                      <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                        {t('date') || 'Datum'}
+                      </GluestackText>
+                      <GluestackText fontSize="$sm" color={isDark ? "$textLight300" : "$textDark700"}>
+                        {new Date(selected.date).toLocaleString()}
+                      </GluestackText>
+                    </VStack>
+                  </HStack>
+                  {selected.serverId && (
+                    <HStack alignItems="center" mt={8}>
+                      <GluestackText fontSize="$xs" color={isDark ? "$textLight500" : "$textDark400"}>
+                        Server ID: {selected.serverId}
+                      </GluestackText>
+                    </HStack>
+                  )}
+                </VStack>
 
-                        {/* Holding Pressure */}
-                        {key === 'holdingPressure' && (
-                          <VStack space="sm">
-                            {(selected as any).holdingPressure?.mainMenu && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Main Menu</GluestackText>
-                                {Object.entries((selected as any).holdingPressure.mainMenu).map(([label, value]: any) => (
-                                  <HStack key={label} justifyContent="space-between">
-                                    <GluestackText color="$textLight400">{label}</GluestackText>
-                                    <GluestackText color="$textLight50">{String(value)}</GluestackText>
+                {/* Sections */}
+                <VStack space="md">
+                  <Heading size="md" color={isDark ? "$textLight50" : "$textDark900"}>
+                    {t('savedSections') || 'Gespeicherte Bereiche'}
+                  </Heading>
+                  
+                  {(['injection','dosing','holdingPressure','cylinderHeating'] as const).map(key => (
+                    <VStack key={key} space="md" bg={isDark ? "$backgroundDark900" : "$backgroundLight100"} p={12} rounded="$lg" borderWidth={1} borderColor={isDark ? "$backgroundDark800" : "$backgroundLight200"}>
+                      <HStack alignItems="center" space="sm">
+                        <Box w={8} h={8} rounded="$full" bg={selected[key] ? "$green600" : (isDark ? "$backgroundDark700" : "$backgroundLight300")} />
+                        <GluestackText fontSize="$lg" fontWeight="$bold" textTransform="capitalize" color={isDark ? "$textLight50" : "$textDark900"}>
+                          {key}
+                        </GluestackText>
+                      </HStack>
+                      
+                      {!selected[key] ? (
+                        <GluestackText color={isDark ? "$textLight500" : "$textDark400"} fontStyle="italic">
+                          {t('notAvailable') || 'Nicht vorhanden'}
+                        </GluestackText>
+                      ) : (
+                        <VStack space="md">
+                          {/* Injection */}
+                          {key === 'injection' && (
+                            <VStack space="md">
+                              {/* Main Menu */}
+                              {(selected as any).injection?.mainMenu && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Main Menu
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    {Object.entries((selected as any).injection.mainMenu).map(([label, value]: any) => (
+                                      <HStack key={label} justifyContent="space-between" alignItems="center">
+                                        <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                                          {label}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$sm" fontWeight="$medium" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {String(value)}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                              
+                              {/* Sub Menu Values */}
+                              {Array.isArray((selected as any).injection?.subMenuValues?.values) && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Sub Menu · Werte
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    <HStack justifyContent="space-between" bg={isDark ? "$backgroundDark700" : "$backgroundLight200"} p={8} rounded="$sm">
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>Index</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v2</GluestackText>
+                                    </HStack>
+                                    {((selected as any).injection.subMenuValues.values as any[]).map((row: any, idx: number) => (
+                                      <HStack key={idx} justifyContent="space-between" p={4}>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.index ?? idx + 1}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v ?? '-'}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v2 ?? '-'}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                              
+                              {/* Switch Type */}
+                              {(selected as any).injection?.switchType && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Switch Type
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    {Object.entries((selected as any).injection.switchType).map(([label, value]: any) => (
+                                      <HStack key={label} justifyContent="space-between" alignItems="center">
+                                        <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                                          {label}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$sm" fontWeight="$medium" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {String(value)}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                            </VStack>
+                          )}
+
+                          {/* Holding Pressure */}
+                          {key === 'holdingPressure' && (
+                            <VStack space="md">
+                              {(selected as any).holdingPressure?.mainMenu && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Main Menu
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    {Object.entries((selected as any).holdingPressure.mainMenu).map(([label, value]: any) => (
+                                      <HStack key={label} justifyContent="space-between" alignItems="center">
+                                        <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                                          {label}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$sm" fontWeight="$medium" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {String(value)}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                              
+                              {Array.isArray((selected as any).holdingPressure?.subMenusValues?.values) && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Sub Menu · Werte
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    <HStack justifyContent="space-between" bg={isDark ? "$backgroundDark700" : "$backgroundLight200"} p={8} rounded="$sm">
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>Index</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>t</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>p</GluestackText>
+                                    </HStack>
+                                    {((selected as any).holdingPressure.subMenusValues.values as any[]).map((row: any, idx: number) => (
+                                      <HStack key={idx} justifyContent="space-between" p={4}>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.index ?? idx + 1}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.t ?? '-'}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.p ?? '-'}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                            </VStack>
+                          )}
+
+                          {/* Dosing */}
+                          {key === 'dosing' && (
+                            <VStack space="md">
+                              {(selected as any).dosing?.mainMenu && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Main Menu
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    {Object.entries((selected as any).dosing.mainMenu).map(([label, value]: any) => (
+                                      <HStack key={label} justifyContent="space-between" alignItems="center">
+                                        <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                                          {label}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$sm" fontWeight="$medium" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {String(value)}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                              
+                              {Array.isArray((selected as any).dosing?.dosingSpeedsValues?.values) && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Speeds
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    <HStack justifyContent="space-between" bg={isDark ? "$backgroundDark700" : "$backgroundLight200"} p={8} rounded="$sm">
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>Index</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v2</GluestackText>
+                                    </HStack>
+                                    {((selected as any).dosing.dosingSpeedsValues.values as any[]).map((row: any, idx: number) => (
+                                      <HStack key={idx} justifyContent="space-between" p={4}>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.index ?? idx + 1}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v ?? '-'}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v2 ?? '-'}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                              
+                              {Array.isArray((selected as any).dosing?.dosingPressuresValues?.values) && (
+                                <VStack space="sm">
+                                  <GluestackText fontSize="$sm" fontWeight="$semibold" color={isDark ? "$textLight300" : "$textDark600"}>
+                                    Pressures
+                                  </GluestackText>
+                                  <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                    <HStack justifyContent="space-between" bg={isDark ? "$backgroundDark700" : "$backgroundLight200"} p={8} rounded="$sm">
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>Index</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v</GluestackText>
+                                      <GluestackText fontSize="$xs" fontWeight="$bold" color={isDark ? "$textLight400" : "$textDark500"}>v2</GluestackText>
+                                    </HStack>
+                                    {((selected as any).dosing.dosingPressuresValues.values as any[]).map((row: any, idx: number) => (
+                                      <HStack key={idx} justifyContent="space-between" p={4}>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.index ?? idx + 1}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v ?? '-'}
+                                        </GluestackText>
+                                        <GluestackText fontSize="$xs" color={isDark ? "$textLight50" : "$textDark900"}>
+                                          {row.v2 ?? '-'}
+                                        </GluestackText>
+                                      </HStack>
+                                    ))}
+                                  </VStack>
+                                </VStack>
+                              )}
+                            </VStack>
+                          )}
+
+                          {/* Cylinder Heating */}
+                          {key === 'cylinderHeating' && (
+                            <VStack space="sm">
+                              <VStack space="xs" bg={isDark ? "$backgroundDark800" : "$backgroundLight50"} p={12} rounded="$md">
+                                {Object.entries((selected as any).cylinderHeating).map(([label, value]: any) => (
+                                  <HStack key={label} justifyContent="space-between" alignItems="center">
+                                    <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                                      {label}
+                                    </GluestackText>
+                                    <GluestackText fontSize="$sm" fontWeight="$medium" color={isDark ? "$textLight50" : "$textDark900"}>
+                                      {String(value)}
+                                    </GluestackText>
                                   </HStack>
                                 ))}
                               </VStack>
-                            )}
-                            {Array.isArray((selected as any).holdingPressure?.subMenusValues?.values) && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Sub Menu · Werte</GluestackText>
-                                <VStack space="xs">
-                                  <HStack justifyContent="space-between">
-                                    <GluestackText color="$textLight500">Index</GluestackText>
-                                    <GluestackText color="$textLight500">t</GluestackText>
-                                    <GluestackText color="$textLight500">p</GluestackText>
-                                  </HStack>
-                                  {((selected as any).holdingPressure.subMenusValues.values as any[]).map((row: any, idx: number) => (
-                                    <HStack key={idx} justifyContent="space-between">
-                                      <GluestackText color="$textLight50">{row.index ?? idx + 1}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.t ?? '-'}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.p ?? '-'}</GluestackText>
-                                    </HStack>
-                                  ))}
-                                </VStack>
-                              </VStack>
-                            )}
-                          </VStack>
-                        )}
-
-                        {/* Dosing */}
-                        {key === 'dosing' && (
-                          <VStack space="sm">
-                            {(selected as any).dosing?.mainMenu && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Main Menu</GluestackText>
-                                {Object.entries((selected as any).dosing.mainMenu).map(([label, value]: any) => (
-                                  <HStack key={label} justifyContent="space-between">
-                                    <GluestackText color="$textLight400">{label}</GluestackText>
-                                    <GluestackText color="$textLight50">{String(value)}</GluestackText>
-                                  </HStack>
-                                ))}
-                              </VStack>
-                            )}
-                            {Array.isArray((selected as any).dosing?.dosingSpeedsValues?.values) && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Speeds</GluestackText>
-                                <VStack space="xs">
-                                  <HStack justifyContent="space-between">
-                                    <GluestackText color="$textLight500">Index</GluestackText>
-                                    <GluestackText color="$textLight500">v</GluestackText>
-                                    <GluestackText color="$textLight500">v2</GluestackText>
-                                  </HStack>
-                                  {((selected as any).dosing.dosingSpeedsValues.values as any[]).map((row: any, idx: number) => (
-                                    <HStack key={idx} justifyContent="space-between">
-                                      <GluestackText color="$textLight50">{row.index ?? idx + 1}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v ?? '-'}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v2 ?? '-'}</GluestackText>
-                                    </HStack>
-                                  ))}
-                                </VStack>
-                              </VStack>
-                            )}
-                            {Array.isArray((selected as any).dosing?.dosingPressuresValues?.values) && (
-                              <VStack>
-                                <GluestackText color="$textLight400" mb={4}>Pressures</GluestackText>
-                                <VStack space="xs">
-                                  <HStack justifyContent="space-between">
-                                    <GluestackText color="$textLight500">Index</GluestackText>
-                                    <GluestackText color="$textLight500">v</GluestackText>
-                                    <GluestackText color="$textLight500">v2</GluestackText>
-                                  </HStack>
-                                  {((selected as any).dosing.dosingPressuresValues.values as any[]).map((row: any, idx: number) => (
-                                    <HStack key={idx} justifyContent="space-between">
-                                      <GluestackText color="$textLight50">{row.index ?? idx + 1}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v ?? '-'}</GluestackText>
-                                      <GluestackText color="$textLight50">{row.v2 ?? '-'}</GluestackText>
-                                    </HStack>
-                                  ))}
-                                </VStack>
-                              </VStack>
-                            )}
-                          </VStack>
-                        )}
-
-                        {/* Cylinder Heating */}
-                        {key === 'cylinderHeating' && (
-                          <VStack space="xs">
-                            {Object.entries((selected as any).cylinderHeating).map(([label, value]: any) => (
-                              <HStack key={label} justifyContent="space-between">
-                                <GluestackText color="$textLight400">{label}</GluestackText>
-                                <GluestackText color="$textLight50">{String(value)}</GluestackText>
-                              </HStack>
-                            ))}
-                          </VStack>
-                        )}
-                      </VStack>
-                    )}
-                  </VStack>
-                ))}
+                            </VStack>
+                          )}
+                        </VStack>
+                      )}
+                    </VStack>
+                  ))}
+                </VStack>
               </VStack>
             )}
           </ModalBody>
-          <ModalFooter>
-            <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)}>
-              <GluestackText color="$textLight50">Schließen</GluestackText>
+          <ModalFooter borderTopWidth={1} borderTopColor={isDark ? "$backgroundDark800" : "$backgroundLight200"} pt={16}>
+            <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)} size="lg">
+              <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>
+                {t('close') || 'Schließen'}
+              </GluestackText>
             </Button>
           </ModalFooter>
         </ModalContent>
