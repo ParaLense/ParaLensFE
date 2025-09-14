@@ -82,12 +82,62 @@ const HistoryScreen = () => {
         data={fullScans}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => {
-          const present = {
-            injection: !!item.injection,
-            holdingPressure: !!item.holdingPressure,
-            dosing: !!item.dosing,
-            cylinderHeating: !!item.cylinderHeating,
+          // Check if sections are complete or partial
+          const getSectionStatus = (section: any, sectionType: string) => {
+            if (!section) return 'not_scanned'; // White - not scanned
+            
+            switch (sectionType) {
+              case 'injection':
+                const hasMainMenu = !!section.mainMenu;
+                const hasSubMenuValues = !!section.subMenuValues?.values?.length;
+                const hasSwitchType = !!section.switchType;
+                if (hasMainMenu && hasSubMenuValues && hasSwitchType) return 'complete'; // Green
+                if (hasMainMenu || hasSubMenuValues || hasSwitchType) return 'partial'; // Orange
+                return 'not_scanned';
+                
+              case 'dosing':
+                const hasDosingMainMenu = !!section.mainMenu;
+                const hasDosingSpeeds = !!section.dosingSpeedsValues?.values?.length;
+                const hasDosingPressures = !!section.dosingPressuresValues?.values?.length;
+                if (hasDosingMainMenu && hasDosingSpeeds && hasDosingPressures) return 'complete'; // Green
+                if (hasDosingMainMenu || hasDosingSpeeds || hasDosingPressures) return 'partial'; // Orange
+                return 'not_scanned';
+                
+              case 'holdingPressure':
+                const hasHoldingMainMenu = !!section.mainMenu;
+                const hasHoldingSubMenus = !!section.subMenusValues?.values?.length;
+                if (hasHoldingMainMenu && hasHoldingSubMenus) return 'complete'; // Green
+                if (hasHoldingMainMenu || hasHoldingSubMenus) return 'partial'; // Orange
+                return 'not_scanned';
+                
+              case 'cylinderHeating':
+                console.log('CylinderHeating section data:', JSON.stringify(section, null, 2));
+                // Check for mainMenu or any setpoint values
+                const hasCylinderMainMenu = !!section.mainMenu;
+                const hasSetpoint1 = !!section.setpoint1;
+                const hasSetpoint2 = !!section.setpoint2;
+                const hasSetpoint3 = !!section.setpoint3;
+                const hasSetpoint4 = !!section.setpoint4;
+                const hasSetpoint5 = !!section.setpoint5;
+                const hasAnySetpoint = hasSetpoint1 || hasSetpoint2 || hasSetpoint3 || hasSetpoint4 || hasSetpoint5;
+                
+                console.log('hasCylinderMainMenu:', hasCylinderMainMenu, 'hasAnySetpoint:', hasAnySetpoint);
+                
+                if (hasCylinderMainMenu || hasAnySetpoint) return 'complete'; // Green
+                return 'not_scanned';
+                
+              default:
+                return 'not_scanned';
+            }
           };
+
+          const sectionStatuses = {
+            injection: getSectionStatus(item.injection, 'injection'),
+            holdingPressure: getSectionStatus(item.holdingPressure, 'holdingPressure'),
+            dosing: getSectionStatus(item.dosing, 'dosing'),
+            cylinderHeating: getSectionStatus(item.cylinderHeating, 'cylinderHeating'),
+          };
+          
           const uploadStatus = getUploadStatus(item.id);
           const isUploading = uploadStatus === 'uploading';
           
@@ -122,11 +172,29 @@ const HistoryScreen = () => {
               </HStack>
               
               <HStack mt={10} space="sm" flexWrap="wrap">
-                {Object.entries(present).map(([key, val]) => (
-                  <Box key={key} px={8} py={4} rounded="$sm" bg={val ? '$green600' : (isDark ? '$backgroundDark800' : '$backgroundLight200')}>
-                    <GluestackText color={val ? '$textLight50' : (isDark ? '$textLight400' : '$textDark500')}>{key}</GluestackText>
-                  </Box>
-                ))}
+                {Object.entries(sectionStatuses).map(([key, status]) => {
+                  let bgColor, textColor;
+                  
+                  switch (status) {
+                    case 'complete':
+                      bgColor = '$green600';
+                      textColor = '$textLight50';
+                      break;
+                    case 'partial':
+                      bgColor = '$orange500';
+                      textColor = '$textLight50';
+                      break;
+                    default: // 'not_scanned'
+                      bgColor = isDark ? '$backgroundDark800' : '$backgroundLight200';
+                      textColor = isDark ? '$textLight400' : '$textDark500';
+                  }
+                  
+                  return (
+                    <Box key={key} px={8} py={4} rounded="$sm" bg={bgColor}>
+                      <GluestackText color={textColor}>{key}</GluestackText>
+                    </Box>
+                  );
+                })}
               </HStack>
 
               {/* Upload/Update buttons */}
