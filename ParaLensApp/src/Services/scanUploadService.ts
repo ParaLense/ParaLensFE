@@ -47,7 +47,11 @@ class ScanUploadService {
       // Convert ISO date to YYYY-MM-DD format as expected by backend
       const dateOnly = new Date(scan.date).toISOString().split('T')[0];
       
+      console.log('Original scan data:', JSON.stringify(scan, null, 2));
+      console.log('CylinderHeating data:', JSON.stringify(scan.cylinderHeating, null, 2));
+      
       // Transform injection data to match backend structure
+      // Always provide minimal structure to satisfy backend requirements
       const transformedInjection = scan.injection ? {
         mainMenu: scan.injection.mainMenu,
         subMenuValues: {
@@ -70,7 +74,10 @@ class ScanUploadService {
           values: scan.dosing.dosingPressuresValues?.values || []
         }
       } : {
-        subMenuValues: {
+        dosingSpeedsValues: {
+          values: []
+        },
+        dosingPressuresValues: {
           values: []
         }
       };
@@ -82,10 +89,37 @@ class ScanUploadService {
           values: scan.holdingPressure.subMenusValues?.values || []
         }
       } : {
-        subMenuValues: {
+        subMenusValues: {
           values: []
         }
       };
+
+      // Transform cylinder heating data to match backend structure
+      // CylinderHeating only has mainMenu, no additional arrays
+      let transformedCylinderHeating;
+      
+      if (scan.cylinderHeating && scan.cylinderHeating.mainMenu) {
+        // If we have cylinderHeating data with mainMenu
+        transformedCylinderHeating = {
+          mainMenu: scan.cylinderHeating.mainMenu
+        };
+      } else if (scan.cylinderHeating) {
+        // If we have cylinderHeating but no mainMenu, use the cylinderHeating data directly
+        transformedCylinderHeating = {
+          mainMenu: scan.cylinderHeating
+        };
+      } else {
+        // If no cylinderHeating data at all, provide default structure
+        transformedCylinderHeating = {
+          mainMenu: {
+            setpoint1: 0,
+            setpoint2: 0,
+            setpoint3: 0,
+            setpoint4: 0,
+            setpoint5: 0
+          }
+        };
+      }
 
       const request: CreateFullScanRequest = {
         name: `Scan_${scan.id}_${scan.author}`,
@@ -94,7 +128,7 @@ class ScanUploadService {
         injection: transformedInjection,
         dosing: transformedDosing,
         holdingPressure: transformedHoldingPressure,
-        cylinderHeating: scan.cylinderHeating,
+        cylinderHeating: transformedCylinderHeating,
       };
 
       console.log('Creating scan with request:', JSON.stringify(request, null, 2));
@@ -140,7 +174,11 @@ class ScanUploadService {
       // Convert ISO date to YYYY-MM-DD format as expected by backend
       const dateOnly = new Date(scan.date).toISOString().split('T')[0];
       
+      console.log('Original scan data (update):', JSON.stringify(scan, null, 2));
+      console.log('CylinderHeating data (update):', JSON.stringify(scan.cylinderHeating, null, 2));
+      
       // Transform injection data to match backend structure
+      // Always provide minimal structure to satisfy backend requirements
       const transformedInjection = scan.injection ? {
         mainMenu: scan.injection.mainMenu,
         subMenuValues: {
@@ -163,7 +201,10 @@ class ScanUploadService {
           values: scan.dosing.dosingPressuresValues?.values || []
         }
       } : {
-        subMenuValues: {
+        dosingSpeedsValues: {
+          values: []
+        },
+        dosingPressuresValues: {
           values: []
         }
       };
@@ -175,10 +216,37 @@ class ScanUploadService {
           values: scan.holdingPressure.subMenusValues?.values || []
         }
       } : {
-        subMenuValues: {
+        subMenusValues: {
           values: []
         }
       };
+
+      // Transform cylinder heating data to match backend structure
+      // CylinderHeating only has mainMenu, no additional arrays
+      let transformedCylinderHeating;
+      
+      if (scan.cylinderHeating && scan.cylinderHeating.mainMenu) {
+        // If we have cylinderHeating data with mainMenu
+        transformedCylinderHeating = {
+          mainMenu: scan.cylinderHeating.mainMenu
+        };
+      } else if (scan.cylinderHeating) {
+        // If we have cylinderHeating but no mainMenu, use the cylinderHeating data directly
+        transformedCylinderHeating = {
+          mainMenu: scan.cylinderHeating
+        };
+      } else {
+        // If no cylinderHeating data at all, provide default structure
+        transformedCylinderHeating = {
+          mainMenu: {
+            setpoint1: 0,
+            setpoint2: 0,
+            setpoint3: 0,
+            setpoint4: 0,
+            setpoint5: 0
+          }
+        };
+      }
 
       const request: UpdateFullScanRequest = {
         name: `Scan_${scan.id}_${scan.author}`,
@@ -187,7 +255,7 @@ class ScanUploadService {
         injection: transformedInjection,
         dosing: transformedDosing,
         holdingPressure: transformedHoldingPressure,
-        cylinderHeating: scan.cylinderHeating,
+        cylinderHeating: transformedCylinderHeating,
       };
 
       const endpoint = API_ENDPOINTS.SCANS_BY_NAME.replace('{name}', `Scan_${scan.id}_${scan.author}`);
