@@ -15,4 +15,4 @@
 
 # Vision Camera Frame Processors
 -keep class com.mrousavy.camera.** { *; }
--keep class com.bearblock.visioncameraocr.** { *; }
+-keep class com.alex8734.visioncamerascreendetector.** { *; }

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Dimensions, AppState, AppStateStatus } from 'react-native';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { performOcr } from '@bear-block/vision-camera-ocr';
+import { performScan } from 'vision-camera-screen-detector';
 import { Box, Heading } from '@gluestack-ui/themed';
 import { Text as GluestackText } from '@gluestack-ui/themed/build/components/Text';
 import { useRunOnJS } from 'react-native-worklets-core';
@@ -100,6 +101,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = (props:UiScannerCameraPr
           results[box.id] = result.text;
         }
       }
+      const SCreen = performScan(frame)
 
       if (Object.keys(results).length > 0) {
         setOcrMapJS(results);
