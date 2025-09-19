@@ -1,8 +1,0 @@
-{
-	"name": "react-dom",
-	"version": "0.0.0-shim",
-	"main": "index.js",
-	"module": "index.js",
-	"type": "module"
-}
-

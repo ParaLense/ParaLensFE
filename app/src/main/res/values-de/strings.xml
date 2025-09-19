@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">ParaLensFE</string>
+    <string name="tab_history">Verlauf</string>
+    <string name="tab_camera">Kamera</string>
+    <string name="tab_settings">Einstellungen</string>
+    <string name="camera_permission_required">Kameraberechtigung erforderlich</string>
+    <string name="toggle_theme">Theme umschalten</string>
+    <string name="continue_label">Weiter</string>
+    <string name="review_title">Überprüfen</string>
+    <string name="back">Zurück</string>
+    <string name="save">Speichern</string>
+</resources>
+
+
