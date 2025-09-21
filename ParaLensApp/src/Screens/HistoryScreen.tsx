@@ -1,18 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Alert } from 'react-native';
-import { Box, Heading, VStack, HStack, Text as GluestackText, Button, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from '@gluestack-ui/themed';
+import { FlatList, Alert, Platform } from 'react-native';
+import { Box, Heading, VStack, HStack, Text as GluestackText, Button, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner, Progress, ProgressFilledTrack } from '@gluestack-ui/themed';
 import { useFullScan } from '../contexts/FullScanContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useI18n } from '../utils/i18n';
 import ConnectivityTest from '../Services/connectivityTest';
+import { useApiContext } from '../contexts/ApiContext';
 
 const HistoryScreen = () => {
   const { fullScans, uploadScan, updateScan, getUploadStatus } = useFullScan();
   const { theme } = useSettings();
   const { t } = useI18n();
+  const { excelService } = useApiContext();
   const isDark = theme === 'dark';
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const selected = useMemo(() => fullScans.find(f => f.id === selectedId) || null, [fullScans, selectedId]);
 
   const getStatusEmoji = (status: string) => {
@@ -67,6 +71,50 @@ const HistoryScreen = () => {
       }
     } catch (error) {
       Alert.alert('Connection Test Failed', 'An unexpected error occurred');
+    }
+  };
+
+  const handleDownloadExcel = async (scanId: number) => {
+    if (!selected) return;
+    
+    // Check if scan is uploaded first
+    const uploadStatus = getUploadStatus(scanId);
+    if (uploadStatus !== 'uploaded') {
+      Alert.alert(
+        'Scan Not Uploaded',
+        'The scan needs to be uploaded to the server first before you can download the Excel file. Please upload the scan and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    
+    try {
+      // Use the original scan name format that was used during upload
+      const scanName = `Scan_${scanId}_${selected.author}`;
+      
+      const result = await excelService.downloadExcel(scanName, (progress) => {
+        setDownloadProgress(progress);
+      });
+      
+      if (result.success) {
+        Alert.alert(
+          'Download Complete', 
+          Platform.OS === 'android' 
+            ? 'Excel file has been downloaded successfully! You can find it in your Downloads folder.'
+            : 'Excel file has been downloaded successfully! You can find it in the Files app under this app\'s documents.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Download Failed', result.error || 'Failed to download Excel file');
+      }
+    } catch (error) {
+      Alert.alert('Download Failed', 'An unexpected error occurred while downloading the file');
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -560,11 +608,48 @@ const HistoryScreen = () => {
             )}
           </ModalBody>
           <ModalFooter borderTopWidth={1} borderTopColor={isDark ? "$backgroundDark800" : "$backgroundLight200"} pt={16}>
-            <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)} size="lg">
-              <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>
-                {t('close') || 'Schließen'}
-              </GluestackText>
-            </Button>
+            <HStack space="md" flex={1} justifyContent="space-between">
+              <Button 
+                variant="solid" 
+                action="primary" 
+                onPress={() => selected && handleDownloadExcel(selected.id)} 
+                disabled={isDownloading || (selected && getUploadStatus(selected.id) !== 'uploaded')}
+                size="lg"
+                flex={1}
+              >
+                {isDownloading ? (
+                  <VStack alignItems="center" space="xs">
+                    <Spinner size="small" color="$white" />
+                    <GluestackText color="$white">Downloading...</GluestackText>
+                  </VStack>
+                ) : selected && getUploadStatus(selected.id) !== 'uploaded' ? (
+                  <GluestackText color="$white">📤 Upload First</GluestackText>
+                ) : (
+                  <GluestackText color="$white">📥 Download Excel</GluestackText>
+                )}
+              </Button>
+              <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)} size="lg">
+                <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>
+                  {t('close') || 'Schließen'}
+                </GluestackText>
+              </Button>
+            </HStack>
+            
+            {isDownloading && (
+              <VStack mt={12} space="xs">
+                <HStack justifyContent="space-between" alignItems="center">
+                  <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                    Download Progress
+                  </GluestackText>
+                  <GluestackText fontSize="$sm" color={isDark ? "$textLight300" : "$textDark600"}>
+                    {Math.round(downloadProgress * 100)}%
+                  </GluestackText>
+                </HStack>
+                <Progress value={downloadProgress * 100} size="sm">
+                  <ProgressFilledTrack />
+                </Progress>
+              </VStack>
+            )}
           </ModalFooter>
         </ModalContent>
       </Modal>

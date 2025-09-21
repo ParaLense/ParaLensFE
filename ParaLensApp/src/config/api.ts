@@ -18,4 +18,6 @@ export const API_ENDPOINTS = {
   DOSING: '/api/scans/{scanId}/dosing',
   HOLDING_PRESSURE: '/api/scans/{scanId}/holdingpressure',
   CYLINDER_HEATING: '/api/scans/{scanId}/cylinderheating',
+  EXCEL_CREATE: '/excel/{name}',
+  EXCEL_DOWNLOAD: '/excel/{name}',
 } as const; 

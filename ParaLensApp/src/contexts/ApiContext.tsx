@@ -5,6 +5,7 @@ import {
   dosingService,
   holdingPressureService,
   cylinderHeatingService,
+  excelService,
 } from '../Services';
 
 interface ApiContextType {
@@ -13,6 +14,7 @@ interface ApiContextType {
   dosingService: typeof dosingService;
   holdingPressureService: typeof holdingPressureService;
   cylinderHeatingService: typeof cylinderHeatingService;
+  excelService: typeof excelService;
 }
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined);
@@ -28,6 +30,7 @@ export function ApiProvider({ children }: ApiProviderProps) {
     dosingService,
     holdingPressureService,
     cylinderHeatingService,
+    excelService,
   };
 
   return (
