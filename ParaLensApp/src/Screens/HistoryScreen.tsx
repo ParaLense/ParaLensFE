@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { FlatList, Alert, Platform } from 'react-native';
+import FileViewer from 'react-native-file-viewer';
+import Share from 'react-native-share';
 import { Box, Heading, VStack, HStack, Text as GluestackText, Button, Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner, Progress, ProgressFilledTrack } from '@gluestack-ui/themed';
 import { useFullScan } from '../contexts/FullScanContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -17,6 +19,8 @@ const HistoryScreen = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [lastDownloadedPath, setLastDownloadedPath] = useState<string | null>(null);
+  const lastProgressUpdateRef = useRef<number>(0);
   const selected = useMemo(() => fullScans.find(f => f.id === selectedId) || null, [fullScans, selectedId]);
 
   const getStatusEmoji = (status: string) => {
@@ -96,16 +100,54 @@ const HistoryScreen = () => {
       const scanName = `Scan_${scanId}_${selected.author}`;
       
       const result = await excelService.downloadExcel(scanName, (progress) => {
-        setDownloadProgress(progress);
+        const now = Date.now();
+        const last = lastProgressUpdateRef.current || 0;
+        // Throttle to ~4 updates/second or on completion
+        if (progress >= 1 || now - last >= 250) {
+          lastProgressUpdateRef.current = now;
+          if (!Number.isNaN(progress) && progress >= 0 && progress <= 1) {
+            setDownloadProgress(progress);
+          }
+        }
       });
       
       if (result.success) {
+        setLastDownloadedPath(result.filePath || null);
+        const message = Platform.OS === 'android'
+          ? 'Excel file downloaded. Open it or share it now.'
+          : 'Excel file downloaded. Open it or share it now.';
         Alert.alert(
-          'Download Complete', 
-          Platform.OS === 'android' 
-            ? 'Excel file has been downloaded successfully! You can find it in your Downloads folder.'
-            : 'Excel file has been downloaded successfully! You can find it in the Files app under this app\'s documents.',
-          [{ text: 'OK' }]
+          'Download Complete',
+          message,
+          [
+            {
+              text: 'Open',
+              onPress: async () => {
+                if (!result.filePath) return;
+                try {
+                  await FileViewer.open(result.filePath, { showOpenWithDialog: true });
+                } catch (e) {
+                  Alert.alert('Open Failed', 'Could not open the file on this device.');
+                }
+              },
+            },
+            {
+              text: 'Share',
+              onPress: async () => {
+                if (!result.filePath) return;
+                try {
+                  await Share.open({
+                    url: `file://${result.filePath}`,
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    failOnCancel: false,
+                  });
+                } catch (e) {
+                  // user might cancel or error
+                }
+              },
+            },
+            { text: 'OK' },
+          ]
         );
       } else {
         Alert.alert('Download Failed', result.error || 'Failed to download Excel file');
@@ -115,6 +157,7 @@ const HistoryScreen = () => {
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
+      lastProgressUpdateRef.current = 0;
     }
   };
 
@@ -607,6 +650,21 @@ const HistoryScreen = () => {
               </VStack>
             )}
           </ModalBody>
+          {isDownloading && (
+            <VStack px={16} pt={8} pb={0} space="xs" w="100%">
+              <HStack justifyContent="space-between" alignItems="center">
+                <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
+                  Download Progress
+                </GluestackText>
+                <GluestackText fontSize="$sm" color={isDark ? "$textLight300" : "$textDark600"}>
+                  {Math.round(downloadProgress * 100)}%
+                </GluestackText>
+              </HStack>
+              <Progress value={downloadProgress * 100} size="sm">
+                <ProgressFilledTrack />
+              </Progress>
+            </VStack>
+          )}
           <ModalFooter borderTopWidth={1} borderTopColor={isDark ? "$backgroundDark800" : "$backgroundLight200"} pt={16}>
             <HStack space="md" flex={1} justifyContent="space-between">
               <Button 
@@ -617,16 +675,18 @@ const HistoryScreen = () => {
                 size="lg"
                 flex={1}
               >
-                {isDownloading ? (
-                  <VStack alignItems="center" space="xs">
-                    <Spinner size="small" color="$white" />
-                    <GluestackText color="$white">Downloading...</GluestackText>
-                  </VStack>
-                ) : selected && getUploadStatus(selected.id) !== 'uploaded' ? (
-                  <GluestackText color="$white">📤 Upload First</GluestackText>
-                ) : (
+                <Box position="relative" w={220} alignItems="center" justifyContent="center">
+                  {isDownloading && (
+                    <HStack position="absolute" left={8} alignItems="center" space="xs">
+                      <Spinner size="small" color="$white" />
+                    </HStack>
+                  )}
                   <GluestackText color="$white">📥 Download Excel</GluestackText>
-                )}
+                  {/* Hidden text to reserve width for alternative label */}
+                  <GluestackText color="$white" opacity={0} position="absolute">
+                    📤 Upload First
+                  </GluestackText>
+                </Box>
               </Button>
               <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)} size="lg">
                 <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>
@@ -635,21 +695,7 @@ const HistoryScreen = () => {
               </Button>
             </HStack>
             
-            {isDownloading && (
-              <VStack mt={12} space="xs">
-                <HStack justifyContent="space-between" alignItems="center">
-                  <GluestackText fontSize="$sm" color={isDark ? "$textLight400" : "$textDark500"}>
-                    Download Progress
-                  </GluestackText>
-                  <GluestackText fontSize="$sm" color={isDark ? "$textLight300" : "$textDark600"}>
-                    {Math.round(downloadProgress * 100)}%
-                  </GluestackText>
-                </HStack>
-                <Progress value={downloadProgress * 100} size="sm">
-                  <ProgressFilledTrack />
-                </Progress>
-              </VStack>
-            )}
+            
           </ModalFooter>
         </ModalContent>
       </Modal>

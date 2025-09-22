@@ -73,9 +73,10 @@ export class ExcelService {
           fromUrl: downloadUrl,
           toFile: downloadPath,
           progress: (res) => {
-            const progress = res.bytesWritten / res.contentLength;
-            if (onProgress) {
-              onProgress(progress);
+            const totalBytes = Number(res.contentLength) || 0;
+            const writtenBytes = Number(res.bytesWritten) || 0;
+            if (onProgress && totalBytes > 0) {
+              onProgress(writtenBytes / totalBytes);
             }
           },
         }).promise;
@@ -102,9 +103,10 @@ export class ExcelService {
           fromUrl: downloadUrl,
           toFile: downloadPath,
           progress: (res) => {
-            const progress = res.bytesWritten / res.contentLength;
-            if (onProgress) {
-              onProgress(progress);
+            const totalBytes = Number(res.contentLength) || 0;
+            const writtenBytes = Number(res.bytesWritten) || 0;
+            if (onProgress && totalBytes > 0) {
+              onProgress(writtenBytes / totalBytes);
             }
           },
         }).promise;
@@ -171,7 +173,7 @@ export class ExcelService {
   private async scanFile(filePath: string): Promise<void> {
     try {
       if (Platform.OS === 'android') {
-        // Use react-native-fs to trigger media scan
+        // Trigger media scan so the file appears in the Downloads app
         await RNFS.scanFile(filePath);
       }
     } catch (error) {
