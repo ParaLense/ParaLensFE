@@ -8,12 +8,15 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useI18n } from '../utils/i18n';
 import ConnectivityTest from '../Services/connectivityTest';
 import { useApiContext } from '../contexts/ApiContext';
+import { useGuide } from '../contexts/GuideContext';
+import { StyleSheet } from 'react-native';
 
 const HistoryScreen = () => {
   const { fullScans, uploadScan, updateScan, getUploadStatus } = useFullScan();
   const { theme } = useSettings();
   const { t } = useI18n();
   const { excelService } = useApiContext();
+  const guide = useGuide();
   const isDark = theme === 'dark';
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -233,7 +236,9 @@ const HistoryScreen = () => {
           const isUploading = uploadStatus === 'uploading';
           
           return (
-            <Box bg={isDark ? "$backgroundDark900" : "$backgroundLight100"} p={12} rounded="$md" mb={10} borderWidth={1} borderColor={isDark ? "$backgroundDark800" : "$backgroundLight200"}>
+            <Box bg={isDark ? "$backgroundDark900" : "$backgroundLight100"} p={12} rounded="$md" mb={10} borderWidth={1} borderColor={isDark ? "$backgroundDark800" : "$backgroundLight200"}
+              style={guide.shouldHighlight(`history-item-${item.id}`) ? stylesHL.border : undefined}
+            >
               <HStack alignItems="center" justifyContent="space-between">
                 <VStack flex={1}>
                   <HStack alignItems="center" space="sm">
@@ -254,8 +259,9 @@ const HistoryScreen = () => {
                   <Button 
                     variant="outline" 
                     action="secondary" 
-                    onPress={() => { setSelectedId(item.id); setIsDetailsOpen(true); }}
+                    onPress={() => { setSelectedId(item.id); setIsDetailsOpen(true); if (guide.isActive) guide.signalOpenedDetails(); }}
                     size="sm"
+                    style={guide.shouldHighlight(`history-details-${item.id}`) ? stylesHL.border : undefined}
                   >
                     <GluestackText color={isDark ? "$textLight50" : "$textDark900"}>{t('details') || 'Details'}</GluestackText>
                   </Button>
@@ -294,9 +300,10 @@ const HistoryScreen = () => {
                   <Button 
                     variant="solid" 
                     action="primary" 
-                    onPress={() => handleUpload(item.id)}
+                    onPress={async () => { await handleUpload(item.id); if (guide.isActive) guide.signalUploaded(); }}
                     disabled={isUploading}
                     size="sm"
+                    style={guide.shouldHighlight(`history-upload-${item.id}`) ? stylesHL.border : undefined}
                   >
                     {isUploading ? (
                       <HStack alignItems="center" space="xs">
@@ -311,9 +318,10 @@ const HistoryScreen = () => {
                   <Button 
                     variant="solid" 
                     action="secondary" 
-                    onPress={() => handleUpdate(item.id)}
+                    onPress={async () => { await handleUpdate(item.id); if (guide.isActive) guide.signalUploaded(); }}
                     disabled={isUploading}
                     size="sm"
+                    style={guide.shouldHighlight(`history-update-${item.id}`) ? stylesHL.border : undefined}
                   >
                     {isUploading ? (
                       <HStack alignItems="center" space="xs">
@@ -328,7 +336,7 @@ const HistoryScreen = () => {
                   <Button 
                     variant="outline" 
                     action="secondary" 
-                    onPress={() => handleUpdate(item.id)}
+                    onPress={async () => { await handleUpdate(item.id); if (guide.isActive) guide.signalUploaded(); }}
                     disabled={isUploading}
                     size="sm"
                   >
@@ -704,3 +712,11 @@ const HistoryScreen = () => {
 };
 
 export default HistoryScreen; 
+
+const stylesHL = StyleSheet.create({
+  border: {
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+    borderRadius: 8,
+  }
+});

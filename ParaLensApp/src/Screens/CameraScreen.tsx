@@ -11,6 +11,7 @@ import UiScannerCamera from '../Components/UiScannerCamera.tsx';
 import { useFullScan } from '../contexts/FullScanContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useI18n } from '../utils/i18n';
+import { useGuide } from '../contexts/GuideContext';
 
 
 // Types for modes
@@ -35,6 +36,12 @@ const CameraScreen = () => {
   const { theme } = useSettings();
   const isDark = theme === 'dark';
   const { t } = useI18n();
+  const guide = useGuide();
+  const shouldHL = guide.shouldHighlight;
+  const canPickFullScan = guide.isActive && guide.step === 'camera_select_fullscan';
+  const canSelectSection = guide.isActive && (guide.step === 'camera_select_section');
+  const canPickInjectionMode = guide.isActive && guide.step === 'injection_select_mode';
+  const canPressContinue = guide.isActive ? guide.step === 'camera_continue_to_review' : (injectionMode || holdingMode || dosingMode || selectedMenu === 'cylinderHeating');
 
 
 
@@ -115,10 +122,16 @@ const CameraScreen = () => {
         <VStack w="$5/6" mb={20} space="sm">
           <Heading size="sm" color={isDark ? "$textLight50" : "$textDark900"}>{t('selectFullScan') || 'Full Scan wählen'}</Heading>
           <HStack space="sm" alignItems="center">
-            <Button flex={1} variant="outline" action="secondary" onPress={() => setIsPickerOpen(true)}>
+            <Button flex={1} variant="outline" action="secondary" onPress={() => { setIsPickerOpen(true); if (guide.isActive) guide.signalSelectedFullScan(); }}
+              style={shouldHL('fullscan-picker') ? styles.hl : undefined}
+              disabled={guide.isActive ? !canPickFullScan : false}
+            >
               <GluestackText color={isDark ? "$textLight50" : "$textDark900"} numberOfLines={1}>{selectedLabel}</GluestackText>
             </Button>
-            <Button variant="solid" action="primary" px={12} onPress={() => setIsAddOpen(true)}>
+            <Button variant="solid" action="primary" px={12} onPress={() => { setIsAddOpen(true); if (guide.isActive) guide.signalSelectedFullScan(); }}
+              style={shouldHL('fullscan-create') ? styles.hl : undefined}
+              disabled={guide.isActive ? !canPickFullScan : false}
+            >
               <GluestackText color="$textLight50" fontWeight="$bold">+</GluestackText>
             </Button>
           </HStack>
@@ -179,8 +192,8 @@ const CameraScreen = () => {
         </Modal>
         <VStack space="md" w="$5/6">
           {(['injection','dosing','holdingPressure','cylinderHeating'] as ScanMenu[]).map((menu) => (
+            <Box key={menu} style={shouldHL(`menu-${menu}`) ? styles.hlBox : undefined}>
             <Button
-              key={menu}
               onPress={() => {
                 if (menu === 'injection') {
                   setSelectedMenu('injection');
@@ -194,12 +207,15 @@ const CameraScreen = () => {
                 } else {
                   setSelectedMenu(menu);
                 }
-              }}
+                if (guide.isActive) guide.signalSelectedSection(menu);
+               }}
               action="primary"
               variant="solid"
+               disabled={guide.isActive ? !canSelectSection : false}
             >
               <GluestackText color="$textLight50" textTransform="capitalize">{menu}</GluestackText>
             </Button>
+            </Box>
           ))}
         </VStack>
       </Box>
@@ -212,15 +228,21 @@ const CameraScreen = () => {
       <Box flex={1} alignItems="center" justifyContent="center" bg="$backgroundDark950" px={24}>
         <Heading size="lg" color="$textLight50" mb={24}>Injection · Auswahl</Heading>
         <VStack space="md" w="$5/6">
-          <Button action="primary" variant="solid" onPress={() => setInjectionMode('mainMenu')}>
+          <Box style={shouldHL('menu-injection-mainMenu') ? styles.hlBox : undefined}>
+          <Button action="primary" variant="solid" onPress={() => { setInjectionMode('mainMenu'); if (guide.isActive) guide.signalSelectedInjectionMode(); }} disabled={guide.isActive ? !canPickInjectionMode : false}>
             <GluestackText color="$textLight50">Main Menu</GluestackText>
           </Button>
-          <Button action="primary" variant="solid" onPress={() => setInjectionMode('subMenuGraphic')}>
+          </Box>
+          <Box style={shouldHL('menu-injection-subMenuGraphic') ? styles.hlBox : undefined}>
+          <Button action="primary" variant="solid" onPress={() => { setInjectionMode('subMenuGraphic'); if (guide.isActive) guide.signalSelectedInjectionMode(); }} disabled={guide.isActive ? !canPickInjectionMode : false}>
             <GluestackText color="$textLight50">Sub Menu Graphic</GluestackText>
           </Button>
-          <Button action="primary" variant="solid" onPress={() => setInjectionMode('switchType')}>
+          </Box>
+          <Box style={shouldHL('menu-injection-switchType') ? styles.hlBox : undefined}>
+          <Button action="primary" variant="solid" onPress={() => { setInjectionMode('switchType'); if (guide.isActive) guide.signalSelectedInjectionMode(); }} disabled={guide.isActive ? !canPickInjectionMode : false}>
             <GluestackText color="$textLight50">Switch Type</GluestackText>
           </Button>
+          </Box>
         </VStack>
         <Button mt={24} variant="outline" action="secondary" onPress={resetToRootMenu}>
           <GluestackText color="$textLight50">Zurück</GluestackText>
@@ -309,14 +331,34 @@ const CameraScreen = () => {
       {(injectionMode || holdingMode || dosingMode || selectedMenu === 'cylinderHeating') && (
         <Box position="absolute" bottom={32} left={0} right={0} alignItems="center">
           <HStack space="md">
-            <Button variant="outline" action="secondary" onPress={() => setIsReviewOpen(true)}>
+            <Button variant="outline" action="secondary" onPress={() => { setIsReviewOpen(true); if (guide.isActive) guide.signalOpenedReview(); }}
+              style={shouldHL('continue-button') ? styles.hl : undefined}
+              disabled={guide.isActive ? !canPressContinue : false}
+            >
               <GluestackText color="$textLight50">{t('continue') || 'Continue'}</GluestackText>
             </Button>
           </HStack>
         </Box>
       )}
+      {/* Guide overlay at bottom */}
+      {/* Lazy import to avoid circular deps */}
+      {/**/}
     </Box>
   );
 };
 
 export default CameraScreen;
+
+const styles = StyleSheet.create({
+  hl: {
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+    borderRadius: 10,
+  },
+  hlBox: {
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+    borderRadius: 12,
+    padding: 2,
+  }
+});

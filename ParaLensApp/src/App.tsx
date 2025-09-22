@@ -9,6 +9,8 @@ import { ApiProvider } from "./contexts/ApiContext";
 import {AppNavigator} from "./Nagivation/AppNavigator.tsx";
 import { FullScanProvider } from './contexts/FullScanContext';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
+import { GuideProvider } from './contexts/GuideContext';
+import GuideOverlay from './Components/GuideOverlay';
 
 const AppInner = () => {
     const { theme } = useSettings();
@@ -22,9 +24,12 @@ const AppInner = () => {
             />
             <SafeAreaView style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#fff' }}>
                 <FullScanProvider>
-                    <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
-                        <AppNavigator />
-                    </NavigationContainer>
+                    <GuideProvider>
+                        <NavigationContainer theme={isDarkMode ? DarkTheme : DefaultTheme}>
+                            <AppNavigator />
+                        </NavigationContainer>
+                        <GuideOverlay />
+                    </GuideProvider>
                 </FullScanProvider>
             </SafeAreaView>
         </>

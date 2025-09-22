@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HistoryScreen from "../Screens/HistoryScreen.tsx";
 import SettingsScreen from "../Screens/SettingsScreen.tsx";
 import CameraScreen from "../Screens/CameraScreen.tsx";
+import GuideScreen from "../Screens/GuideScreen.tsx";
 import { useSettings } from "../contexts/SettingsContext";
 import { useI18n } from "../utils/i18n";
 
@@ -41,7 +42,7 @@ export const AppNavigator = () => {
                     pt={2}
                 >
                     <HStack flex={1} alignItems="center" justifyContent="space-around">
-                        {state.routes.map((route, index) => {
+                        {state.routes.filter(r => r.name !== 'Guide').map((route, index) => {
                             const { options } = descriptors[route.key];
                             const isFocused = state.index === index;
                             let iconName = '';
@@ -74,6 +75,7 @@ export const AppNavigator = () => {
             <Tab.Screen name="History" component={HistoryScreen} options={{ title: t('history') }} />
             <Tab.Screen name="Camera" component={CameraScreen} options={{ title: t('camera') }} />
             <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: t('settings') }} />
+            <Tab.Screen name="Guide" component={GuideScreen} options={{ title: t('guidedTour') }} />
         </Tab.Navigator>
     );
 };
