@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+.tasks/
+.idea/
+
 # Expo
 .expo/
 dist/
@@ -41,3 +44,4 @@ app-example
 # generated native folders
 /ios
 /android
+/.tasks/
