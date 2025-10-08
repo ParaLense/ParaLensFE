@@ -21,10 +21,11 @@ enum TemplateLayout {
 }
 
 // Statically require all JSON files so Metro can bundle them
- 
-const screenDetection: TemplateBox[] = require('./0. Bildschirmaufbau_Screendetection.json');
- 
+
+import screenDetection from './0.1 Bildschirmaufbau_Screendetection.json';
+
 const injection: TemplateBox[] = require('./1. Einspritzen.json');
+
  
 const injectionSpeedScroll: TemplateBox[] = require('./1.1 Einspritzgeschwindigkeit_ScrollBar.json');
  

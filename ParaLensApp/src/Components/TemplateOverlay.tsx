@@ -39,4 +39,4 @@ const TemplateOverlay: React.FC<Props> = ({ layout, isActive = true, color, onBo
 
 export default TemplateOverlay;
 
- 
+

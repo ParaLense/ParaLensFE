@@ -1,6 +1,6 @@
+import Feather from '@expo/vector-icons/Feather';
+import { Box, Text as GluestackText, HStack, Input, InputField, Pressable, VStack } from '@gluestack-ui/themed';
 import React from 'react';
-import { HStack, VStack, Box, Text as GluestackText, Input, InputField, Pressable } from '@gluestack-ui/themed';
-import Icon from 'react-native-vector-icons/Feather';
 
 export interface IndexValuePair { index: string; v?: string; v2?: string; t?: string; p?: string; }
 
@@ -49,7 +49,7 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels }) => {
             disabled={rows.length <= 1}
             opacity={rows.length <= 1 ? 0.4 : 1}
           >
-            <Icon name="trash-2" size={20} color="#fff" />
+            <Feather name="trash-2" size={20} color="#fff" />
           </Pressable>
         </HStack>
       ))}
@@ -62,7 +62,7 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels }) => {
           }}
         >
           <HStack space="sm" alignItems="center">
-            <Icon name="plus" size={20} color="#fff" />
+            <Feather name="plus" size={20} color="#fff" />
             <GluestackText color="$textLight50">Zeile hinzufügen</GluestackText>
           </HStack>
         </Pressable>

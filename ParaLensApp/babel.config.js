@@ -1,11 +1,13 @@
-module.exports = {
-  presets: ['module:@react-native/babel-preset'],
-  plugins: [
-    ['react-native-worklets-core/plugin'],
-    '@babel/plugin-proposal-optional-chaining',
-    '@babel/plugin-proposal-nullish-coalescing-operator',
-    [
-      //
-      'react-native-reanimated/plugin'], // MUSS das letzte Plugin sein!
-  ],
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+    plugins: [
+      ['react-native-worklets-core/plugin'],
+      'react-native-reanimated/plugin',
+    ],
+  };
 };
+
+
+
