@@ -5,6 +5,27 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/features/*": [
+        "./features/*"
+      ],
+      "@/components/*": [
+        "./components/*"
+      ],
+      "@/components": [
+        "./components"
+      ],
+      "@/features": [
+        "./features"
+      ],
+      "@/features/api": [
+        "./features/api"
+      ],
+      "@/features/fullscan": [
+        "./features/fullscan"
+      ],
+      "tailwind.config": [
+        "./tailwind.config.js"
       ]
     }
   },
@@ -12,6 +33,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
   ]
 }

@@ -1,29 +1,29 @@
-import { ApiProvider } from "@/src/contexts/ApiContext";
-import { FullScanProvider } from "@/src/contexts/FullScanContext";
-import { SettingsProvider } from "@/src/contexts/SettingsContext";
-import { config } from '@gluestack-ui/config';
-import { GluestackUIProvider } from '@gluestack-ui/themed';
-import { Slot } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import React from "react";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { ApiProvider } from "@/features/api/api-context";
+import { FullScanProvider } from "@/features/fullscan/fullscan-context";
+import { SettingsProvider } from "@/features/settings/settings-context";
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
+import "@/global.css";
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
         <SettingsProvider>
           <ApiProvider>
-            <GluestackUIProvider config={config}>
-              <FullScanProvider>
-                <StatusBar style="auto" />
-                <Slot />
-              </FullScanProvider>
-            </GluestackUIProvider>
+            <FullScanProvider>
+              <GluestackUIProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                </Stack>
+              </GluestackUIProvider>
+            </FullScanProvider>
           </ApiProvider>
         </SettingsProvider>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

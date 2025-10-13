@@ -1,53 +1,45 @@
-import { useSettings } from '@/src/contexts/SettingsContext';
-import { useI18n } from '@/src/utils/i18n';
-import Feather from '@expo/vector-icons/Feather';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import React from "react";
+import { Tabs } from "expo-router";
+import Feather from "@expo/vector-icons/Feather";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useI18n } from "@/features/settings/i18n";
+import { useSettings } from "@/features/settings/settings-context";
 
 export default function TabsLayout() {
-  const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const { theme } = useSettings();
-  const isDark = theme === 'dark';
+  const isDark = theme === "dark";
+  const { t } = useI18n();
 
   return (
     <Tabs
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarActiveTintColor: "#4F8EF7",
+        tabBarInactiveTintColor: isDark ? "#A0AEC0" : "#64748B",
         tabBarStyle: {
-          backgroundColor: isDark ? '#000' : '#fff',
+          backgroundColor: isDark ? "#000" : "#fff",
           borderTopWidth: 0,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 12),
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#4F8EF7',
-        tabBarInactiveTintColor: isDark ? '#aaa' : '#888',
-      }}
+        tabBarIcon: ({ color, size }) => {
+          const iconMap: Record<string, keyof typeof Feather.glyphMap> = {
+            history: "clock",
+            camera: "camera",
+            settings: "settings",
+          };
+          const iconName = iconMap[route.name] ?? "circle";
+          return <Feather name={iconName} size={size} color={color} />;
+        },
+      })}
     >
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: t('history'),
-          tabBarIcon: ({ color, size }) => <Feather name="clock" size={size ?? 26} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="camera"
-        options={{
-          title: t('camera'),
-          tabBarIcon: ({ color, size }) => <Feather name="camera" size={size ?? 26} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: t('settings'),
-          tabBarIcon: ({ color, size }) => <Feather name="settings" size={size ?? 26} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="history" options={{ title: t("history"), href: "/(tabs)/history" }} />
+      <Tabs.Screen name="camera" options={{ title: t("camera"), href: "/(tabs)/camera" }} />
+      <Tabs.Screen name="settings" options={{ title: t("settings"), href: "/(tabs)/settings" }} />
     </Tabs>
   );
 }
-
-
 

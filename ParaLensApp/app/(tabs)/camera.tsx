@@ -1,26 +1,451 @@
-import UiScannerCamera from '@/src/Components/UiScannerCamera';
-import { TemplateLayout } from '@/src/hooks/useTemplateLayout';
-import React, { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
-import { useCameraDevice } from 'react-native-vision-camera';
+import React, { useMemo, useState } from "react";
+import { useRouter } from "expo-router";
+import { FlatList, Pressable } from "react-native";
 
-export default function CameraTab() {
-  const device = useCameraDevice('back');
+import UiScannerCamera from "@/components/UiScannerCamera";
+import { Box } from "@/components/ui/box";
+import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/heading";
+import { HStack } from "@/components/ui/hstack";
+import { Input, InputField } from "@/components/ui/input";
+import {
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@/components/ui/modal";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
+import { useFullScan } from "@/features/fullscan/fullscan-context";
+import { TemplateLayout } from "@/features/templates/use-template-layout";
+import { useI18n } from "@/features/settings/i18n";
+import { useSettings } from "@/features/settings/settings-context";
+import { useCameraDevice, useCameraDevices, type CameraDevice } from "react-native-vision-camera";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type ScanMenu = "injection" | "dosing" | "holdingPressure" | "cylinderHeating";
+type InjectionMode = "mainMenu" | "subMenuGraphic" | "switchType" | null;
+type HoldingPressureMode = "mainMenu" | "subMenuGraphic" | null;
+type DosingMode = "mainMenu" | "subMenuGraphic" | null;
+
+export default function CameraScreen() {
+  const { theme } = useSettings();
+  const isDark = theme === "dark";
+  const { t } = useI18n();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const devices = useCameraDevices();
+  const device = useCameraDevice("back");
+
+  const { fullScans, selectedFullScanId, selectFullScan, createFullScan } =
+    useFullScan();
+
+  const [selectedMenu, setSelectedMenu] = useState<ScanMenu | null>(null);
+  const [injectionMode, setInjectionMode] = useState<InjectionMode>(null);
+  const [holdingMode, setHoldingMode] = useState<HoldingPressureMode>(null);
+  const [dosingMode, setDosingMode] = useState<DosingMode>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [authorInput, setAuthorInput] = useState("");
+
+  const selectedLabel = useMemo(() => {
+    if (!selectedFullScanId) {
+      return fullScans.length
+        ? t("selectFullScan") ?? "Full Scan auswählen"
+        : t("noFullScans") ?? "Kein Full Scan vorhanden";
+    }
+    const fs = fullScans.find((f) => f.id === selectedFullScanId);
+    return fs
+      ? `${fs.author || t("unknown") || "Unbekannt"} · ${new Date(
+          fs.date,
+        ).toLocaleString()}`
+      : t("selectFullScan") ?? "Full Scan auswählen";
+  }, [fullScans, selectedFullScanId, t]);
+
+  const headerLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (selectedMenu) parts.push(selectedMenu);
+    if (injectionMode) parts.push(injectionMode);
+    if (!injectionMode && holdingMode) parts.push(holdingMode);
+    if (!injectionMode && !holdingMode && dosingMode) parts.push(dosingMode);
+    return parts.join(" · ");
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
+
+  const currentLayout: TemplateLayout | null = useMemo(() => {
+    if (!selectedMenu) return null;
+    if (selectedMenu === "injection") {
+      if (injectionMode === "subMenuGraphic")
+        return TemplateLayout.InjectionSpeed_ScrollBar;
+      if (injectionMode === "switchType")
+        return TemplateLayout.Injection_SwitchType;
+      return TemplateLayout.Injection;
+    }
+    if (selectedMenu === "holdingPressure") {
+      if (holdingMode === "subMenuGraphic")
+        return TemplateLayout.HoldingPressure_ScrollBar;
+      return TemplateLayout.HoldingPressure;
+    }
+    if (selectedMenu === "dosing") {
+      if (dosingMode === "subMenuGraphic")
+        return TemplateLayout.Dosing_ScrollBar;
+      return TemplateLayout.Dosing;
+    }
+    if (selectedMenu === "cylinderHeating") {
+      return TemplateLayout.CylinderHeating;
+    }
+    return null;
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
+
+  const resetToRootMenu = () => {
+    setSelectedMenu(null);
+    setInjectionMode(null);
+    setHoldingMode(null);
+    setDosingMode(null);
+  };
+
+  const goReview = () => {
+    router.push({
+      pathname: "/scan-review",
+      params: {
+        selectedMenu: selectedMenu ?? "",
+        injectionMode: injectionMode ?? "",
+        holdingMode: holdingMode ?? "",
+        dosingMode: dosingMode ?? "",
+      },
+    });
+  };
 
   if (!device) {
-    return null;
+    return (
+      <Box
+        style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}
+        className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+      >
+        <Text className={`text-lg mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+          {t("loadingCamera") ?? "Loading camera..."}
+        </Text>
+        <Text className={`text-lg ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+          {t("foundCameras") ?? "Gefundene Kameras:"}
+        </Text>
+        <FlatList
+          data={Object.entries(devices)}
+          keyExtractor={(item) => item[0]}
+          renderItem={({ item }: {item: [string, CameraDevice]}) => (
+            <Text className={`text-lg mt-2 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+              {item[0]}: {item[1]?.name ?? t("unknown") ?? "Unbekannt"} (
+              {item[1]?.position ?? "unknown"})
+            </Text>
+          )}
+        />
+      </Box>
+    );
   }
 
-  const currentLayout = useMemo(() => TemplateLayout.ScreenDetection, []);
+  if (!selectedMenu) {
+    return (
+      <Box
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+        className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+      >
+        <Heading size="lg" className={`mb-6 text-center ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+          {t("whatToScan") ?? "Was möchten Sie scannen?"}
+        </Heading>
+
+        <VStack className="w-5/6 mb-6 gap-2">
+          <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
+            {t("selectFullScan") ?? "Full Scan wählen"}
+          </Heading>
+          <HStack className="gap-2" style={{ alignItems: 'center' }}>
+            <Button
+              variant="outline"
+              action="secondary"
+              className="flex-1"
+              onPress={() => setIsPickerOpen(true)}
+            >
+              <Text numberOfLines={1}>{selectedLabel}</Text>
+            </Button>
+            <Button
+              variant="solid"
+              action="primary"
+              onPress={() => setIsAddOpen(true)}
+            >
+              <Text className="font-bold text-typography-0">+</Text>
+            </Button>
+          </HStack>
+        </VStack>
+
+        <VStack className="w-5/6 gap-4">
+          {([
+            "injection",
+            "dosing",
+            "holdingPressure",
+            "cylinderHeating",
+          ] as ScanMenu[]).map((menu) => (
+            <Button
+              key={menu}
+              action="primary"
+              variant="solid"
+              onPress={() => {
+                setSelectedMenu(menu);
+                if (menu === "injection") setInjectionMode(null);
+                if (menu === "holdingPressure") setHoldingMode(null);
+                if (menu === "dosing") setDosingMode(null);
+              }}
+            >
+              <Text className="text-typography-0 capitalize">{menu}</Text>
+            </Button>
+          ))}
+        </VStack>
+
+        <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)}>
+          <ModalBackdrop />
+          <ModalContent>
+            <ModalHeader>
+              <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
+                {t("chooseFullScan") ?? "Full Scan auswählen"}
+              </Heading>
+            </ModalHeader>
+            <ModalBody>
+              {fullScans.length === 0 ? (
+                <Text className={isDark ? "text-typography-200" : "text-typography-600"}>
+                  {t("noFullScans") ?? "Keine Full Scans vorhanden"}
+                </Text>
+              ) : (
+                <VStack className="gap-3">
+                  {fullScans.map((fs) => {
+                    const isSelected = selectedFullScanId === fs.id;
+                    return (
+                      <Pressable
+                        key={fs.id}
+                        className={`rounded-lg border px-3 py-2 ${
+                          isSelected
+                            ? "border-primary-500 bg-primary-500/10"
+                            : isDark
+                            ? "border-backgroundDark700"
+                            : "border-backgroundLight300"
+                        }`}
+                        onPress={() => {
+                          selectFullScan(fs.id);
+                          setIsPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          className={
+                            isDark
+                              ? "text-typography-50 font-semibold"
+                              : "text-typography-900 font-semibold"
+                          }
+                        >
+                          {fs.author || t("unknown") || "Unbekannt"}
+                        </Text>
+                        <Text
+                          className={
+                            isDark ? "text-typography-200" : "text-typography-600"
+                          }
+                        >
+                          {new Date(fs.date).toLocaleString()}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </VStack>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="outline"
+                action="secondary"
+                onPress={() => setIsPickerOpen(false)}
+              >
+                <Text>{t("close") ?? "Schließen"}</Text>
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
+          <ModalBackdrop />
+          <ModalContent>
+            <ModalHeader>
+              <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
+                {t("createNewFullScan") ?? "Neuen Full Scan erstellen"}
+              </Heading>
+            </ModalHeader>
+            <ModalBody>
+              <Input>
+                <InputField
+                  value={authorInput}
+                  onChangeText={setAuthorInput}
+                  placeholder={t("author") ?? "Autor"}
+                />
+              </Input>
+            </ModalBody>
+            <ModalFooter>
+              <HStack className="gap-3">
+                <Button
+                  variant="outline"
+                  action="secondary"
+                  onPress={() => {
+                    setIsAddOpen(false);
+                    setAuthorInput("");
+                  }}
+                >
+                  <Text>{t("cancel") ?? "Abbrechen"}</Text>
+                </Button>
+                <Button
+                  onPress={() => {
+                    const name = authorInput.trim() || "Unbekannt";
+                    createFullScan(name);
+                    setIsAddOpen(false);
+                    setAuthorInput("");
+                  }}
+                >
+                  <Text className="text-typography-0">
+                    {t("create") ?? "Erstellen"}
+                  </Text>
+                </Button>
+              </HStack>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </Box>
+    );
+  }
+
+  if (selectedMenu === "injection" && injectionMode === null) {
+    return (
+      <Box
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+        className="bg-backgroundDark950"
+      >
+        <Heading size="lg" className="mb-6 text-typography-0">
+          Injection · Auswahl
+        </Heading>
+        <VStack className="w-5/6 gap-4">
+          <Button onPress={() => setInjectionMode("mainMenu")}>
+            <Text className="text-typography-0">Main Menu</Text>
+          </Button>
+          <Button onPress={() => setInjectionMode("subMenuGraphic")}>
+            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          </Button>
+          <Button onPress={() => setInjectionMode("switchType")}>
+            <Text className="text-typography-0">Switch Type</Text>
+          </Button>
+        </VStack>
+        <Button
+          variant="outline"
+          action="secondary"
+          className="mt-8"
+          onPress={resetToRootMenu}
+        >
+          <Text>{t("cancel") ?? "Zurück"}</Text>
+        </Button>
+      </Box>
+    );
+  }
+
+  if (selectedMenu === "holdingPressure" && holdingMode === null) {
+    return (
+      <Box
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+        className="bg-backgroundDark950"
+      >
+        <Heading size="lg" className="mb-6 text-typography-0">
+          Nachdruck · Auswahl
+        </Heading>
+        <VStack className="w-5/6 gap-4">
+          <Button onPress={() => setHoldingMode("mainMenu")}>
+            <Text className="text-typography-0">Main Menu</Text>
+          </Button>
+          <Button onPress={() => setHoldingMode("subMenuGraphic")}>
+            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          </Button>
+        </VStack>
+        <Button
+          variant="outline"
+          action="secondary"
+          className="mt-8"
+          onPress={resetToRootMenu}
+        >
+          <Text>{t("cancel") ?? "Zurück"}</Text>
+        </Button>
+      </Box>
+    );
+  }
+
+  if (selectedMenu === "dosing" && dosingMode === null) {
+    return (
+      <Box
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+        className="bg-backgroundDark950"
+      >
+        <Heading size="lg" className="mb-6 text-typography-0">
+          Dosing · Auswahl
+        </Heading>
+        <VStack className="w-5/6 gap-4">
+          <Button onPress={() => setDosingMode("mainMenu")}>
+            <Text className="text-typography-0">Main Menu</Text>
+          </Button>
+          <Button onPress={() => setDosingMode("subMenuGraphic")}>
+            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          </Button>
+        </VStack>
+        <Button
+          variant="outline"
+          action="secondary"
+          className="mt-8"
+          onPress={resetToRootMenu}
+        >
+          <Text>{t("cancel") ?? "Zurück"}</Text>
+        </Button>
+      </Box>
+    );
+  }
 
   return (
-    <UiScannerCamera
-      currentLayout={currentLayout}
-      style={StyleSheet.absoluteFill}
-      device={device}
-      isActive={true}
-      enableFpsGraph={true}
-    />
+    <Box
+      style={{ flex: 1 }}
+      className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+    >
+      <UiScannerCamera
+        currentLayout={currentLayout ?? TemplateLayout.ScreenDetection}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+        isActive
+        device={device}
+      />
+
+      <Box
+        style={{ position: 'absolute', top: 24 + insets.top, left: 20 }}
+        className="rounded bg-backgroundDark700 px-3 py-2"
+      >
+        <Button
+          size="sm"
+          variant="solid"
+          action="secondary"
+          onPress={resetToRootMenu}
+        >
+          <Text className="text-typography-0">
+            {headerLabel
+              ? `${headerLabel} · ${t("change") ?? "Ändern"}`
+              : t("change") ?? "Ändern"}
+          </Text>
+        </Button>
+      </Box>
+
+      {(injectionMode || holdingMode || dosingMode ||
+        selectedMenu === "cylinderHeating") && (
+        <Box style={{ position: 'absolute', left: 0, right: 0, bottom: 32, alignItems: 'center' }}>
+          <HStack className="gap-4">
+            <Button variant="outline" action="secondary" onPress={goReview}>
+              <Text>{t("continue") ?? "Continue"}</Text>
+            </Button>
+          </HStack>
+        </Box>
+      )}
+    </Box>
   );
 }
 

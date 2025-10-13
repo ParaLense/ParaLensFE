@@ -38,11 +38,13 @@ export type PerformScanOptions = {
 export function performScan(
   frame: Frame,
   opts: PerformScanOptions
-): { screen: {
-    template_pixel_boxes?: { x:number; y:number; w:number; h:number }[];
+): {
+  screen: {
+    template_pixel_boxes?: { x: number; y: number; w: number; h: number }[];
     matched_boxes?: any;
     image_base64?: string;
-  }} | null {
+  };
+} | null {
   'worklet';
   if (plugin == null)
     throw new Error('Failed to load Frame Processor Plugin "detectScreen"!');
