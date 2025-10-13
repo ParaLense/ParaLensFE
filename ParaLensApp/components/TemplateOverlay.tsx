@@ -3,19 +3,47 @@ import { Pressable } from 'react-native';
 import { Box } from '@/components/ui/box';
 import { useTemplateLayout, type TemplateLayout } from '@/features/templates/use-template-layout';
 
-interface Props {
+interface TemplateOverlayProps {
   layout: TemplateLayout | null;
   isActive?: boolean;
   color?: string;
   onBoxPress?: (boxId: string) => void;
   viewportWidth?: number;
   viewportHeight?: number;
-  widthPercent?: number; // 0..1, default 0.75
-  aspectRatio?: number;  // width/height, default 3/4
+  widthPercent?: number;
+  aspectRatio?: number;
+  containerWidth?: number;
+  containerHeight?: number;
+  offsetX?: number;
+  offsetY?: number;
 }
 
-const TemplateOverlay: React.FC<Props> = ({ layout, isActive = true, color, onBoxPress, viewportHeight, viewportWidth, widthPercent, aspectRatio }) => {
-  const boxes = useTemplateLayout({ layout, color, viewportHeight, viewportWidth, widthPercent, aspectRatio });
+const TemplateOverlay: React.FC<TemplateOverlayProps> = ({
+  layout,
+  isActive = true,
+  color,
+  onBoxPress,
+  viewportHeight,
+  viewportWidth,
+  widthPercent,
+  aspectRatio,
+  containerHeight,
+  containerWidth,
+  offsetX,
+  offsetY,
+}) => {
+  const boxes = useTemplateLayout({
+    layout,
+    color,
+    viewportHeight,
+    viewportWidth,
+    widthPercent,
+    aspectRatio,
+    containerHeight,
+    containerWidth,
+    offsetX,
+    offsetY,
+  });
   if (!isActive || !layout) return null;
 
   return (

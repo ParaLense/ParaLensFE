@@ -122,16 +122,16 @@ class ScreenDetectorFrameProcessorPlugin(
     )
   }
   private fun buildHomography(templateBoxes: List<Box>, matches: Array<IntArray?>, templateW: Int, templateH: Int): Pair<Mat?, Mat?> {
-    val srcPtsList = ArrayList<Point>()
-    val dstPtsList = ArrayList<Point>()
+    val dstPtsList = ArrayList<Point>() // canonical template points (destination)
+    val srcPtsList = ArrayList<Point>() // observed points from the frame (source)
     for (i in templateBoxes.indices) {
-      val m = matches[i] ?: continue
-      percentBoxToPts(templateBoxes[i], templateW, templateH).forEach { srcPtsList.add(it) }
-      rectToPtsXYWH(m).forEach { dstPtsList.add(it) }
+      val observed = matches[i] ?: continue
+      percentBoxToPts(templateBoxes[i], templateW, templateH).forEach { dstPtsList.add(it) }
+      rectToPtsXYWH(observed).forEach { srcPtsList.add(it) }
     }
-    if (srcPtsList.size < 4) return Pair(null, null)
-    val src = MatOfPoint2f(); src.fromList(srcPtsList)
-    val dst = MatOfPoint2f(); dst.fromList(dstPtsList)
+    if (srcPtsList.size < 4 || dstPtsList.size < 4) return Pair(null, null)
+    val src = MatOfPoint2f().apply { fromList(srcPtsList) }
+    val dst = MatOfPoint2f().apply { fromList(dstPtsList) }
     val mask = Mat()
     val H = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 3.0, mask)
     return Pair(H, mask)
@@ -343,7 +343,16 @@ class ScreenDetectorFrameProcessorPlugin(
 
       if (detected && returnWarpedImage && H != null && !H.empty()) {
         val base64 = warpAndEncodeGrayToBase64(rotated, H, outputW, outputH, imageQuality)
-        if (base64 != null) { screenData["image_base64"] = base64; screenData["image_format"] = "jpeg"; val imap = HashMap<String, Any?>(); imap["w"] = outputW; imap["h"] = outputH; screenData["image_size"] = imap }
+        base64?.let {
+          val preview = if (it.length > 120) it.substring(0, 120) + "…" else it
+          Log.d("ScreenDetector", "warped image len=${it.length}, preview=$preview")
+          screenData["image_base64"] = it
+          screenData["image_format"] = "jpeg"
+          val imap = HashMap<String, Any?>()
+          imap["w"] = outputW
+          imap["h"] = outputH
+          screenData["image_size"] = imap
+        }
       }
 
       try {
