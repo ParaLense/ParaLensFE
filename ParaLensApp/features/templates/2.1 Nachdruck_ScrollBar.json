@@ -1,26 +1,26 @@
 [
   {
-    "id": "box_1",
+    "id": "specific_back_pressure_start",
     "x": 8.26,
     "y": 72.5,
     "width": 2.92,
     "height": 6.83,
-    "label": "Box 1"
+    "label": "Specific Back Pressure Start"
   },
   {
-    "id": "box_2",
+    "id": "specific_back_pressure_items",
     "x": 8.35,
     "y": 72.5,
     "width": 84.25,
     "height": 6.83,
-    "label": "Box 2"
+    "label": "Specific Back Pressure Items"
   },
   {
-    "id": "box_3",
+    "id": "specific_back_pressure_end",
     "x": 87.54,
     "y": 72.43,
     "width": 4.99,
     "height": 6.97,
-    "label": "Box 3"
+    "label": "Specific Back Pressure End"
   }
 ]

@@ -1,58 +1,58 @@
 [
   {
-    "id": "box_1",
+    "id": "dosing_profile_modal",
     "x": 22.45,
     "y": 18.06,
     "width": 54.7,
     "height": 15.57,
-    "label": "Box 1"
+    "label": "Dosing Profile Modal"
   },
   {
-    "id": "box_2",
+    "id": "dosing_stroke",
     "x": 71.27,
     "y": 36.66,
     "width": 14.24,
     "height": 2.82,
-    "label": "Box 2"
+    "label": "Dosing Stroke"
   },
   {
-    "id": "box_3",
+    "id": "dosing_delay_time",
     "x": 72.45,
     "y": 43.64,
     "width": 10.68,
     "height": 2.59,
-    "label": "Box 3"
+    "label": "Dosing Delay Time"
   },
   {
-    "id": "box_4",
+    "id": "relieve_dosing",
     "x": 8.15,
     "y": 60.51,
     "width": 39.02,
     "height": 2.59,
-    "label": "Box 4"
+    "label": "Relieve Dosing"
   },
   {
-    "id": "box_5",
+    "id": "relieve_after_dosing",
     "x": 47.8,
     "y": 60.41,
     "width": 37.42,
     "height": 2.71,
-    "label": "Box 5"
+    "label": "Relieve After Dosing"
   },
   {
-    "id": "box_6",
+    "id": "discharge_speed_before",
     "x": 72.44,
     "y": 65.67,
     "width": 11.06,
     "height": 3.1,
-    "label": "Box 6"
+    "label": "Discharge Speed Before"
   },
   {
-    "id": "box_7",
+    "id": "discharge_speed_after",
     "x": 72.42,
     "y": 68.8,
     "width": 11.06,
     "height": 3.28,
-    "label": "Box 7"
+    "label": "Discharge Speed After"
   }
 ]

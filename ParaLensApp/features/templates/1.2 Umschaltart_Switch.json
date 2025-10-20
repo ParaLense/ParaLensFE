@@ -1,50 +1,50 @@
 [
   {
-    "id": "box_1",
+    "id": "transshipment_position_checkbox",
     "x": 12.61,
     "y": 13.83,
     "width": 2.7,
     "height": 2.02,
-    "label": "Box 1"
+    "label": "Transshipment Position Checkbox"
   },
   {
-    "id": "box_2",
+    "id": "transshipment_position",
     "x": 72.55,
     "y": 16.18,
     "width": 13.75,
     "height": 2.76,
-    "label": "Box 2"
+    "label": "Transshipment Position"
   },
   {
-    "id": "box_3",
+    "id": "switch_over_time_checkbox",
     "x": 12.46,
     "y": 25.29,
     "width": 2.7,
     "height": 2.14,
-    "label": "Box 3"
+    "label": "Switch Over Time Checkbox"
   },
   {
-    "id": "box_4",
+    "id": "switch_over_time",
     "x": 73.27,
     "y": 27.8,
     "width": 10.93,
     "height": 2.93,
-    "label": "Box 4"
+    "label": "Switch Over Time"
   },
   {
-    "id": "box_5",
+    "id": "switching_pressure_checkbox",
     "x": 12.42,
     "y": 31.31,
     "width": 2.77,
     "height": 2.02,
-    "label": "Box 5"
+    "label": "Switching Pressure Checkbox"
   },
   {
-    "id": "box_6",
+    "id": "switching_pressure",
     "x": 73.4,
     "y": 33.76,
     "width": 12.53,
     "height": 2.82,
-    "label": "Box 6"
+    "label": "Switching Pressure"
   }
 ]

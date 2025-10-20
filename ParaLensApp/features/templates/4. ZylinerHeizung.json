@@ -1,10 +1,10 @@
 [
   {
-    "id": "box_1",
+    "id": "cylinder_heating_items",
     "x": 15.6,
     "y": 34.0,
     "width": 73.23,
     "height": 3.51,
-    "label": "Box 1"
+    "label": "Cylinder Heating Items"
   }
 ]
