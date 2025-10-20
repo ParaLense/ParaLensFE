@@ -1,0 +1,170 @@
+[
+  {
+    "id": "box_1",
+    "x": 2.24,
+    "y": 5.89,
+    "width": 4.99,
+    "height": 3.85,
+    "label": "Box 1"
+  },
+  {
+    "id": "box_2",
+    "x": 2.2,
+    "y": 12.06,
+    "width": 5.22,
+    "height": 3.81,
+    "label": "Box 2"
+  },
+  {
+    "id": "box_3",
+    "x": 2.01,
+    "y": 18.46,
+    "width": 5.15,
+    "height": 3.82,
+    "label": "Box 3"
+  },
+  {
+    "id": "box_4",
+    "x": 2.32,
+    "y": 24.5,
+    "width": 5.07,
+    "height": 3.95,
+    "label": "Box 4"
+  },
+  {
+    "id": "box_5",
+    "x": 2.16,
+    "y": 37.1,
+    "width": 5.15,
+    "height": 3.78,
+    "label": "Box 5"
+  },
+  {
+    "id": "box_6",
+    "x": 2.26,
+    "y": 43.37,
+    "width": 4.83,
+    "height": 3.76,
+    "label": "Box 6"
+  },
+  {
+    "id": "box_7",
+    "x": 2.25,
+    "y": 49.9,
+    "width": 4.99,
+    "height": 3.59,
+    "label": "Box 7"
+  },
+  {
+    "id": "box_8",
+    "x": 2.26,
+    "y": 56.01,
+    "width": 4.87,
+    "height": 3.71,
+    "label": "Box 8"
+  },
+  {
+    "id": "box_9",
+    "x": 2.29,
+    "y": 62.26,
+    "width": 4.87,
+    "height": 3.56,
+    "label": "Box 9"
+  },
+  {
+    "id": "box_10",
+    "x": 2.44,
+    "y": 68.24,
+    "width": 4.73,
+    "height": 3.82,
+    "label": "Box 10"
+  },
+  {
+    "id": "box_11",
+    "x": 10.69,
+    "y": 1.16,
+    "width": 4.96,
+    "height": 3.97,
+    "label": "Box 11"
+  },
+  {
+    "id": "box_12",
+    "x": 92.0,
+    "y": 5.93,
+    "width": 5.18,
+    "height": 3.73,
+    "label": "Box 12"
+  },
+  {
+    "id": "box_13",
+    "x": 92.1,
+    "y": 12.27,
+    "width": 5.48,
+    "height": 3.67,
+    "label": "Box 13"
+  },
+  {
+    "id": "box_14",
+    "x": 92.1,
+    "y": 18.59,
+    "width": 4.88,
+    "height": 3.68,
+    "label": "Box 14"
+  },
+  {
+    "id": "box_15",
+    "x": 92.0,
+    "y": 24.9,
+    "width": 5.16,
+    "height": 3.74,
+    "label": "Box 15"
+  },
+  {
+    "id": "box_16",
+    "x": 92.09,
+    "y": 30.85,
+    "width": 5.1,
+    "height": 3.45,
+    "label": "Box 16"
+  },
+  {
+    "id": "box_17",
+    "x": 91.9,
+    "y": 37.42,
+    "width": 5.27,
+    "height": 3.66,
+    "label": "Box 17"
+  },
+  {
+    "id": "box_18",
+    "x": 92.4,
+    "y": 43.43,
+    "width": 4.97,
+    "height": 3.66,
+    "label": "Box 18"
+  },
+  {
+    "id": "box_19",
+    "x": 92.25,
+    "y": 49.74,
+    "width": 4.98,
+    "height": 3.74,
+    "label": "Box 19"
+  },
+  {
+    "id": "box_20",
+    "x": 92.44,
+    "y": 55.91,
+    "width": 4.69,
+    "height": 3.52,
+    "label": "Box 20"
+  },
+  {
+    "id": "box_21",
+    "x": 92.1,
+    "y": 61.82,
+    "width": 4.97,
+    "height": 3.81,
+    "label": "Box 21"
+  }
+]
