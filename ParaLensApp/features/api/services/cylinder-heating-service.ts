@@ -5,7 +5,7 @@ import {
   CreateCylinderHeatingMainMenuRequest,
   CreateCylinderHeatingRequest,
   CylinderHeatingMainMenuDto,
-} from "@/features/api/types";
+} from "@/features/api/types/api";
 
 export class CylinderHeatingService {
   async getCylinderHeating(scanId: number): Promise<CylinderHeatingDto> {

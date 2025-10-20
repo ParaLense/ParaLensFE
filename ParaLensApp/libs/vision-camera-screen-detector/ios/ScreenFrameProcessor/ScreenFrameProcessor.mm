@@ -3,7 +3,7 @@
 #import <VisionCamera/Frame.h>
 #import <CoreImage/CoreImage.h>
 
-// OpenCV-basierter Frame-Processor: Template-Box-Erkennung + optionale Bildrückgabe (Base64 JPEG)
+// OpenCV-basierter Frame-Processor: ROI → Konturen → Polygon → Homographie (+ optionale Bildrückgabe)
 #import <opencv2/opencv.hpp>
 
 @interface ScreenDetectorFrameProcessorPlugin : FrameProcessorPlugin
@@ -56,6 +56,13 @@ static NSArray* _Nullable sd_getArray(NSDictionary* _Nullable dict, NSString* ke
   if (dict == nil) return nil;
   id v = dict[key];
   if ([v isKindOfClass:[NSArray class]]) return (NSArray*)v;
+  return nil;
+}
+
+static NSDictionary* _Nullable sd_getMap(NSDictionary* _Nullable dict, NSString* key) {
+  if (dict == nil) return nil;
+  id v = dict[key];
+  if ([v isKindOfClass:[NSDictionary class]]) return (NSDictionary*)v;
   return nil;
 }
 
@@ -120,6 +127,56 @@ static void sd_rectToPts(const cv::Rect& r, std::vector<cv::Point2f>& pts) {
   pts.emplace_back(x, y + h);
 }
 
+static cv::Rect sd_normToPx(NSDictionary* rect, int W, int H) {
+  double x = sd_getDouble(rect, @"x", 0.0);
+  double y = sd_getDouble(rect, @"y", 0.0);
+  double w = sd_getDouble(rect, @"width", 1.0);
+  double h = sd_getDouble(rect, @"height", 1.0);
+  int px = (int)std::round(x * W);
+  int py = (int)std::round(y * H);
+  int pw = std::max(1, (int)std::round(w * W));
+  int ph = std::max(1, (int)std::round(h * H));
+  return cv::Rect(px, py, pw, ph);
+}
+
+static cv::Rect sd_enforceMinAspect(cv::Rect r, int W, int H, double minAspect) {
+  if (r.width <= 0 || r.height <= 0) return r;
+  double ratio = (double)r.width / (double)r.height;
+  if (ratio < minAspect) {
+    int newH = std::max(1, (int)std::round(r.width / minAspect));
+    int cy = r.y + r.height / 2;
+    r.y = std::max(0, std::min(H - newH, cy - newH / 2));
+    r.height = newH;
+  }
+  r.x = std::max(0, std::min(W - r.width, r.x));
+  r.y = std::max(0, std::min(H - r.height, r.y));
+  return r;
+}
+
+static BOOL sd_rectWithinRoi(const cv::Rect& t, const cv::Rect& inner, const cv::Rect& outer, int tol) {
+  int tx1 = t.x, ty1 = t.y, tx2 = t.x + t.width, ty2 = t.y + t.height;
+  int ox1 = outer.x, oy1 = outer.y, ox2 = outer.x + outer.width, oy2 = outer.y + outer.height;
+  int ix1 = inner.x, iy1 = inner.y, ix2 = inner.x + inner.width, iy2 = inner.y + inner.height;
+  if (tx1 < ox1 - tol || ty1 < oy1 - tol || tx2 > ox2 + tol || ty2 > oy2 + tol) return NO;
+  if (tx1 > ix1 + tol) return NO;
+  if (ty1 > iy1 + tol) return NO;
+  if (tx2 < ix2 - tol) return NO;
+  if (ty2 < iy2 - tol) return NO;
+  return YES;
+}
+
+static std::vector<cv::Point2f> sd_orderQuad(const std::vector<cv::Point2f>& p) {
+  std::vector<cv::Point2f> out(4);
+  std::vector<double> sums(4), diffs(4);
+  for (int i = 0; i < 4; ++i) { sums[i] = p[i].x + p[i].y; diffs[i] = p[i].x - p[i].y; }
+  int tl = (int)std::distance(sums.begin(), std::min_element(sums.begin(), sums.end()));
+  int br = (int)std::distance(sums.begin(), std::max_element(sums.begin(), sums.end()));
+  int tr = (int)std::distance(diffs.begin(), std::min_element(diffs.begin(), diffs.end()));
+  int bl = (int)std::distance(diffs.begin(), std::max_element(diffs.begin(), diffs.end()));
+  out[0] = p[tl]; out[1] = p[tr]; out[2] = p[br]; out[3] = p[bl];
+  return out;
+}
+
 - (id _Nullable)callback:(Frame* _Nonnull)frame
            withArguments:(NSDictionary* _Nullable)arguments {
   CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer);
@@ -127,93 +184,74 @@ static void sd_rectToPts(const cv::Rect& r, std::vector<cv::Point2f>& pts) {
   size_t height = CVPixelBufferGetHeight(pixelBuffer);
 
   @try {
-    // 1) Template lesen (Pflicht). Ohne Template -> detected=false
-    std::vector<SDBOX> templateBoxes = sd_parseTemplate(arguments, self.options);
-    if (templateBoxes.empty()) {
-      NSDictionary *screenData = @{
-        @"width": @(width),
-        @"height": @(height),
-        @"detected": @NO
-      };
-      return @{ @"screen": screenData };
-    }
-
-    // 2) Parameter (mit Defaults)
-    double screenWidthRatio = sd_getDouble(arguments, @"screenWidthRatio", sd_getDouble(self.options, @"screenWidthRatio", 0.80));
+    // Parameters for ROI-driven detection
     int screenAspectW = sd_getInt(arguments, @"screenAspectW", sd_getInt(self.options, @"screenAspectW", 3));
     int screenAspectH = sd_getInt(arguments, @"screenAspectH", sd_getInt(self.options, @"screenAspectH", 4));
-    double minIouForMatch = sd_getDouble(arguments, @"minIouForMatch", sd_getDouble(self.options, @"minIouForMatch", 0.30));
-    double accuracyThreshold = sd_getDouble(arguments, @"accuracyThreshold", sd_getDouble(self.options, @"accuracyThreshold", 0.60));
     int templateTargetW = sd_getInt(arguments, @"templateTargetW", sd_getInt(self.options, @"templateTargetW", 1200));
     int templateTargetH = sd_getInt(arguments, @"templateTargetH", sd_getInt(self.options, @"templateTargetH", 1600));
-
     BOOL returnWarpedImage = sd_getBool(arguments, @"returnWarpedImage", sd_getBool(self.options, @"returnWarpedImage", NO));
     int outputW = sd_getInt(arguments, @"outputW", templateTargetW);
     int outputH = sd_getInt(arguments, @"outputH", templateTargetH);
     int imageQuality = sd_getInt(arguments, @"imageQuality", 80);
 
-    // 3) Template-Boxen -> Pixelrechtecke bezogen auf den zentralen Bereich (screenWidthRatio)
-    double cropW = width * screenWidthRatio;
-    double cropX = (width - cropW) / 2.0;
-    std::vector<cv::Rect> templateRects;
-    for (const SDBOX& b : templateBoxes) {
-      int x = (int)(b.x / 100.0 * cropW + cropX);
-      int y = (int)(b.y / 100.0 * height);
-      int w = (int)(b.w / 100.0 * cropW);
-      int h = (int)(b.h / 100.0 * height);
-      templateRects.emplace_back(x, y, w, h);
-    }
-// Neu: Pixel-Rechtecke vorbereiten (vor Matching)
-    NSMutableArray* tmplPixelArr = [NSMutableArray arrayWithCapacity:templateRects.size()];
-    for (const auto& r : templateRects) {
-      [tmplPixelArr addObject:@{ @"x": @(r.x), @"y": @(r.y), @"w": @(r.width), @"h": @(r.height) }];
-    }
+    NSDictionary* roiOuterArg = sd_getMap(arguments, @"roiOuter");
+    NSDictionary* roiInnerArg = sd_getMap(arguments, @"roiInner");
+    if (!roiOuterArg) roiOuterArg = @{ @"x": @0.10, @"y": @0.05, @"width": @0.80, @"height": @0.90 };
+    if (!roiInnerArg) roiInnerArg = @{ @"x": @0.30, @"y": @0.20, @"width": @0.45, @"height": @0.60 };
+    int minAspectW = sd_getInt(arguments, @"minAspectW", 3);
+    int minAspectH = sd_getInt(arguments, @"minAspectH", 4);
+    double minAspect = (minAspectH != 0) ? ((double)minAspectW / (double)minAspectH) : 0.75;
 
-    // 5) Kontur-Rechtecke per IoU dem besten Template zuordnen
-    std::vector<cv::Rect> matched(templateRects.size());
-    std::vector<bool> matchedValid(templateRects.size(), false);
+    // Create gray and rotate 90 CW
+    CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+    void* base = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0);
+    cv::Mat gray((int)height, (int)width, CV_8UC1);
+    if (base) {
+      for (int row = 0; row < gray.rows; ++row) {
+        memcpy(gray.ptr(row), (uint8_t*)base + row * bytesPerRow, (size_t)gray.cols);
+      }
+    }
+    cv::Mat rotated; cv::rotate(gray, rotated, cv::ROTATE_90_CLOCKWISE);
+    int frameW = rotated.cols, frameH = rotated.rows;
 
+    cv::Rect roiOuterPx = sd_enforceMinAspect(sd_normToPx(roiOuterArg, frameW, frameH), frameW, frameH, minAspect);
+    cv::Rect roiInnerPx = sd_enforceMinAspect(sd_normToPx(roiInnerArg, frameW, frameH), frameW, frameH, minAspect);
+
+    cv::Mat edges; cv::Canny(rotated, edges, 50.0, 150.0);
+    std::vector<std::vector<cv::Point>> contours; cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    cv::Rect bestRect; bool hasBest = false; double bestScore = 0.0; std::vector<cv::Point2f> bestQuad;
+    NSMutableArray* allRects = [NSMutableArray array];
     for (const auto& cnt : contours) {
       double peri = cv::arcLength(cnt, true);
-      std::vector<cv::Point> approx;
-      cv::approxPolyDP(cnt, approx, 0.02 * peri, true);
-      if (approx.size() == 4) {
-        cv::Rect rect = cv::boundingRect(approx);
-        rect &= cv::Rect(0, 0, (int)width, (int)height);
-        if (rect.width <= 0 || rect.height <= 0) continue;
-        double bestIou = 0.0; int bestIdx = -1;
-        for (size_t i = 0; i < templateRects.size(); ++i) {
-          double score = sd_iou(rect, templateRects[i]);
-          if (score > bestIou) { bestIou = score; bestIdx = (int)i; }
-        }
-        if (bestIdx >= 0 && bestIou > minIouForMatch) {
-          matched[bestIdx] = rect; matchedValid[bestIdx] = true;
-        }
+      std::vector<cv::Point> approx; cv::approxPolyDP(cnt, approx, 0.02 * peri, true);
+      if (approx.size() != 4) continue;
+      cv::Rect rect = cv::boundingRect(approx) & cv::Rect(0,0,frameW,frameH);
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      [allRects addObject:@{ @"x": @(rect.x), @"y": @(rect.y), @"w": @(rect.width), @"h": @(rect.height) }];
+      if (!sd_rectWithinRoi(rect, roiInnerPx, roiOuterPx, 12)) continue;
+      double score = sd_iou(rect, rect);
+      if (score > bestScore) {
+        bestScore = score; bestRect = rect; hasBest = true;
+        std::vector<cv::Point2f> pts(4);
+        for (int i = 0; i < 4; ++i) pts[i] = cv::Point2f((float)approx[i].x, (float)approx[i].y);
+        bestQuad = sd_orderQuad(pts);
       }
     }
 
-    // 6) Genauigkeit + Homographie (RANSAC)
-    int matchedCount = 0;
-    for (bool v : matchedValid) if (v) matchedCount++;
-    int total = (int)matchedValid.size();
-    double accuracy = total > 0 ? (double)matchedCount / (double)total : 0.0;
-
-    cv::Mat H, inlierMask;
-    if (matchedCount >= 1) {
-      std::vector<cv::Point2f> srcPts, dstPts;
-      srcPts.reserve(matchedCount * 4);
-      dstPts.reserve(matchedCount * 4);
-      for (size_t i = 0; i < templateBoxes.size(); ++i) {
-        if (!matchedValid[i]) continue;
-        sd_percentBoxToPts(templateBoxes[i], templateTargetW, templateTargetH, srcPts);
-        sd_rectToPts(matched[i], dstPts);
-      }
-      if (srcPts.size() >= 4) {
-        H = cv::findHomography(srcPts, dstPts, cv::RANSAC, 3.0, inlierMask, 2000, 0.995);
-      }
+    cv::Mat H;
+    if (hasBest) {
+      std::vector<cv::Point2f> dst = {
+        cv::Point2f(0.f, 0.f),
+        cv::Point2f((float)templateTargetW, 0.f),
+        cv::Point2f((float)templateTargetW, (float)templateTargetH),
+        cv::Point2f(0.f, (float)templateTargetH)
+      };
+      H = cv::findHomography(bestQuad, dst, cv::RANSAC, 3.0);
     }
 
-    // 7) Optional: entzerrtes Bild (Gray) -> JPEG Base64
+    // Optional: entzerrtes Bild (Gray) -> JPEG Base64
     NSString* imageBase64 = nil;
     if (!H.empty() && returnWarpedImage) {
       cv::Mat warped;
@@ -228,13 +266,12 @@ static void sd_rectToPts(const cv::Rect& r, std::vector<cv::Point2f>& pts) {
 
     CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
 
-    // 8) Ergebnis-Objekt aufbauen
+    // Ergebnis-Objekt aufbauen
     NSMutableDictionary* screenData = [NSMutableDictionary dictionary];
-    screenData[@"width"] = @((int)width);
-    screenData[@"height"] = @((int)height);
-    screenData[@"accuracy"] = @(accuracy);
-    screenData[@"accuracy_threshold"] = @(accuracyThreshold);
-    BOOL detected = (accuracy >= accuracyThreshold) && !H.empty();
+    screenData[@"width"] = @((int)frameW);
+    screenData[@"height"] = @((int)frameH);
+    BOOL detected = !H.empty();
+    screenData[@"accuracy"] = detected ? @(1.0) : @(0.0);
     screenData[@"detected"] = @(detected);
 
     NSMutableDictionary* sizeMap = [NSMutableDictionary dictionary];
@@ -268,34 +305,14 @@ static void sd_rectToPts(const cv::Rect& r, std::vector<cv::Point2f>& pts) {
       screenData[@"homography_inliers_mask"] = [NSNull null];
     }
 
-    NSMutableArray* matchedArr = [NSMutableArray arrayWithCapacity:total];
-    for (int i = 0; i < total; i++) {
-      if (!matchedValid[i]) {
-        [matchedArr addObject:[NSNull null]];
-      } else {
-        cv::Rect r = matched[i];
-        [matchedArr addObject:@{ @"x": @(r.x), @"y": @(r.y), @"w": @(r.width), @"h": @(r.height) }];
-      }
+    // ROI + candidate reporting
+    screenData[@"roi_outer_px"] = @{ @"x": @(roiOuterPx.x), @"y": @(roiOuterPx.y), @"w": @(roiOuterPx.width), @"h": @(roiOuterPx.height) };
+    screenData[@"roi_inner_px"] = @{ @"x": @(roiInnerPx.x), @"y": @(roiInnerPx.y), @"w": @(roiInnerPx.width), @"h": @(roiInnerPx.height) };
+    if (hasBest) {
+      screenData[@"screen_rect"] = @{ @"x": @(bestRect.x), @"y": @(bestRect.y), @"w": @(bestRect.width), @"h": @(bestRect.height) };
     }
-    screenData[@"matched_boxes"] = matchedArr;
-// Neu: template_pixel_boxes + crop_info
-    screenData[@"template_pixel_boxes"] = tmplPixelArr;
-    screenData[@"crop_info"] = @{
-      @"crop_x": @(cropX),
-      @"crop_w": @(cropW),
-      @"screen_width_ratio": @(screenWidthRatio)
-    };
-
-    // Echo der Template-Boxen
-    NSMutableArray* tmplArr = [NSMutableArray arrayWithCapacity:templateBoxes.size()];
-    for (const auto& b : templateBoxes) {
-      NSMutableDictionary* m = [NSMutableDictionary dictionary];
-      if (b.bid) m[@"id"] = b.bid;
-      m[@"x"] = @(b.x); m[@"y"] = @(b.y);
-      m[@"width"] = @(b.w); m[@"height"] = @(b.h);
-      [tmplArr addObject:m];
-    }
-    screenData[@"template_boxes"] = tmplArr;
+    screenData[@"all_detected_rects"] = allRects;
+    screenData[@"template_rect"] = @{ @"x": @(roiOuterPx.x), @"y": @(roiOuterPx.y), @"w": @(roiOuterPx.width), @"h": @(roiOuterPx.height) };
 
     if (detected && imageBase64 != nil) {
       screenData[@"image_base64"] = imageBase64;

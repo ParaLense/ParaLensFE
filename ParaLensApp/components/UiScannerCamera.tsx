@@ -207,11 +207,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         h: Math.max(1, toNumber(rect.h)),
       };
     }
-
     if (frameDimensions) {
       return computeTemplateRect(frameDimensions.width, frameDimensions.height);
     }
-
     return null;
   }, [frameDimensions, screenResult]);
 
@@ -250,17 +248,19 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
       const scan = performScan(frame, {
         template: screenTemplate,
-        screenWidthRatio: SCREEN_WIDTH_RATIO,
         screenAspectW: SCREEN_ASPECT_W,
         screenAspectH: SCREEN_ASPECT_H,
-        minIouForMatch: 0.3,
-        accuracyThreshold: 0.6,
-        templateTargetW: 720,
-        templateTargetH: 1280,
+        templateTargetW: 1200,
+        templateTargetH: 1600,
         returnWarpedImage: true,
-        outputW: 600,
-        outputH: 800,
+        accuracyThreshold: 0.50,
+        // ROI in normalized coordinates (defaults equivalent to main2.py)
+        roiOuter: { x: 0.10, y: 0.05, width: 0.80, height: 0.90 },
+        roiInner: { x: 0.30, y: 0.20, width: 0.45, height: 0.60 },
+        minAspectW: 3,
+        minAspectH: 4,
         imageQuality: 80,
+        rotate90CW: true,
       });
 
       if (scan?.screen) {
@@ -381,7 +381,46 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         format={cameraFormat}
       />
 
-      {renderTemplateOverlays()}
+      {/* Draw only ROI overlays using TemplateOverlay */}
+      {templateViewport ? (
+        <>
+          <TemplateOverlay
+            layout={null}
+            isActive
+            boxes={[{
+              id: 'roi-outer',
+              x: templateViewport.offsetX,
+              y: templateViewport.offsetY,
+              width: templateViewport.width,
+              height: templateViewport.height,
+              color: '#FF0000',
+            }]}
+          />
+          {/* Optional inner ROI estimate at 30/20/45/60 of viewport */}
+          <TemplateOverlay
+            layout={null}
+            isActive
+            boxes={[{
+              id: 'roi-inner',
+              x: templateViewport.offsetX + templateViewport.width * 0.30,
+              y: templateViewport.offsetY + templateViewport.height * 0.20,
+              width: templateViewport.width * 0.45,
+              height: templateViewport.height * 0.60,
+              color: '#00FF00',
+            }]}
+          />
+        </>
+      ) : (
+        <TemplateOverlay
+          layout={null}
+          isActive
+          widthPercent={SCREEN_WIDTH_RATIO}
+          aspectRatio={SCREEN_ASPECT_RATIO}
+          containerWidth={cameraLayoutSize?.width}
+          containerHeight={cameraLayoutSize?.height}
+          boxes={[]}
+        />
+      )}
 
       {screenResult && (
         <Box
@@ -456,28 +495,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         }
       )}
 
-      {screenResult?.template_pixel_boxes?.map(
-        (rect: { x: any; y: any; w: any; h: any }, idx: number) => {
-          if (!rect) return null;
-          const style = mapBoxToViewStyle(rect);
-          if (!style) return null;
-
-          return (
-            <Box
-              key={`tmpl_px_${idx}`}
-              style={{
-                position: 'absolute',
-                ...style,
-                borderWidth: 1,
-                borderColor: 'magenta',
-                borderStyle: 'dashed',
-                zIndex: 170,
-              }}
-              pointerEvents="none"
-            />
-          );
-        }
-      )}
+      {/* No template-pixel boxes overlay anymore */}
 
       {ocrLayoutBoxes.map(box => {
         const text = ocrMap[box.id];

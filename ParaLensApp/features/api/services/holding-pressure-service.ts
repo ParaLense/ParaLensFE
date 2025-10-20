@@ -7,7 +7,7 @@ import {
   HoldingPressureDto,
   HoldingPressureMainMenuDto,
   HoldingPressureSubMenuScrollDto,
-} from "@/features/api/types";
+} from "@/features/api/types/api";
 
 export class HoldingPressureService {
   async getHoldingPressure(scanId: number): Promise<HoldingPressureDto> {

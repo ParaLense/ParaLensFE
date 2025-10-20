@@ -8,6 +8,8 @@ interface TemplateOverlayProps {
   isActive?: boolean;
   color?: string;
   onBoxPress?: (boxId: string) => void;
+  // Optional explicit boxes (view-space pixels). If provided, these are rendered instead of template layout
+  boxes?: Array<{ id: string; x: number; y: number; width: number; height: number; color?: string }>; 
   viewportWidth?: number;
   viewportHeight?: number;
   widthPercent?: number;
@@ -23,6 +25,7 @@ const TemplateOverlay: React.FC<TemplateOverlayProps> = ({
   isActive = true,
   color,
   onBoxPress,
+  boxes,
   viewportHeight,
   viewportWidth,
   widthPercent,
@@ -32,7 +35,7 @@ const TemplateOverlay: React.FC<TemplateOverlayProps> = ({
   offsetX,
   offsetY,
 }) => {
-  const boxes = useTemplateLayout({
+  const templateBoxes = useTemplateLayout({
     layout,
     color,
     viewportHeight,
@@ -44,11 +47,11 @@ const TemplateOverlay: React.FC<TemplateOverlayProps> = ({
     offsetX,
     offsetY,
   });
-  if (!isActive || !layout) return null;
+  if (!isActive) return null;
 
   return (
     <Box style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-      {boxes.map(box => (
+      {(boxes ?? templateBoxes).map(box => (
         <Pressable key={box.id} onPress={() => onBoxPress?.(box.id)}>
           <Box
             style={{

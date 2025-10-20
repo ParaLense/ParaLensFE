@@ -21,7 +21,7 @@ export type PerformScanOptions = {
   screenAspectW?: number; // default 3
   screenAspectH?: number; // default 4
   minIouForMatch?: number; // default 0.30
-  accuracyThreshold?: number; // default 0.60
+  accuracyThreshold?: number; // default 0.80 (plan)
   templateTargetW?: number; // default 1200
   templateTargetH?: number; // default 1600
   // Optional: Bild zurückgeben
@@ -29,6 +29,14 @@ export type PerformScanOptions = {
   outputW?: number;
   outputH?: number;
   imageQuality?: number; // 0..100
+  // ROI options (normalized 0..1). If provided, native side will use ROI-driven detection
+  roiOuter?: { x: number; y: number; width: number; height: number };
+  roiInner?: { x: number; y: number; width: number; height: number };
+  // Minimum aspect ratio to enforce for ROI (width/height >= minAspectW/minAspectH)
+  minAspectW?: number; // default 3
+  minAspectH?: number; // default 4
+  // Optional: rotate native frame 90° CW before processing (testing/orientation)
+  rotate90CW?: boolean;
 };
 
 /**
@@ -87,10 +95,31 @@ export function performScan(
     ...(opts.outputW != null ? { outputW: +opts.outputW } : {}),
     ...(opts.outputH != null ? { outputH: +opts.outputH } : {}),
     ...(opts.imageQuality != null ? { imageQuality: +opts.imageQuality } : {}),
+    ...(opts.roiOuter
+      ? {
+          roiOuter: {
+            x: +opts.roiOuter.x,
+            y: +opts.roiOuter.y,
+            width: +opts.roiOuter.width,
+            height: +opts.roiOuter.height,
+          },
+        }
+      : {}),
+    ...(opts.roiInner
+      ? {
+          roiInner: {
+            x: +opts.roiInner.x,
+            y: +opts.roiInner.y,
+            width: +opts.roiInner.width,
+            height: +opts.roiInner.height,
+          },
+        }
+      : {}),
+    ...(opts.minAspectW != null ? { minAspectW: +opts.minAspectW } : {}),
+    ...(opts.minAspectH != null ? { minAspectH: +opts.minAspectH } : {}),
+    ...(opts.rotate90CW != null ? { rotate90CW: opts.rotate90CW } : {}),
   } as const;
 
-  console.log("frame size: " + frame.width + "x" + frame.height);
-  console.log("performScan args: " + JSON.stringify(args));
   // Typcast auf any, da template ein Array von Objekten ist und die nativen Plugins dies erwarten.
   // Die Typen der nativen Seite sind korrekt, TS meckert nur wegen der Record-Signatur.
   return plugin.call(frame, args as any) as { screen: any } | null;

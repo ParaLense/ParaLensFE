@@ -32,6 +32,11 @@ class ScreenDetectorFrameProcessorPlugin(
   options: Map<String, Any>?
 ) : FrameProcessorPlugin() {
   private val pluginOptions = options
+  
+  companion object {
+    private var detectionCounter = 0
+    private var totalFrameCounter = 0
+  }
 
   // --- Option Helpers ---
   private fun getDouble(map: Map<String, Any>?, key: String, def: Double): Double {
@@ -67,6 +72,12 @@ class ScreenDetectorFrameProcessorPlugin(
     val v = map[key] ?: return null
     @Suppress("UNCHECKED_CAST")
     return v as? List<Any>
+  }
+  private fun getMap(map: Map<String, Any>?, key: String): Map<String, Any>? {
+    if (map == null) return null
+    val v = map[key] ?: return null
+    @Suppress("UNCHECKED_CAST")
+    return v as? Map<String, Any>
   }
 
   private data class Box(val id: String?, val x: Double, val y: Double, val w: Double, val h: Double)
@@ -108,6 +119,81 @@ class ScreenDetectorFrameProcessorPlugin(
       Point(x + w, y + h),
       Point(x, y + h)
     )
+  }
+  private fun orderQuad(pts: Array<Point>): Array<Point> {
+    // Order by sum/diff like TL (min sum), TR (min diff), BR (max sum), BL (max diff)
+    // Order points to match the canonical template orientation
+    // Find centroid
+    val cx = pts.map { it.x }.average()
+    val cy = pts.map { it.y }.average()
+    
+    // Separate into left/right based on x-coordinate
+    val (left, right) = pts.partition { it.x < cx }
+    
+    // Sort left points by y (top to bottom)
+    val leftSorted = left.sortedBy { it.y }
+    val tl = if (leftSorted.isNotEmpty()) leftSorted[0] else pts[0]
+    val bl = if (leftSorted.size > 1) leftSorted[1] else pts[3]
+    
+    // Sort right points by y (top to bottom)
+    val rightSorted = right.sortedBy { it.y }
+    val tr = if (rightSorted.isNotEmpty()) rightSorted[0] else pts[1]
+    val br = if (rightSorted.size > 1) rightSorted[1] else pts[2]
+    
+    return arrayOf(tl, tr, br, bl)
+  }
+
+  private fun clamp(v: Int, minV: Int, maxV: Int) = Math.max(minV, Math.min(maxV, v))
+
+  private fun normRectToPx(
+    rect: Map<String, Any>,
+    frameW: Int,
+    frameH: Int
+  ): IntArray {
+    val x = getDouble(rect, "x", 0.0)
+    val y = getDouble(rect, "y", 0.0)
+    val w = getDouble(rect, "width", 1.0)
+    val h = getDouble(rect, "height", 1.0)
+    val px = (x * frameW).toInt()
+    val py = (y * frameH).toInt()
+    val pw = Math.max(1, (w * frameW).toInt())
+    val ph = Math.max(1, (h * frameH).toInt())
+    return intArrayOf(px, py, pw, ph)
+  }
+
+  private fun enforceMinAspect(
+    r: IntArray,
+    frameW: Int,
+    frameH: Int,
+    minAspect: Double
+  ): IntArray {
+    var x = r[0]; var y = r[1]; var w = r[2]; var h = r[3]
+    if (w <= 0 || h <= 0) return intArrayOf(x, y, w, h)
+    val ratio = w.toDouble() / h.toDouble()
+    if (ratio < minAspect) {
+      // reduce height to satisfy min aspect, keep center
+      val newH = Math.max(1, (w / minAspect).toInt())
+      val cy = y + h / 2
+      y = clamp(cy - newH / 2, 0, frameH - newH)
+      h = newH
+    }
+    // clamp within frame
+    x = clamp(x, 0, Math.max(0, frameW - w))
+    y = clamp(y, 0, Math.max(0, frameH - h))
+    return intArrayOf(x, y, w, h)
+  }
+
+  private fun rectWithinRoi(test: IntArray, inner: IntArray, outer: IntArray, tol: Int = 0): Boolean {
+    val tx1 = test[0]; val ty1 = test[1]; val tx2 = test[0] + test[2]; val ty2 = test[1] + test[3]
+    val ox1 = outer[0]; val oy1 = outer[1]; val ox2 = outer[0] + outer[2]; val oy2 = outer[1] + outer[3]
+    val ix1 = inner[0]; val iy1 = inner[1]; val ix2 = inner[0] + inner[2]; val iy2 = inner[1] + inner[3]
+
+    if (tx1 < ox1 - tol || ty1 < oy1 - tol || tx2 > ox2 + tol || ty2 > oy2 + tol) return false
+    if (tx1 > ix1 + tol) return false
+    if (ty1 > iy1 + tol) return false
+    if (tx2 < ix2 - tol) return false
+    if (ty2 < iy2 - tol) return false
+    return true
   }
   private fun percentBoxToPts(box: Box, templateW: Int, templateH: Int): Array<Point> {
     val x = box.x / 100.0 * templateW
@@ -193,21 +279,12 @@ class ScreenDetectorFrameProcessorPlugin(
     val srcHeight = mediaImage.height
 
     try {
-      val templateBoxes = parseTemplate(arguments)
-      if (templateBoxes == null) {
-        val screenData = HashMap<String, Any?>()
-        screenData["width"] = srcWidth
-        screenData["height"] = srcHeight
-        screenData["detected"] = false
-        data["screen"] = screenData
-        return data
-      }
+      val templateBoxes = parseTemplate(arguments) // optional now
 
-      val screenWidthRatio = getDouble(arguments, "screenWidthRatio", getDouble(pluginOptions, "screenWidthRatio", 0.80))
       val screenAspectW = getInt(arguments, "screenAspectW", getInt(pluginOptions, "screenAspectW", 3))
       val screenAspectH = getInt(arguments, "screenAspectH", getInt(pluginOptions, "screenAspectH", 4))
       val minIouForMatch = getDouble(arguments, "minIouForMatch", getDouble(pluginOptions, "minIouForMatch", 0.30))
-      val accuracyThreshold = getDouble(arguments, "accuracyThreshold", getDouble(pluginOptions, "accuracyThreshold", 0.60))
+      val accuracyThreshold = getDouble(arguments, "accuracyThreshold", getDouble(pluginOptions, "accuracyThreshold", 0.80))
       val templateTargetW = getInt(arguments, "templateTargetW", getInt(pluginOptions, "templateTargetW", 1200))
       val templateTargetH = getInt(arguments, "templateTargetH", getInt(pluginOptions, "templateTargetH", 1600))
       val returnWarpedImage = getBool(arguments, "returnWarpedImage", getBool(pluginOptions, "returnWarpedImage", false))
@@ -215,110 +292,211 @@ class ScreenDetectorFrameProcessorPlugin(
       val outputH = getInt(arguments, "outputH", templateTargetH)
       val imageQuality = getInt(arguments, "imageQuality", 80)
 
+      // ROI config (normalized 0..1). Defaults similar to Python main2.py
+      val roiOuterArg = getMap(arguments, "roiOuter") ?: mapOf(
+        "x" to 0.10, "y" to 0.05, "width" to 0.80, "height" to 0.90
+      )
+      val roiInnerArg = getMap(arguments, "roiInner") ?: mapOf(
+        "x" to 0.30, "y" to 0.20, "width" to 0.45, "height" to 0.60
+      )
+      val minAspectW = getInt(arguments, "minAspectW", 3)
+      val minAspectH = getInt(arguments, "minAspectH", 4)
+      val minAspect = if (minAspectH != 0) minAspectW.toDouble() / minAspectH.toDouble() else 0.75
+
       val gray = yPlaneToGrayMat(mediaImage)
-      val rotated = Mat()
-      Core.rotate(gray, rotated, Core.ROTATE_90_CLOCKWISE)
-      val frameW = rotated.cols()
-      val frameH = rotated.rows()
-      DebugHttpStreamer.updateMatGray("rotated", rotated, 60)
-
-      // Zentriertes Template-Rechteck
-      var templW = (frameW * screenWidthRatio).toInt().coerceAtLeast(1)
-      var templH = (templW * screenAspectH / screenAspectW.toDouble()).toInt().coerceAtLeast(1)
-      if (templH > frameH) {
-        val scale = frameH.toDouble() / templH.toDouble()
-        templH = frameH
-        templW = (templW * scale).toInt().coerceAtLeast(1)
+      val rotate90CW = getBool(arguments, "rotate90CW", getBool(pluginOptions, "rotate90CW", false))
+      
+      val img = if (rotate90CW) {
+        val rotated = Mat()
+        Core.rotate(gray, rotated, Core.ROTATE_90_CLOCKWISE)
+        rotated
+      } else {
+        gray
       }
-      val templX = (frameW - templW) / 2
-      val templY = (frameH - templH) / 2
-      val cropW = templW
-      val cropX = templX
+      val frameW = img.width()
+      val frameH = img.height()
 
-      val templateRects = templateBoxes.map { b ->
-        val x = templX + (b.x / 100.0 * templW).toInt()
-        val y = templY + (b.y / 100.0 * templH).toInt()
-        val wpx = (b.w / 100.0 * templW).toInt().coerceAtLeast(1)
-        val hpx = (b.h / 100.0 * templH).toInt().coerceAtLeast(1)
-        intArrayOf(x, y, wpx, hpx)
-      }
-      val templatePixelRectsArr = ArrayList<HashMap<String, Any?>>()
-      for (r in templateRects) {
-        val m = HashMap<String, Any?>(); m["x"] = r[0]; m["y"] = r[1]; m["w"] = r[2]; m["h"] = r[3]; templatePixelRectsArr.add(m)
-      }
 
-      val edges = Mat()
-      Imgproc.Canny(rotated, edges, 50.0, 150.0)
-      DebugHttpStreamer.updateMatGray("edges", edges, 60)
-      val contours = ArrayList<MatOfPoint>()
-      val hierarchy = Mat()
-      Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+      DebugHttpStreamer.updateMatGray("gray", gray, 60)
+      DebugHttpStreamer.updateMatGray("rotated", img, 60)
+
+      // Resolve ROIs in pixels, enforce min aspect
+      val roiOuterPx = enforceMinAspect(normRectToPx(roiOuterArg, frameW, frameH), frameW, frameH, minAspect)
+      val roiInnerPx = enforceMinAspect(normRectToPx(roiInnerArg, frameW, frameH), frameW, frameH, minAspect)
+
+      // Preprocessing for better light handling
+      val normalized = Mat()
+      val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
+      
+      // Option 1: CLAHE (Contrast Limited Adaptive Histogram Equalization)
+      // This helps with uneven lighting
+      clahe.apply(img, normalized)
+      
+      // Option 2: Alternative - Adaptive threshold preprocessing
+      // val adaptiveThresh = Mat()
+      // Imgproc.adaptiveThreshold(img, adaptiveThresh, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY, 31, 10.0)
+      
+      // Two-pass approach: different edge detection for screen vs template boxes
+      val screenBlur = Mat()
+      val detailBlur = Mat()
+      
+      // For screen detection: stronger blur, adaptive thresholds based on image mean
+      Imgproc.GaussianBlur(normalized, screenBlur, Size(5.0, 5.0), 1.5)
+      val mean = Core.mean(screenBlur)
+      val sigma = 0.33 // lower sigma for screen detection
+      val v = mean.`val`[0]
+      val lowerScreen = Math.max(0.0, (1.0 - sigma) * v)
+      val upperScreen = Math.min(255.0, (1.0 + sigma) * v)
+      
+      // For detail/template detection: minimal blur, lower thresholds
+      Imgproc.GaussianBlur(normalized, detailBlur, Size(3.0, 3.0), 1.0)
+      
+      // Create two edge maps
+      val screenEdges = Mat()
+      val detailEdges = Mat()
+      
+      // Screen edges: for finding the display outline
+      Imgproc.Canny(screenBlur, screenEdges, lowerScreen, upperScreen, 3, false)
+      
+      // Detail edges: for finding template boxes with dynamic thresholds
+      val detailMean = Core.mean(detailBlur)
+      val detailV = detailMean.`val`[0]
+      val detailLower = Math.max(20.0, detailV * 0.3)
+      val detailUpper = Math.min(200.0, detailV * 0.9)
+      Imgproc.Canny(detailBlur, detailEdges, detailLower, detailUpper, 3, false)
+      
+      // Optional: Light morphological closing on screen edges to connect gaps
+      val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
+      Imgproc.morphologyEx(screenEdges, screenEdges, Imgproc.MORPH_CLOSE, kernel)
+      
+      // Debug output
+      DebugHttpStreamer.updateMatGray("normalized", normalized, 60)
+      DebugHttpStreamer.updateMatGray("screenEdges", screenEdges, 60)
+      DebugHttpStreamer.updateMatGray("detailEdges", detailEdges, 60)
+      
+      // First pass: Find screen using screen edges
+      val screenContours = ArrayList<MatOfPoint>()
+      val screenHierarchy = Mat()
+      Imgproc.findContours(screenEdges, screenContours, screenHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
       val approx = MatOfPoint2f()
       val tmp2f = MatOfPoint2f()
+      var bestRect: IntArray? = null
+      var bestQuad: Array<Point>? = null
+      var bestScore = 0.0
       val allRects = ArrayList<HashMap<String, Any?>>()
-      for (cnt in contours) {
+      
+      // First find the best screen candidate
+      for (cnt in screenContours) {
         tmp2f.fromArray(*cnt.toArray())
         val perim = Imgproc.arcLength(tmp2f, true)
         Imgproc.approxPolyDP(tmp2f, approx, 0.02 * perim, true)
-        if (approx.total().toInt() == 4) {
-          val pts = approx.toArray()
-          var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
-          var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
-          for (p in pts) {
-            if (p.x < minX) minX = p.x
-            if (p.y < minY) minY = p.y
-            if (p.x > maxX) maxX = p.x
-            if (p.y > maxY) maxY = p.y
-          }
-          val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
-          val wpx = min(frameW - x, (maxX - minX).toInt())
-          val hpx = min(frameH - y, (maxY - minY).toInt())
-          if (wpx <= 0 || hpx <= 0) continue
-          val rectMap = HashMap<String, Any?>(); rectMap["x"] = x; rectMap["y"] = y; rectMap["w"] = wpx; rectMap["h"] = hpx; allRects.add(rectMap)
+        if (approx.total().toInt() != 4) continue
+        val pts = approx.toArray()
+        var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
+        var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+        for (p in pts) { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y }
+        val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
+        val wpx = min(frameW - x, (maxX - minX).toInt()); val hpx = min(frameH - y, (maxY - minY).toInt())
+        if (wpx <= 0 || hpx <= 0) continue
+        val rect = intArrayOf(x, y, wpx, hpx)
+        // collect for debug
+        run { val m = HashMap<String, Any?>(); m["x"] = x; m["y"] = y; m["w"] = wpx; m["h"] = hpx; allRects.add(m) }
+        if (!rectWithinRoi(rect, roiInnerPx, roiOuterPx, 12)) continue
+        val bbox = intArrayOf(x, y, wpx, hpx)
+        val score = iou(bbox, bbox) // IoU with itself ~ 1.0, but keep for extensibility
+        if (score > bestScore) {
+          bestScore = score
+          bestRect = rect
+          bestQuad = orderQuad(arrayOf(pts[0], pts[1], pts[2], pts[3]))
         }
       }
-      run { val fr = HashMap<String, Any?>(); fr["x"] = 0; fr["y"] = 0; fr["w"] = frameW; fr["h"] = frameH; allRects.add(0, fr) }
-
-      val matched: Array<IntArray?> = arrayOfNulls(templateRects.size)
-      for (cnt in contours) {
+      
+      // Second pass: Find all detail contours for template matching
+      val detailContours = ArrayList<MatOfPoint>()
+      val detailHierarchy = Mat()
+      Imgproc.findContours(detailEdges, detailContours, detailHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+      
+      val contourRects = ArrayList<IntArray>()
+      for (cnt in detailContours) {
         tmp2f.fromArray(*cnt.toArray())
         val perim = Imgproc.arcLength(tmp2f, true)
         Imgproc.approxPolyDP(tmp2f, approx, 0.02 * perim, true)
-        if (approx.total().toInt() == 4) {
-          val pts = approx.toArray()
-          var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
-          var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
-          for (p in pts) {
-            if (p.x < minX) minX = p.x
-            if (p.y < minY) minY = p.y
-            if (p.x > maxX) maxX = p.x
-            if (p.y > maxY) maxY = p.y
-          }
-          val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
-          val wpx = min(frameW - x, (maxX - minX).toInt())
-          val hpx = min(frameH - y, (maxY - minY).toInt())
-          if (wpx <= 0 || hpx <= 0) continue
-          val rect = intArrayOf(x, y, wpx, hpx)
-          var bestIou = 0.0; var bestIdx = -1
-          for (i in templateRects.indices) {
-            val score = iou(rect, templateRects[i])
-            if (score > bestIou) { bestIou = score; bestIdx = i }
-          }
-          if (bestIdx >= 0 && bestIou > minIouForMatch) matched[bestIdx] = rect
-        }
+        if (approx.total().toInt() != 4) continue
+        val pts = approx.toArray()
+        var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
+        var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+        for (p in pts) { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y }
+        val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
+        val wpx = min(frameW - x, (maxX - minX).toInt()); val hpx = min(frameH - y, (maxY - minY).toInt())
+        if (wpx <= 0 || hpx <= 0) continue
+        contourRects.add(intArrayOf(x, y, wpx, hpx))
       }
 
-      val matchedCount = matched.count { it != null }
-      val accuracy = if (templateRects.isNotEmpty()) matchedCount.toDouble() / templateRects.size.toDouble() else 0.0
-      val (H, mask) = if (matchedCount >= 1) buildHomography(templateBoxes, matched, templateTargetW, templateTargetH) else Pair(null, null)
-      val detected = accuracy >= accuracyThreshold && H != null && !H.empty()
+      var H: Mat? = null
+      var mask: Mat? = null
+      if (bestQuad != null) {
+        // Build H as canonical (template) -> image space
+        val src = MatOfPoint2f(
+          Point(0.0, 0.0),
+          Point(templateTargetW.toDouble(), 0.0),
+          Point(templateTargetW.toDouble(), templateTargetH.toDouble()),
+          Point(0.0, templateTargetH.toDouble())
+        )
+        val dst = MatOfPoint2f()
+        dst.fromArray(*bestQuad!!)
+        H = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 3.0)
+      }
+      // Optional template-abgleich via homography inverse
+      var accuracy = 0.0
+      val matchedArr = ArrayList<Any?>()
+      val templatePixelRectsArr = ArrayList<HashMap<String, Any?>>()
+      if (H != null && !H.empty() && templateBoxes != null && templateBoxes.isNotEmpty()) {
+        var matches = 0
+        for (b in templateBoxes) {
+          val pts = MatOfPoint2f(*percentBoxToPts(b, templateTargetW, templateTargetH))
+          val proj = MatOfPoint2f()
+          // Project canonical template box into image using H (canonical -> image)
+          Core.perspectiveTransform(pts, proj, H)
+          val arr = proj.toArray()
+          var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
+          var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+          for (p in arr) { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y }
+          val rx = max(0, minX.toInt()); val ry = max(0, minY.toInt())
+          val rw = min(frameW - rx, (maxX - minX).toInt()); val rh = min(frameH - ry, (maxY - minY).toInt())
+          val rectMap = HashMap<String, Any?>(); rectMap["x"] = rx; rectMap["y"] = ry; rectMap["w"] = rw; rectMap["h"] = rh; templatePixelRectsArr.add(rectMap)
+
+          var best = 0.0; var bestRectForThis: IntArray? = null
+          for (cr in contourRects) {
+            val sc = iou(intArrayOf(rx, ry, rw, rh), cr)
+            if (sc > best) { best = sc; bestRectForThis = cr }
+          }
+          if (bestRectForThis != null && best >= minIouForMatch) {
+            matches += 1
+            val mm = HashMap<String, Any?>(); mm["x"] = bestRectForThis[0]; mm["y"] = bestRectForThis[1]; mm["w"] = bestRectForThis[2]; mm["h"] = bestRectForThis[3]
+            matchedArr.add(mm)
+          } else {
+            matchedArr.add(null)
+          }
+        }
+        accuracy = if (templateBoxes.isNotEmpty()) matches.toDouble() / templateBoxes.size.toDouble() else 0.0
+      }
+      val detected = (H != null && !H.empty()) && (
+        if (templateBoxes != null && templateBoxes.isNotEmpty()) accuracy >= accuracyThreshold else true
+      )
+      
+      // Update counters
+      totalFrameCounter++
+      if (detected) detectionCounter++
 
       val screenData = HashMap<String, Any?>()
       screenData["width"] = frameW; screenData["height"] = frameH
       screenData["detected"] = detected
       screenData["accuracy"] = accuracy
       screenData["accuracy_threshold"] = accuracyThreshold
+      screenData["detection_count"] = detectionCounter
+      screenData["total_frames"] = totalFrameCounter
+      screenData["detection_rate"] = if (totalFrameCounter > 0) detectionCounter.toDouble() / totalFrameCounter.toDouble() else 0.0
       val origSize = HashMap<String, Any?>(); origSize["w"] = srcWidth; origSize["h"] = srcHeight; screenData["source_frame_size"] = origSize
       val aspect = HashMap<String, Any?>(); aspect["w"] = screenAspectW; aspect["h"] = screenAspectH; screenData["screen_aspect"] = aspect
       val tSize = HashMap<String, Any?>(); tSize["w"] = templateTargetW; tSize["h"] = templateTargetH; screenData["template_target_size"] = tSize
@@ -333,16 +511,33 @@ class ScreenDetectorFrameProcessorPlugin(
         val mArr = ArrayList<Int>(); val mBytes = ByteArray(mask.rows() * mask.cols()); mask.get(0,0,mBytes); for (b in mBytes) mArr.add(if (b.toInt()==0) 0 else 1); screenData["homography_inliers_mask"] = mArr
       } else screenData["homography_inliers_mask"] = null
 
-      val matchedArr = ArrayList<Any?>(); for (m in matched) { if (m==null) matchedArr.add(null) else { val mm = HashMap<String, Any?>(); mm["x"]=m[0]; mm["y"]=m[1]; mm["w"]=m[2]; mm["h"]=m[3]; matchedArr.add(mm) } }
-      screenData["matched_boxes"] = matchedArr
-      screenData["template_pixel_boxes"] = templatePixelRectsArr
-      val cropInfo = HashMap<String, Any?>(); cropInfo["crop_x"] = cropX; cropInfo["crop_w"] = cropW; cropInfo["screen_width_ratio"] = screenWidthRatio; cropInfo["template_x"] = templX; cropInfo["template_y"] = templY; cropInfo["template_w"] = templW; cropInfo["template_h"] = templH; screenData["crop_info"] = cropInfo
-      val templateRect = HashMap<String, Any?>(); templateRect["x"] = templX; templateRect["y"] = templY; templateRect["w"] = templW; templateRect["h"] = templH; screenData["template_rect"] = templateRect
+      // ROI and candidate info
+      val roiOuterMap = HashMap<String, Any?>(); roiOuterMap["x"] = roiOuterPx[0]; roiOuterMap["y"] = roiOuterPx[1]; roiOuterMap["w"] = roiOuterPx[2]; roiOuterMap["h"] = roiOuterPx[3]
+      val roiInnerMap = HashMap<String, Any?>(); roiInnerMap["x"] = roiInnerPx[0]; roiInnerMap["y"] = roiInnerPx[1]; roiInnerMap["w"] = roiInnerPx[2]; roiInnerMap["h"] = roiInnerPx[3]
+      screenData["roi_outer_px"] = roiOuterMap
+      screenData["roi_inner_px"] = roiInnerMap
+      if (bestRect != null) {
+        val r = bestRect!!
+        val br = HashMap<String, Any?>(); br["x"] = r[0]; br["y"] = r[1]; br["w"] = r[2]; br["h"] = r[3]
+        screenData["screen_rect"] = br
+      }
+      screenData["all_detected_rects"] = allRects
+      // Expose a template_rect for UI viewport mapping (use outer ROI)
+      val templateRect = HashMap<String, Any?>(); templateRect["x"] = roiOuterPx[0]; templateRect["y"] = roiOuterPx[1]; templateRect["w"] = roiOuterPx[2]; templateRect["h"] = roiOuterPx[3]; screenData["template_rect"] = templateRect
 
-      val tmplArr = ArrayList<HashMap<String, Any?>>(); for (b in templateBoxes) { val bMap = HashMap<String, Any?>(); if (b.id!=null) bMap["id"] = b.id; bMap["x"] = b.x; bMap["y"] = b.y; bMap["width"] = b.w; bMap["height"] = b.h; tmplArr.add(bMap) }; screenData["template_boxes"] = tmplArr
+      if (templatePixelRectsArr.isNotEmpty()) screenData["template_pixel_boxes"] = templatePixelRectsArr
+      if (matchedArr.isNotEmpty()) screenData["matched_boxes"] = matchedArr
 
       if (detected && returnWarpedImage && H != null && !H.empty()) {
-        val base64 = warpAndEncodeGrayToBase64(rotated, H, outputW, outputH, imageQuality)
+        // Warp image -> canonical using inverse(H)
+        val warped = Mat(outputH, outputW, CvType.CV_8UC1)
+        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+        
+        // Show warped result in debug stream
+        DebugHttpStreamer.updateMatGray("warped", warped, 80)
+        
+        // Convert to base64 for return
+        val base64 = warpAndEncodeGrayToBase64(img, H.inv(), outputW, outputH, imageQuality)
         base64?.let {
           val preview = if (it.length > 120) it.substring(0, 120) + "…" else it
           Log.d("ScreenDetector", "warped image len=${it.length}, preview=$preview")
@@ -353,14 +548,68 @@ class ScreenDetectorFrameProcessorPlugin(
           imap["h"] = outputH
           screenData["image_size"] = imap
         }
+      } else if (H != null && !H.empty()) {
+        // Even if not returning base64, show warped result in debug for testing
+        val warped = Mat(outputH, outputW, CvType.CV_8UC1)
+        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+        DebugHttpStreamer.updateMatGray("warped", warped, 80)
       }
 
       try {
-        val overlayColor = Mat(); Imgproc.cvtColor(rotated, overlayColor, Imgproc.COLOR_GRAY2BGR)
-        Imgproc.rectangle(overlayColor, Point(templX.toDouble(), templY.toDouble()), Point((templX+templW).toDouble(), (templY+templH).toDouble()), Scalar(0.0,0.0,255.0), 2)
-        for (r in templateRects) Imgproc.rectangle(overlayColor, Point(r[0].toDouble(), r[1].toDouble()), Point((r[0]+r[2]).toDouble(), (r[1]+r[3]).toDouble()), Scalar(255.0,0.0,0.0), 2)
-        for (m in matched) if (m!=null) Imgproc.rectangle(overlayColor, Point(m[0].toDouble(), m[1].toDouble()), Point((m[0]+m[2]).toDouble(), (m[1]+m[3]).toDouble()), Scalar(0.0,255.0,0.0), 2)
-        DebugHttpStreamer.updateMatColor("overlay", overlayColor, 70)
+        val overlayColor = Mat(); Imgproc.cvtColor(img, overlayColor, Imgproc.COLOR_GRAY2BGR)
+        
+        // Draw counter text
+        val detectionText = "Detections: $detectionCounter / $totalFrameCounter (${String.format("%.1f", screenData["detection_rate"] as Double * 100)}%)"
+        val statusText = if (detected) "DETECTED" else "SEARCHING"
+        val statusColor = if (detected) Scalar(0.0, 255.0, 0.0) else Scalar(0.0, 0.0, 255.0)
+        
+        Imgproc.putText(overlayColor, detectionText, Point(10.0, 30.0), Imgproc.FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255.0, 255.0, 255.0), 2)
+        Imgproc.putText(overlayColor, statusText, Point(10.0, 60.0), Imgproc.FONT_HERSHEY_SIMPLEX, 0.9, statusColor, 2)
+        
+        // Draw ROIs
+        Imgproc.rectangle(overlayColor, Point(roiOuterPx[0].toDouble(), roiOuterPx[1].toDouble()), Point((roiOuterPx[0]+roiOuterPx[2]).toDouble(), (roiOuterPx[1]+roiOuterPx[3]).toDouble()), Scalar(0.0,0.0,255.0), 2)
+        Imgproc.rectangle(overlayColor, Point(roiInnerPx[0].toDouble(), roiInnerPx[1].toDouble()), Point((roiInnerPx[0]+roiInnerPx[2]).toDouble(), (roiInnerPx[1]+roiInnerPx[3]).toDouble()), Scalar(255.0,0.0,0.0), 2)
+
+        // Draw best screen quad if available
+        if (bestQuad != null) {
+          val q = bestQuad!!
+          Imgproc.line(overlayColor, q[0], q[1], Scalar(0.0,255.0,0.0), 2)
+          Imgproc.line(overlayColor, q[1], q[2], Scalar(0.0,255.0,0.0), 2)
+          Imgproc.line(overlayColor, q[2], q[3], Scalar(0.0,255.0,0.0), 2)
+          Imgproc.line(overlayColor, q[3], q[0], Scalar(0.0,255.0,0.0), 2)
+        }
+
+        // Project and draw template boxes via H (canonical -> image)
+        if (H != null && !H.empty() && templateBoxes != null && templateBoxes.isNotEmpty()) {
+          for (b in templateBoxes) {
+            val srcPts = MatOfPoint2f(*percentBoxToPts(b, templateTargetW, templateTargetH))
+            val projPts = MatOfPoint2f()
+            Core.perspectiveTransform(srcPts, projPts, H)
+            val arr = projPts.toArray()
+            val poly = MatOfPoint(
+              Point(arr[0].x, arr[0].y),
+              Point(arr[1].x, arr[1].y),
+              Point(arr[2].x, arr[2].y),
+              Point(arr[3].x, arr[3].y)
+            )
+            Imgproc.polylines(overlayColor, listOf(poly), true, Scalar(0.0,128.0,255.0), 2)
+          }
+        }
+
+        // Optionally draw matched rects (green)
+        if (matchedArr.isNotEmpty()) {
+          for (m in matchedArr) {
+            if (m is HashMap<*, *>) {
+              val mx = (m["x"] as? Number)?.toInt() ?: continue
+              val my = (m["y"] as? Number)?.toInt() ?: continue
+              val mw = (m["w"] as? Number)?.toInt() ?: continue
+              val mh = (m["h"] as? Number)?.toInt() ?: continue
+              Imgproc.rectangle(overlayColor, Point(mx.toDouble(), my.toDouble()), Point((mx+mw).toDouble(), (my+mh).toDouble()), Scalar(0.0,255.0,0.0), 2)
+            }
+          }
+        }
+
+        DebugHttpStreamer.updateMatColor("overlay", overlayColor, 80)
       } catch (_: Throwable) {}
 
       data["screen"] = screenData

@@ -9,7 +9,7 @@ import {
   DosingMainMenuDto,
   DosingSubMenuDosingPressureScrollDto,
   DosingSubMenuDosingSpeedScrollDto,
-} from "@/features/api/types";
+} from "@/features/api/types/api";
 
 export class DosingService {
   async getDosing(scanId: number): Promise<DosingDto> {
