@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { FlatList, Pressable } from "react-native";
+import { FlatList, Pressable, Modal as RNModal } from "react-native";
 
 import UiScannerCamera from "@/components/UiScannerCamera";
 import { Box } from "@/components/ui/box";
@@ -8,14 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
 import { HStack } from "@/components/ui/hstack";
 import { Input, InputField } from "@/components/ui/input";
-import {
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@/components/ui/modal";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
 import { useFullScan } from "@/features/fullscan/fullscan-context";
@@ -200,91 +192,117 @@ export default function CameraScreen() {
           ))}
         </VStack>
 
-        <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)}>
-          <ModalBackdrop />
-          <ModalContent>
-            <ModalHeader>
+        <RNModal
+          
+          visible={isPickerOpen}
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setIsPickerOpen(false)}
+        >
+          <Pressable
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 24 }}
+            
+            onPress={() => setIsPickerOpen(false)}
+          >
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
+              style={{ borderRadius: 12, padding: 16 }}
+              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+            >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("chooseFullScan") ?? "Full Scan auswählen"}
               </Heading>
-            </ModalHeader>
-            <ModalBody>
-              {fullScans.length === 0 ? (
-                <Text className={isDark ? "text-typography-200" : "text-typography-600"}>
-                  {t("noFullScans") ?? "Keine Full Scans vorhanden"}
-                </Text>
-              ) : (
-                <VStack className="gap-3">
-                  {fullScans.map((fs) => {
-                    const isSelected = selectedFullScanId === fs.id;
-                    return (
-                      <Pressable
-                        key={fs.id}
-                        className={`rounded-lg border px-3 py-2 ${
-                          isSelected
-                            ? "border-primary-500 bg-primary-500/10"
-                            : isDark
-                            ? "border-backgroundDark700"
-                            : "border-backgroundLight300"
-                        }`}
-                        onPress={() => {
-                          selectFullScan(fs.id);
-                          setIsPickerOpen(false);
-                        }}
-                      >
-                        <Text
-                          className={
-                            isDark
-                              ? "text-typography-50 font-semibold"
-                              : "text-typography-900 font-semibold"
-                          }
+              <Box className="mt-4">
+                {fullScans.length === 0 ? (
+                  <Text className={isDark ? "text-typography-200" : "text-typography-600"}>
+                    {t("noFullScans") ?? "Keine Full Scans vorhanden"}
+                  </Text>
+                ) : (
+                  <VStack className="gap-3">
+                    {fullScans.map((fs) => {
+                      const isSelected = selectedFullScanId === fs.id;
+                      return (
+                        <Pressable
+                          key={fs.id}
+                          className={`rounded-lg border px-3 py-2 ${
+                            isSelected
+                              ? "border-primary-500 bg-primary-500/10"
+                              : isDark
+                              ? "border-backgroundDark700"
+                              : "border-backgroundLight300"
+                          }`}
+                          onPress={() => {
+                            selectFullScan(fs.id);
+                            setIsPickerOpen(false);
+                          }}
                         >
-                          {fs.author || t("unknown") || "Unbekannt"}
-                        </Text>
-                        <Text
-                          className={
-                            isDark ? "text-typography-200" : "text-typography-600"
-                          }
-                        >
-                          {new Date(fs.date).toLocaleString()}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </VStack>
-              )}
-            </ModalBody>
-            <ModalFooter>
-              <Button
-                variant="outline"
-                action="secondary"
-                onPress={() => setIsPickerOpen(false)}
-              >
-                <Text>{t("close") ?? "Schließen"}</Text>
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+                          <Text
+                            className={
+                              isDark
+                                ? "text-typography-50 font-semibold"
+                                : "text-typography-900 font-semibold"
+                            }
+                          >
+                            {fs.author || t("unknown") || "Unbekannt"}
+                          </Text>
+                          <Text
+                            className={
+                              isDark ? "text-typography-200" : "text-typography-600"
+                            }
+                          >
+                            {new Date(fs.date).toLocaleString()}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </VStack>
+                )}
+              </Box>
+              <HStack className="mt-6 justify-end">
+                <Button
+                  variant="outline"
+                  action="secondary"
+                  onPress={() => setIsPickerOpen(false)}
+                >
+                  <Text>{t("close") ?? "Schließen"}</Text>
+                </Button>
+              </HStack>
+            </Pressable>
+          </Pressable>
+        </RNModal>
 
-        <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
-          <ModalBackdrop />
-          <ModalContent>
-            <ModalHeader>
+        <RNModal
+          transparent
+          visible={isAddOpen}
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setIsAddOpen(false)}
+        >
+          <Pressable
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 24 }}
+            onPress={() => {
+              setIsAddOpen(false);
+              setAuthorInput("");
+            }}
+          >
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
+              style={{ borderRadius: 12, padding: 16 }}
+              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+            >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("createNewFullScan") ?? "Neuen Full Scan erstellen"}
               </Heading>
-            </ModalHeader>
-            <ModalBody>
-              <Input>
-                <InputField
-                  value={authorInput}
-                  onChangeText={setAuthorInput}
-                  placeholder={t("author") ?? "Autor"}
-                />
-              </Input>
-            </ModalBody>
-            <ModalFooter>
-              <HStack className="gap-3">
+              <Box className="mt-4">
+                <Input>
+                  <InputField
+                    value={authorInput}
+                    onChangeText={setAuthorInput}
+                    placeholder={t("author") ?? "Autor"}
+                  />
+                </Input>
+              </Box>
+              <HStack className="mt-6 gap-3 justify-end">
                 <Button
                   variant="outline"
                   action="secondary"
@@ -303,14 +321,12 @@ export default function CameraScreen() {
                     setAuthorInput("");
                   }}
                 >
-                  <Text className="text-typography-0">
-                    {t("create") ?? "Erstellen"}
-                  </Text>
+                  <Text className="text-typography-0">{t("create") ?? "Erstellen"}</Text>
                 </Button>
               </HStack>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+            </Pressable>
+          </Pressable>
+        </RNModal>
       </Box>
     );
   }

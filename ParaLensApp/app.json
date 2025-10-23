@@ -11,11 +11,12 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "This app requires camera access to scan screens and perform OCR."
-      }
+        "NSCameraUsageDescription": "This app requires camera access to scan screens and perform OCR.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.htlleonding.paralens"
     },
     "android": {
-      
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -38,7 +39,6 @@
         "expo-build-properties",
         {
           "android": {
-            
             "minSdkVersion": 26,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,

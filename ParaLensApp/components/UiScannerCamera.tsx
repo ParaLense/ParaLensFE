@@ -377,6 +377,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         style={StyleSheet.absoluteFill}
         device={device}
         resizeMode="contain"
+        androidPreviewViewType="texture-view"
         frameProcessor={frameProcessor as ReadonlyFrameProcessor}
         format={cameraFormat}
       />
