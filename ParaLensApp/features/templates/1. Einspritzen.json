@@ -5,7 +5,8 @@
     "y": 20.4,
     "width": 54.61,
     "height": 15.88,
-    "label": "Injection Profile Modal"
+    "label": "Injection Profile Modal",
+    "type": "value"
   },
   {
     "id": "spray_pessure_limit",
@@ -13,7 +14,8 @@
     "y": 41.98,
     "width": 12.64,
     "height": 2.75,
-    "label": "Spray Pessure Limit"
+    "label": "Spray Pessure Limit",
+    "type": "value"
   },
   {
     "id": "increase_specific_point_printer_checkbox",
@@ -21,6 +23,11 @@
     "y": 50.44,
     "width": 3.5,
     "height": 2.5,
-    "label": "Increase Specific Point Printer Checkbox"
+    "label": "Increase Specific Point Printer Checkbox",
+    "type": "checkbox",
+    "options": {
+      "checkboxThreshold": 0.5,
+      "readValue": false
+    }
   }
 ]

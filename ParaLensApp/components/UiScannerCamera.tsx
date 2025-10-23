@@ -13,7 +13,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { performOcr } from '@bear-block/vision-camera-ocr';
 import { performScan } from 'vision-camera-screen-detector';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
@@ -21,6 +20,7 @@ import { Text as GluestackText } from '@/components/ui/text';
 import { useRunOnJS } from 'react-native-worklets-core';
 import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-template-layout';
 import { loadTemplateConfig } from '@/features/templates/template';
+import { loadOcrTemplate } from '@/features/templates/ocr-template';
 import TemplateOverlay from './TemplateOverlay';
 
 const TARGET_FPS = 10;
@@ -129,6 +129,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       })),
     []
   );
+
+  // TODO: load OCR template for currentLayout (percent over warped image)
+  const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
   useEffect(() => {
     let isMounted = true;
@@ -247,7 +250,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       lastFrameTime.value = now;
 
       const scan = performScan(frame, {
-        template: screenTemplate,
+        screenTemplate,
+        ocrTemplate,
+        runOcr: true,
         screenAspectW: SCREEN_ASPECT_W,
         screenAspectH: SCREEN_ASPECT_H,
         templateTargetW: 1200,
@@ -269,20 +274,27 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           setBase64ImageJS(scan.screen.image_base64);
         }
 
-        const results: Record<string, string> = {};
-        for (const box of ocrLayoutBoxes) {
-          const result = performOcr(
-            frame,
-            { x: box.x, y: box.y, width: box.width, height: box.height },
-            { width: viewWidth, height: viewHeight }
-          );
-          if (result?.text) {
-            results[box.id] = result.text;
+        if (scan.ocr?.boxes?.length) {
+          const map: Record<string, string> = {};
+          for (const b of scan.ocr.boxes as any[]) {
+            if (!b || !b.id) continue;
+            if (b.type === 'value') {
+              map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
+            } else if (b.type === 'checkbox') {
+              map[b.id] = b.checked ? 'true' : 'false';
+              // If checkbox has an associated value, also store it
+              if (b.checked && b.valueBoxId && (b.valueText || b.valueNumber != null)) {
+                const valueKey = `${b.id}_value`;
+                map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
+              }
+            } else if (b.type === 'scrollbar') {
+              const val = b.selectedValue ?? b.positionPercent;
+              map[b.id] = String(val ?? '');
+            }
           }
-        }
-
-        if (Object.keys(results).length > 0) {
-          setOcrMapJS(results);
+          if (Object.keys(map).length > 0) {
+            setOcrMapJS(map);
+          }
         }
       }
     } catch (error) {

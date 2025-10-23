@@ -5,7 +5,8 @@
     "y": 17.95,
     "width": 54.77,
     "height": 15.71,
-    "label": "Holding Pressure Profile Modal"
+    "label": "Holding Pressure Profile Modal",
+    "type": "value"
   },
   {
     "id": "holding_pressure_time",
@@ -13,7 +14,8 @@
     "y": 37.01,
     "width": 10.84,
     "height": 3.21,
-    "label": "Holding Pressure Time"
+    "label": "Holding Pressure Time",
+    "type": "value"
   },
   {
     "id": "cooling_time",
@@ -21,7 +23,8 @@
     "y": 52.91,
     "width": 10.84,
     "height": 3.31,
-    "label": "Cooling Time"
+    "label": "Cooling Time",
+    "type": "value"
   },
   {
     "id": "screw_diameter",
@@ -29,6 +32,7 @@
     "y": 64.85,
     "width": 12.45,
     "height": 3.41,
-    "label": "Screw Diameter"
+    "label": "Screw Diameter",
+    "type": "value"
   }
 ]

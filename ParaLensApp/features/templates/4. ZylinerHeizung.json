@@ -5,6 +5,7 @@
     "y": 34.0,
     "width": 73.23,
     "height": 3.51,
-    "label": "Cylinder Heating Items"
+    "label": "Cylinder Heating Items",
+    "type": "value"
   }
 ]

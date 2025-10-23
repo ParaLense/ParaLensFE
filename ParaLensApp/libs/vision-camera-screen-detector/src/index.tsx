@@ -13,10 +13,34 @@ export type TemplateBox = {
   height: number;
 };
 
+// OCR template box (percent of warped image)
+export type OcrTemplateBox = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // value, checkbox, scrollbar
+  type?: 'value' | 'checkbox' | 'scrollbar';
+  options?: {
+    orientation?: 'horizontal' | 'vertical';
+    cells?: number;
+    valuesRegion?: { x: number; y: number; width: number; height: number };
+    checkboxThreshold?: number;
+    readValue?: boolean;
+    valueBoxId?: string;
+  };
+};
+
 // JSON-artiger Param-Typ für Frame-Processor-Argumente (ersetzt fehlenden ParameterType)
 
 export type PerformScanOptions = {
-  template: TemplateBox[];
+  // Backward-compatible: screen detection template
+  template?: TemplateBox[];
+  // New names: allow passing screen and OCR templates separately
+  screenTemplate?: TemplateBox[];
+  ocrTemplate?: OcrTemplateBox[];
+  runOcr?: boolean;
   screenWidthRatio?: number; // 0..1, default 0.80
   screenAspectW?: number; // default 3
   screenAspectH?: number; // default 4
@@ -52,13 +76,37 @@ export function performScan(
     matched_boxes?: any;
     image_base64?: string;
   };
+  ocr?: {
+    boxes: Array<
+      | { id: string; type: 'value'; text?: string; number?: number; confidence?: number }
+      | { 
+          id: string; 
+          type: 'checkbox'; 
+          checked: boolean; 
+          confidence?: number;
+          valueText?: string;
+          valueNumber?: number;
+          valueBoxId?: string;
+        }
+      | {
+          id: string;
+          type: 'scrollbar';
+          positionPercent: number;
+          values?: Array<{ index: number; text?: string; number?: number; confidence?: number }>;
+          selectedIndex?: number;
+          selectedValue?: number | string;
+          confidence?: number;
+        }
+    >;
+  };
 } | null {
   'worklet';
   if (plugin == null)
     throw new Error('Failed to load Frame Processor Plugin "detectScreen"!');
 
   // Nur primitive/plain Werte erlauben (JSI-sicher)
-  const boxes = opts.template.map((b) => ({
+  const screenTemplate = (opts.screenTemplate ?? opts.template) ?? [];
+  const boxes = screenTemplate.map((b) => ({
     id: b.id ?? undefined,
     x: +b.x,
     y: +b.y,
@@ -67,7 +115,43 @@ export function performScan(
   }));
 
   const args = {
+    // Detection template (percent-coordinates in canonical space)
     template: boxes,
+    // OCR template (percent of warped image)
+    ...(opts.ocrTemplate && opts.ocrTemplate.length > 0
+      ? {
+          ocrTemplate: opts.ocrTemplate.map((b) => ({
+            id: b.id,
+            x: +b.x,
+            y: +b.y,
+            width: +b.width,
+            height: +b.height,
+            ...(b.type ? { type: b.type } : {}),
+            ...(b.options
+              ? {
+                  options: {
+                    ...(b.options.orientation ? { orientation: b.options.orientation } : {}),
+                    ...(b.options.cells != null ? { cells: +b.options.cells } : {}),
+                    ...(b.options.checkboxThreshold != null
+                      ? { checkboxThreshold: +b.options.checkboxThreshold }
+                      : {}),
+                    ...(b.options.valuesRegion
+                      ? {
+                          valuesRegion: {
+                            x: +b.options.valuesRegion.x,
+                            y: +b.options.valuesRegion.y,
+                            width: +b.options.valuesRegion.width,
+                            height: +b.options.valuesRegion.height,
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
+          })),
+        }
+      : {}),
+    ...(opts.runOcr != null ? { runOcr: !!opts.runOcr } : {}),
     ...(opts.screenWidthRatio != null
       ? { screenWidthRatio: +opts.screenWidthRatio }
       : {}),
@@ -122,5 +206,5 @@ export function performScan(
 
   // Typcast auf any, da template ein Array von Objekten ist und die nativen Plugins dies erwarten.
   // Die Typen der nativen Seite sind korrekt, TS meckert nur wegen der Record-Signatur.
-  return plugin.call(frame, args as any) as { screen: any } | null;
+  return plugin.call(frame, args as any) as { screen: any; ocr?: any } | null;
 }

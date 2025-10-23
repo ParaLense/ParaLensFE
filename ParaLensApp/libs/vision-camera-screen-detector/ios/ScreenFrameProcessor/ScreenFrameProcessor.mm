@@ -320,7 +320,119 @@ static std::vector<cv::Point2f> sd_orderQuad(const std::vector<cv::Point2f>& p) 
       screenData[@"image_size"] = @{ @"w": @(outputW), @"h": @(outputH) };
     }
 
-    return @{ @"screen": screenData };
+    // --- OCR on warped image (basic scaffold) ---
+    NSMutableDictionary* ocrMap = nil;
+    BOOL runOcr = sd_getBool(arguments, @"runOcr", NO);
+    NSArray* ocrTemplate = sd_getArray(arguments, @"ocrTemplate");
+    if (detected && runOcr && ocrTemplate && [ocrTemplate count] > 0) {
+      // Build warped image
+      cv::Mat warped;
+      cv::warpPerspective(gray, warped, H, cv::Size(outputW, outputH));
+      NSMutableArray* boxes = [NSMutableArray arrayWithCapacity:[ocrTemplate count]];
+      for (id e in ocrTemplate) {
+        if (![e isKindOfClass:[NSDictionary class]]) continue;
+        NSDictionary* m = (NSDictionary*)e;
+        NSString* bid = [m[@"id"] isKindOfClass:[NSString class]] ? (NSString*)m[@"id"] : [[m objectForKey:@"id"] description];
+        if (!bid) continue;
+        double x = sd_getDouble(m, @"x", 0.0);
+        double y = sd_getDouble(m, @"y", 0.0);
+        double w = sd_getDouble(m, @"width", 0.0);
+        double h = sd_getDouble(m, @"height", 0.0);
+        NSString* type = [m[@"type"] isKindOfClass:[NSString class]] ? (NSString*)m[@"type"] : @"value";
+        NSDictionary* opts = sd_getMap(m, @"options");
+
+        int rx = (int)std::round((x / 100.0) * outputW);
+        int ry = (int)std::round((y / 100.0) * outputH);
+        int rw = std::max(1, (int)std::round((w / 100.0) * outputW));
+        int rh = std::max(1, (int)std::round((h / 100.0) * outputH));
+        int x2 = std::min(outputW, rx + rw);
+        int y2 = std::min(outputH, ry + rh);
+        cv::Rect roi(rx, ry, std::max(1, x2 - rx), std::max(1, y2 - ry));
+        cv::Mat sub = warped(roi).clone();
+
+        NSMutableDictionary* r = [NSMutableDictionary dictionary];
+        r[@"id"] = bid;
+        if ([type isEqualToString:@"checkbox"]) {
+          // Simple checkbox heuristic: dark pixel ratio threshold
+          cv::Mat blur; cv::GaussianBlur(sub, blur, cv::Size(3,3), 0.0);
+          cv::Mat th; cv::threshold(blur, th, 0.0, 255.0, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+          int nonZero = cv::countNonZero(th);
+          int total = th.rows * th.cols;
+          double ratio = total > 0 ? ((double)nonZero / (double)total) : 0.0;
+          double thr = sd_getDouble(opts, @"checkboxThreshold", 0.5);
+          if (thr < 0.05) thr = 0.05; if (thr > 0.95) thr = 0.95;
+          BOOL readValue = sd_getBool(opts, @"readValue", NO);
+          NSString* valueBoxId = [opts[@"valueBoxId"] isKindOfClass:[NSString class]] ? (NSString*)opts[@"valueBoxId"] : nil;
+          
+          r[@"type"] = @"checkbox";
+          r[@"checked"] = @(ratio >= thr);
+          r[@"confidence"] = @(fabs(ratio - thr));
+          
+          // If checkbox is checked and readValue is true, also read the associated value
+          if (ratio >= thr && readValue && valueBoxId) {
+            // Find the associated value box and read it
+            for (id ve in ocrTemplate) {
+              if (![ve isKindOfClass:[NSDictionary class]]) continue;
+              NSDictionary* vm = (NSDictionary*)ve;
+              NSString* vid = [vm[@"id"] isKindOfClass:[NSString class]] ? (NSString*)vm[@"id"] : [[vm objectForKey:@"id"] description];
+              if (![vid isEqualToString:valueBoxId]) continue;
+              
+              double vx = sd_getDouble(vm, @"x", 0.0);
+              double vy = sd_getDouble(vm, @"y", 0.0);
+              double vw = sd_getDouble(vm, @"width", 0.0);
+              double vh = sd_getDouble(vm, @"height", 0.0);
+              
+              int vrx = (int)std::round((vx / 100.0) * outputW);
+              int vry = (int)std::round((vy / 100.0) * outputH);
+              int vrw = std::max(1, (int)std::round((vw / 100.0) * outputW));
+              int vrh = std::max(1, (int)std::round((vh / 100.0) * outputH));
+              int vx2 = std::min(outputW, vrx + vrw);
+              int vy2 = std::min(outputH, vry + vrh);
+              cv::Rect vroi(vrx, vry, std::max(1, vx2 - vrx), std::max(1, vy2 - vry));
+              cv::Mat vsub = warped(vroi).clone();
+              
+              // TODO: Add Vision text recognition for iOS here
+              r[@"valueText"] = [NSNull null];
+              r[@"valueNumber"] = [NSNull null];
+              r[@"valueBoxId"] = valueBoxId;
+              break;
+            }
+          }
+        } else if ([type isEqualToString:@"scrollbar"]) {
+          // Basic knob position via projection
+          NSString* ori = [opts[@"orientation"] isKindOfClass:[NSString class]] ? (NSString*)opts[@"orientation"] : ((rw >= rh) ? @"horizontal" : @"vertical");
+          double positionPercent = 0.0;
+          if ([ori isEqualToString:@"horizontal"]) {
+            cv::Mat proj; cv::reduce(sub, proj, 0, cv::REDUCE_SUM, CV_64F);
+            int cols = proj.cols; std::vector<double> buf(cols); if (cols > 0) proj.row(0).copyTo(cv::Mat(buf));
+            double maxVal = -DBL_MAX; int maxIdx = 0;
+            for (int i = 0; i < cols; ++i) { double v = buf[i]; if (v > maxVal) { maxVal = v; maxIdx = i; } }
+            positionPercent = (cols > 1) ? ((double)maxIdx / (double)(cols - 1)) * 100.0 : 0.0;
+          } else {
+            cv::Mat proj; cv::reduce(sub, proj, 1, cv::REDUCE_SUM, CV_64F);
+            int rows = proj.rows; std::vector<double> buf(rows); if (rows > 0) proj.col(0).copyTo(cv::Mat(buf));
+            double maxVal = -DBL_MAX; int maxIdx = 0;
+            for (int i = 0; i < rows; ++i) { double v = buf[i]; if (v > maxVal) { maxVal = v; maxIdx = i; } }
+            positionPercent = (rows > 1) ? ((double)maxIdx / (double)(rows - 1)) * 100.0 : 0.0;
+          }
+          r[@"type"] = @"scrollbar";
+          r[@"positionPercent"] = @(positionPercent);
+        } else {
+          r[@"type"] = @"value";
+          r[@"text"] = [NSNull null];
+          r[@"number"] = [NSNull null];
+          r[@"confidence"] = @(0.0);
+        }
+        [boxes addObject:r];
+      }
+      ocrMap = [@{ @"boxes": boxes } mutableCopy];
+    }
+
+    if (ocrMap) {
+      return @{ @"screen": screenData, @"ocr": ocrMap };
+    } else {
+      return @{ @"screen": screenData };
+    }
   } @catch (NSException *exception) {
     NSLog(@"Screen detection error: %@", exception.reason);
     return nil;

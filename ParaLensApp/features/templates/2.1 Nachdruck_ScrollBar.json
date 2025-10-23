@@ -5,7 +5,8 @@
     "y": 72.5,
     "width": 2.92,
     "height": 6.83,
-    "label": "Specific Back Pressure Start"
+    "label": "Specific Back Pressure Start",
+    "type": "value"
   },
   {
     "id": "specific_back_pressure_items",
@@ -13,7 +14,18 @@
     "y": 72.5,
     "width": 84.25,
     "height": 6.83,
-    "label": "Specific Back Pressure Items"
+    "label": "Specific Back Pressure Items",
+    "type": "scrollbar",
+    "options": {
+      "orientation": "horizontal",
+      "cells": 10,
+      "valuesRegion": {
+        "x": 8.35,
+        "y": 79.33,
+        "width": 84.25,
+        "height": 6.0
+      }
+    }
   },
   {
     "id": "specific_back_pressure_end",
@@ -21,6 +33,7 @@
     "y": 72.43,
     "width": 4.99,
     "height": 6.97,
-    "label": "Specific Back Pressure End"
+    "label": "Specific Back Pressure End",
+    "type": "value"
   }
 ]

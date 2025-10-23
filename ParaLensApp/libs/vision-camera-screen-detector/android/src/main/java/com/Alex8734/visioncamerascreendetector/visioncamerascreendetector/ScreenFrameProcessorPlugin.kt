@@ -22,6 +22,10 @@ import org.opencv.android.Utils
 import org.opencv.core.Core
 import android.graphics.Bitmap
 import android.util.Base64
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.ByteArrayOutputStream
 import org.opencv.core.Scalar
 // Debug Streamer (falls vorhanden)
@@ -32,6 +36,7 @@ class ScreenDetectorFrameProcessorPlugin(
   options: Map<String, Any>?
 ) : FrameProcessorPlugin() {
   private val pluginOptions = options
+  private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
   
   companion object {
     private var detectionCounter = 0
@@ -81,6 +86,15 @@ class ScreenDetectorFrameProcessorPlugin(
   }
 
   private data class Box(val id: String?, val x: Double, val y: Double, val w: Double, val h: Double)
+  private data class OcrBox(
+    val id: String,
+    val x: Double,
+    val y: Double,
+    val w: Double,
+    val h: Double,
+    val type: String?,
+    val options: Map<String, Any>?
+  )
 
   private fun parseTemplate(argMap: Map<String, Any>?): List<Box>? {
     val src = getList(argMap, "template") ?: getList(pluginOptions, "template") ?: return null
@@ -93,6 +107,24 @@ class ScreenDetectorFrameProcessorPlugin(
       val w = (m["width"] as? Number)?.toDouble() ?: (m["width"] as? String)?.toDoubleOrNull()
       val h = (m["height"] as? Number)?.toDouble() ?: (m["height"] as? String)?.toDoubleOrNull()
       if (x != null && y != null && w != null && h != null) out.add(Box(id, x, y, w, h))
+    }
+    return if (out.isEmpty()) null else out
+  }
+
+  private fun parseOcrTemplate(argMap: Map<String, Any>?): List<OcrBox>? {
+    val src = getList(argMap, "ocrTemplate") ?: return null
+    val out = mutableListOf<OcrBox>()
+    for (e in src) {
+      val m = e as? Map<*, *> ?: continue
+      val id = (m["id"] as? String) ?: m["id"]?.toString() ?: continue
+      val x = (m["x"] as? Number)?.toDouble() ?: (m["x"] as? String)?.toDoubleOrNull()
+      val y = (m["y"] as? Number)?.toDouble() ?: (m["y"] as? String)?.toDoubleOrNull()
+      val w = (m["width"] as? Number)?.toDouble() ?: (m["width"] as? String)?.toDoubleOrNull()
+      val h = (m["height"] as? Number)?.toDouble() ?: (m["height"] as? String)?.toDoubleOrNull()
+      val type = m["type"] as? String
+      @Suppress("UNCHECKED_CAST")
+      val options = m["options"] as? Map<String, Any>
+      if (x != null && y != null && w != null && h != null) out.add(OcrBox(id, x, y, w, h, type, options))
     }
     return if (out.isEmpty()) null else out
   }
@@ -283,6 +315,8 @@ class ScreenDetectorFrameProcessorPlugin(
 
       val screenAspectW = getInt(arguments, "screenAspectW", getInt(pluginOptions, "screenAspectW", 3))
       val screenAspectH = getInt(arguments, "screenAspectH", getInt(pluginOptions, "screenAspectH", 4))
+      val runOcr = getBool(arguments, "runOcr", false)
+      val ocrBoxes = if (runOcr) parseOcrTemplate(arguments) else null
       val minIouForMatch = getDouble(arguments, "minIouForMatch", getDouble(pluginOptions, "minIouForMatch", 0.30))
       val accuracyThreshold = getDouble(arguments, "accuracyThreshold", getDouble(pluginOptions, "accuracyThreshold", 0.80))
       val templateTargetW = getInt(arguments, "templateTargetW", getInt(pluginOptions, "templateTargetW", 1200))
@@ -553,6 +587,128 @@ class ScreenDetectorFrameProcessorPlugin(
         val warped = Mat(outputH, outputW, CvType.CV_8UC1)
         Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
         DebugHttpStreamer.updateMatGray("warped", warped, 80)
+      }
+
+      // --- OCR on warped image (basic scaffold) ---
+      if (detected && H != null && !H.empty() && runOcr && ocrBoxes != null && ocrBoxes.isNotEmpty()) {
+        val warped = Mat(outputH, outputW, CvType.CV_8UC1)
+        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+        val ocrArr = ArrayList<HashMap<String, Any?>>()
+        for (b in ocrBoxes) {
+          val rx = ((b.x / 100.0) * outputW).toInt().coerceIn(0, outputW - 1)
+          val ry = ((b.y / 100.0) * outputH).toInt().coerceIn(0, outputH - 1)
+          val rw = Math.max(1, ((b.w / 100.0) * outputW).toInt())
+          val rh = Math.max(1, ((b.h / 100.0) * outputH).toInt())
+          val x2 = (rx + rw).coerceAtMost(outputW)
+          val y2 = (ry + rh).coerceAtMost(outputH)
+          val roi = warped.submat(ry, y2, rx, x2)
+
+          val result = HashMap<String, Any?>()
+          result["id"] = b.id
+          when (b.type) {
+            "checkbox" -> {
+              // Simple checkbox heuristic: dark pixel ratio threshold
+              val blur = Mat(); Imgproc.GaussianBlur(roi, blur, Size(3.0,3.0), 0.0)
+              val th = Mat(); Imgproc.threshold(blur, th, 0.0, 255.0, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU)
+              val nonZero = Core.countNonZero(th)
+              val total = th.rows() * th.cols()
+              val ratio = if (total > 0) nonZero.toDouble() / total.toDouble() else 0.0
+              val threshold = ((b.options?.get("checkboxThreshold") as? Number)?.toDouble() ?: 0.5).coerceIn(0.05, 0.95)
+              val readValue = (b.options?.get("readValue") as? Boolean) ?: false
+              val valueBoxId = b.options?.get("valueBoxId") as? String
+              
+              result["type"] = "checkbox"
+              result["checked"] = ratio >= threshold
+              result["confidence"] = Math.abs(ratio - threshold)
+              
+              // If checkbox is checked and readValue is true, also read the associated value
+              if (ratio >= threshold && readValue && valueBoxId != null) {
+                // Find the associated value box and read it
+                val valueBox = ocrBoxes.find { it.id == valueBoxId }
+                if (valueBox != null) {
+                  val vrx = ((valueBox.x / 100.0) * outputW).toInt().coerceIn(0, outputW - 1)
+                  val vry = ((valueBox.y / 100.0) * outputH).toInt().coerceIn(0, outputH - 1)
+                  val vrw = Math.max(1, ((valueBox.w / 100.0) * outputW).toInt())
+                  val vrh = Math.max(1, ((valueBox.h / 100.0) * outputH).toInt())
+                  val vx2 = (vrx + vrw).coerceAtMost(outputW)
+                  val vy2 = (vry + vrh).coerceAtMost(outputH)
+                  val vroi = warped.submat(vry, vy2, vrx, vx2)
+                  
+                  try {
+                    val vrgba = Mat(); Imgproc.cvtColor(vroi, vrgba, Imgproc.COLOR_GRAY2RGBA)
+                    val vbmp = Bitmap.createBitmap(vrgba.cols(), vrgba.rows(), Bitmap.Config.ARGB_8888)
+                    Utils.matToBitmap(vrgba, vbmp)
+                    val vimage = InputImage.fromBitmap(vbmp, 0)
+                    val vtask = textRecognizer.process(vimage)
+                    val vvisionText = Tasks.await(vtask)
+                    val vtext = vvisionText.text?.trim() ?: ""
+                    val vnumText = vtext.replace(',', '.').replace("\n", " ").trim()
+                    val vnum = vnumText.toDoubleOrNull()
+                    
+                    result["valueText"] = if (vtext.isNotEmpty()) vtext else null
+                    result["valueNumber"] = vnum
+                    result["valueBoxId"] = valueBoxId
+                  } catch (t: Throwable) {
+                    Log.e("ScreenDetector", "ML Kit OCR for checkbox value failed: ${t.message}", t)
+                    result["valueText"] = null
+                    result["valueNumber"] = null
+                  }
+                }
+              }
+            }
+            "scrollbar" -> {
+              // Basic knob position via projection along axis
+              val orientation = (b.options?.get("orientation") as? String) ?: if (rw >= rh) "horizontal" else "vertical"
+              var positionPercent = 0.0
+              if (orientation == "horizontal") {
+                val proj = Mat()
+                Core.reduce(roi, proj, 0, Core.REDUCE_SUM, CvType.CV_64F)
+                var maxVal = Double.NEGATIVE_INFINITY; var maxIdx = 0
+                val cols = proj.cols(); val buf = DoubleArray(cols)
+                proj.get(0, 0, buf)
+                for (i in 0 until cols) { val v = buf[i]; if (v > maxVal) { maxVal = v; maxIdx = i } }
+                positionPercent = if (cols > 1) (maxIdx.toDouble() / (cols - 1).toDouble()) * 100.0 else 0.0
+              } else {
+                val proj = Mat()
+                Core.reduce(roi, proj, 1, Core.REDUCE_SUM, CvType.CV_64F)
+                var maxVal = Double.NEGATIVE_INFINITY; var maxIdx = 0
+                val rows = proj.rows(); val buf = DoubleArray(rows)
+                proj.get(0, 0, buf)
+                for (i in 0 until rows) { val v = buf[i]; if (v > maxVal) { maxVal = v; maxIdx = i } }
+                positionPercent = if (rows > 1) (maxIdx.toDouble() / (rows - 1).toDouble()) * 100.0 else 0.0
+              }
+              result["type"] = "scrollbar"
+              result["positionPercent"] = positionPercent
+              // Values scanning can be plugged here using options.valuesRegion & options.cells
+            }
+            else -> {
+              // value (text): ML Kit Text Recognition
+              result["type"] = "value"
+              try {
+                val rgba = Mat(); Imgproc.cvtColor(roi, rgba, Imgproc.COLOR_GRAY2RGBA)
+                val bmp = Bitmap.createBitmap(rgba.cols(), rgba.rows(), Bitmap.Config.ARGB_8888)
+                Utils.matToBitmap(rgba, bmp)
+                val image = InputImage.fromBitmap(bmp, 0)
+                val task = textRecognizer.process(image)
+                val visionText = Tasks.await(task)
+                val text = visionText.text?.trim() ?: ""
+                result["text"] = if (text.isNotEmpty()) text else null
+                // Try parse number (replace comma)
+                val numText = text.replace(',', '.').replace("\n", " ").trim()
+                val num = numText.toDoubleOrNull()
+                result["number"] = num
+                result["confidence"] = if (!text.isNullOrEmpty()) 1.0 else 0.0
+              } catch (t: Throwable) {
+                Log.e("ScreenDetector", "ML Kit OCR failed: ${t.message}", t)
+                result["text"] = null
+                result["number"] = null
+                result["confidence"] = 0.0
+              }
+            }
+          }
+          ocrArr.add(result)
+        }
+        data["ocr"] = hashMapOf("boxes" to ocrArr)
       }
 
       try {
