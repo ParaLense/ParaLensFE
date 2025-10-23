@@ -1,5 +1,14 @@
 import React, { useMemo, useRef, useState } from "react";
-import { FlatList, Modal as RNModal, Pressable, ScrollView, View, Alert, Platform } from "react-native";
+import {
+    FlatList,
+    Modal as RNModal,
+    Pressable,
+    ScrollView,
+    View,
+    Alert,
+    Platform,
+    StyleSheet,
+} from "react-native";
 
 // Your Expo UI aliases
 import { Box } from "@/components/ui/box";
@@ -44,17 +53,18 @@ const chipColors: Record<string, string> = {
     cylinderHeating: "bg-primary-500",
 };
 
-type UploadStatus = "not_uploaded" | "uploaded" | "needs_update" | "uploading" | "error" | "unknown";
+type UploadStatus =
+    | "not_uploaded"
+    | "uploaded"
+    | "needs_update"
+    | "uploading"
+    | "error"
+    | "unknown";
 
 /**
- * Merged History Screen: keeps your Expo theming and adds:
- * - section completeness chips (complete/partial/not_scanned)
- * - upload/update/re-upload flows + status emoji/text
- * - serverId display
- * - connectivity test
- * - Excel download with progress bar
- *
- * Pulls UI structure from your Expo file, and logic/features from your newer file. :contentReference[oaicite:2]{index=2} :contentReference[oaicite:3]{index=3}
+ * History Screen (fixed):
+ * - Fixes modal scrolling by removing inner Pressable and separating backdrop tap target.
+ * - Keeps your original features (statuses, upload/update, connectivity, Excel download).
  */
 export default function HistoryScreen() {
     const { fullScans, uploadScan, updateScan, getUploadStatus } = useFullScan() as any;
@@ -110,7 +120,10 @@ export default function HistoryScreen() {
         }
     };
 
-    const getSectionStatus = (section: any, type: "injection" | "dosing" | "holdingPressure" | "cylinderHeating") => {
+    const getSectionStatus = (
+        section: any,
+        type: "injection" | "dosing" | "holdingPressure" | "cylinderHeating",
+    ) => {
         if (!section) return "not_scanned" as const;
 
         if (type === "injection") {
@@ -138,7 +151,13 @@ export default function HistoryScreen() {
         }
         // cylinderHeating
         const hasMain = !!section.mainMenu;
-        const hasAnySetpoint = !!(section.setpoint1 || section.setpoint2 || section.setpoint3 || section.setpoint4 || section.setpoint5);
+        const hasAnySetpoint = !!(
+            section.setpoint1 ||
+            section.setpoint2 ||
+            section.setpoint3 ||
+            section.setpoint4 ||
+            section.setpoint5
+        );
         if (hasMain || hasAnySetpoint) return "complete" as const;
         return "not_scanned" as const;
     };
@@ -206,16 +225,19 @@ export default function HistoryScreen() {
 
         try {
             const scanName = `Scan_${scanId}_${selected.author}`;
-            const result = await excelService.downloadExcel(scanName, (progress: number) => {
-                const now = Date.now();
-                const last = lastProgressUpdateRef.current || 0;
-                if (progress >= 1 || now - last >= 250) {
-                    lastProgressUpdateRef.current = now;
-                    if (!Number.isNaN(progress) && progress >= 0 && progress <= 1) {
-                        setDownloadProgress(progress);
+            const result = await excelService.downloadExcel(
+                scanName,
+                (progress: number) => {
+                    const now = Date.now();
+                    const last = lastProgressUpdateRef.current || 0;
+                    if (progress >= 1 || now - last >= 250) {
+                        lastProgressUpdateRef.current = now;
+                        if (!Number.isNaN(progress) && progress >= 0 && progress <= 1) {
+                            setDownloadProgress(progress);
+                        }
                     }
-                }
-            });
+                },
+            );
 
             if (result?.success) {
                 const filePath = result.filePath as string | undefined;
@@ -274,14 +296,10 @@ export default function HistoryScreen() {
             className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
         >
             <HStack style={{ alignItems: "center", justifyContent: "space-between" }} className="mb-3">
-                <Heading
-                    size="lg"
-                    className={isDark ? "text-typography-50" : "text-typography-900"}
-                >
+                <Heading size="lg" className={isDark ? "text-typography-50" : "text-typography-900"}>
                     Full Scans
                 </Heading>
 
-                {/* Connectivity Test (hidden if no service available) */}
                 {(ConnectivityTest?.testConnection || excelService?.ping) && (
                     <Button variant="outline" action="secondary" onPress={doConnectivityTest}>
                         <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
@@ -293,14 +311,12 @@ export default function HistoryScreen() {
 
             <FlatList
                 data={fullScans}
+                keyExtractor={(item: any) => String(item.id)}
                 ListEmptyComponent={() => (
-                    <Text
-                        className={`mt-6 ${isDark ? "text-typography-200" : "text-typography-600"}`}
-                    >
+                    <Text className={`mt-6 ${isDark ? "text-typography-200" : "text-typography-600"}`}>
                         {t("noFullScans") ?? "Keine Full Scans vorhanden"}
                     </Text>
                 )}
-                keyExtractor={(item: any) => String(item.id)}
                 renderItem={({ item }: { item: any }) => {
                     const sectionStatuses = {
                         injection: getSectionStatus(item.injection, "injection"),
@@ -326,14 +342,13 @@ export default function HistoryScreen() {
                                         <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
                                             {item.author || t("unknown") || "Unbekannt"}
                                         </Text>
-                                        <Text className={isDark ? "text-typography-300" : "text-typography-600"}>{"  "}
+                                        <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
+                                            {"  "}
                                             {getStatusEmoji(uploadStatus)} {getStatusText(uploadStatus)}
                                         </Text>
                                     </HStack>
 
-                                    <Text
-                                        className={isDark ? "text-typography-300" : "text-typography-600"}
-                                    >
+                                    <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
                                         {new Date(item.date).toLocaleString()}
                                     </Text>
 
@@ -380,7 +395,7 @@ export default function HistoryScreen() {
                                 })}
                             </HStack>
 
-                            {/* Upload / Update buttons (only show if handlers exist) */}
+                            {/* Upload / Update buttons */}
                             {(uploadScan || updateScan) && (
                                 <HStack className="mt-3" style={{ justifyContent: "flex-end" }}>
                                     {(uploadStatus === "not_uploaded" || uploadStatus === "error") && uploadScan && (
@@ -428,37 +443,36 @@ export default function HistoryScreen() {
                 }}
             />
 
-            {/* Details Modal (kept RN modal for zero extra deps) */}
+            {/* Details Modal (fixed for scrolling) */}
             <RNModal
                 transparent
                 animationType="fade"
                 visible={isDetailsOpen}
                 onRequestClose={() => setIsDetailsOpen(false)}
             >
-                <Pressable
+                <View
                     style={{
                         flex: 1,
                         backgroundColor: "rgba(0,0,0,0.6)",
                         justifyContent: "center",
+                        alignItems: "center",
                         paddingHorizontal: 20,
                     }}
-                    onPress={() => setIsDetailsOpen(false)}
                 >
-                    <Pressable
+                    {/* Backdrop tap target behind the card */}
+                    <Pressable onPress={() => setIsDetailsOpen(false)} style={StyleSheet.absoluteFillObject as any} />
+
+                    {/* Card (non-pressable so scroll gestures work) */}
+                    <View
                         style={{
                             backgroundColor: isDark ? "#0f172a" : "#ffffff",
                             padding: 20,
                             borderRadius: 20,
                             maxHeight: "85%",
                             width: "90%",
-                            alignSelf: "center",
                         }}
-                        onPress={(e) => e.stopPropagation()}
                     >
-                        <Heading
-                            size="md"
-                            className={isDark ? "text-typography-50" : "text-typography-900"}
-                        >
+                        <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                             {t("fullScanDetails") ?? "Full Scan Details"}
                         </Heading>
 
@@ -491,63 +505,66 @@ export default function HistoryScreen() {
                                     </VStack>
                                 </HStack>
                                 {!!selected.serverId && (
-                                    <Text className={isDark ? "text-typography-400" : "text-typography-600"}>Server ID: {selected.serverId}</Text>
+                                    <Text className={isDark ? "text-typography-400" : "text-typography-600"}>
+                                        Server ID: {selected.serverId}
+                                    </Text>
                                 )}
                             </VStack>
                         )}
 
-                        <ScrollView style={{ marginTop: 16 }}>
+                        <ScrollView
+                            style={{ marginTop: 16 }}
+                            contentContainerStyle={{ paddingBottom: 12 }}
+                            nestedScrollEnabled
+                            keyboardShouldPersistTaps="handled"
+                        >
                             {!selected ? (
-                                <Text className="text-typography-500">
-                                    {t("noSelection") ?? "Keine Auswahl"}
-                                </Text>
+                                <Text className="text-typography-500">{t("noSelection") ?? "Keine Auswahl"}</Text>
                             ) : (
                                 <VStack className="gap-4">
                                     <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
                                         {t("savedSections") ?? "Gespeicherte Bereiche"}
                                     </Heading>
 
-                                    {(["injection", "dosing", "holdingPressure", "cylinderHeating"] as const).map(
-                                        (key) => (
-                                            <VStack
-                                                key={key}
-                                                className="p-3 rounded gap-2"
-                                                style={{
-                                                    backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
-                                                    borderWidth: 1,
-                                                    borderColor: isDark ? "#334155" : "#e2e8f0",
-                                                }}
-                                            >
-                                                <HStack style={{ alignItems: "center" }}>
-                                                    <View
-                                                        style={{
-                                                            width: 10,
-                                                            height: 10,
-                                                            borderRadius: 9999,
-                                                            backgroundColor: selected[key] ? "#16a34a" : isDark ? "#374151" : "#cbd5e1",
-                                                            marginRight: 8,
-                                                        }}
-                                                    />
-                                                    <Text className={isDark ? "text-typography-0" : "text-typography-900"}>
-                                                        {key}
-                                                    </Text>
-                                                </HStack>
+                                    {(["injection", "dosing", "holdingPressure", "cylinderHeating"] as const).map((key) => (
+                                        <VStack
+                                            key={key}
+                                            className="p-3 rounded gap-2"
+                                            style={{
+                                                backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+                                                borderWidth: 1,
+                                                borderColor: isDark ? "#334155" : "#e2e8f0",
+                                            }}
+                                        >
+                                            <HStack style={{ alignItems: "center" }}>
+                                                <View
+                                                    style={{
+                                                        width: 10,
+                                                        height: 10,
+                                                        borderRadius: 9999,
+                                                        backgroundColor: selected[key]
+                                                            ? "#16a34a"
+                                                            : isDark
+                                                                ? "#374151"
+                                                                : "#cbd5e1",
+                                                        marginRight: 8,
+                                                    }}
+                                                />
+                                                <Text className={isDark ? "text-typography-0" : "text-typography-900"}>{key}</Text>
+                                            </HStack>
 
-                                                {!selected[key] ? (
-                                                    <Text className="text-typography-400">
-                                                        {t("notAvailable") ?? "Nicht vorhanden"}
-                                                    </Text>
-                                                ) : (
-                                                    <SectionDetails sectionKey={key} data={(selected as any)[key]} isDark={isDark} />
-                                                )}
-                                            </VStack>
-                                        ),
-                                    )}
+                                            {!selected[key] ? (
+                                                <Text className="text-typography-400">{t("notAvailable") ?? "Nicht vorhanden"}</Text>
+                                            ) : (
+                                                <SectionDetails sectionKey={key} data={(selected as any)[key]} isDark={isDark} />
+                                            )}
+                                        </VStack>
+                                    ))}
                                 </VStack>
                             )}
                         </ScrollView>
 
-                        {/* Footer with Download (only if service + selected + uploaded) */}
+                        {/* Footer with Download */}
                         <HStack className="mt-4" style={{ justifyContent: "space-between", alignItems: "center" }}>
                             <VStack style={{ flex: 1, paddingRight: 8 }}>
                                 {isDownloading && (
@@ -560,7 +577,6 @@ export default function HistoryScreen() {
                                                 {Math.round(downloadProgress * 100)}%
                                             </Text>
                                         </HStack>
-                                        {/* Simple progress bar without extra libs */}
                                         <View
                                             style={{
                                                 height: 8,
@@ -603,8 +619,8 @@ export default function HistoryScreen() {
                                 </Button>
                             </HStack>
                         </HStack>
-                    </Pressable>
-                </Pressable>
+                    </View>
+                </View>
             </RNModal>
         </Box>
     );
@@ -622,9 +638,7 @@ function SectionDetails({
     if (sectionKey === "injection") {
         return (
             <VStack className="gap-2">
-                {data?.mainMenu && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
-                )}
+                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
                 {Array.isArray(data?.subMenuValues?.values) && (
                     <ArrayBlock
                         title="Sub Menu · Werte"
@@ -633,9 +647,7 @@ function SectionDetails({
                         isDark={isDark}
                     />
                 )}
-                {data?.switchType && (
-                    <DataBlock title="Switch Type" entries={Object.entries(data.switchType)} isDark={isDark} />
-                )}
+                {data?.switchType && <DataBlock title="Switch Type" entries={Object.entries(data.switchType)} isDark={isDark} />}
             </VStack>
         );
     }
@@ -643,9 +655,7 @@ function SectionDetails({
     if (sectionKey === "holdingPressure") {
         return (
             <VStack className="gap-2">
-                {data?.mainMenu && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
-                )}
+                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
                 {Array.isArray(data?.subMenusValues?.values) && (
                     <ArrayBlock
                         title="Sub Menu · Werte"
@@ -661,16 +671,9 @@ function SectionDetails({
     if (sectionKey === "dosing") {
         return (
             <VStack className="gap-2">
-                {data?.mainMenu && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
-                )}
+                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
                 {Array.isArray(data?.dosingSpeedsValues?.values) && (
-                    <ArrayBlock
-                        title="Speeds"
-                        entries={data.dosingSpeedsValues.values}
-                        columns={["index", "v", "v2"]}
-                        isDark={isDark}
-                    />
+                    <ArrayBlock title="Speeds" entries={data.dosingSpeedsValues.values} columns={["index", "v", "v2"]} isDark={isDark} />
                 )}
                 {Array.isArray(data?.dosingPressuresValues?.values) && (
                     <ArrayBlock
@@ -690,9 +693,7 @@ function SectionDetails({
                 {Object.entries(data).map(([label, value]) => (
                     <HStack key={label} style={{ justifyContent: "space-between" }}>
                         <Text className={isDark ? "text-typography-200" : "text-typography-600"}>{label}</Text>
-                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
-                            {String(value)}
-                        </Text>
+                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>{String(value)}</Text>
                     </HStack>
                 ))}
             </VStack>
