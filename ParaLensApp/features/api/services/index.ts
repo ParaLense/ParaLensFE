@@ -1,8 +1,9 @@
-export { default as scanService } from "./scan-service";
-export { default as injectionService } from "./injection-service";
-export { default as dosingService } from "./dosing-service";
-export { default as holdingPressureService } from "./holding-pressure-service";
-export { default as cylinderHeatingService } from "./cylinder-heating-service";
 
-export { default as httpClient } from "./http-client";
+export { default as scanService } from './scanService';
+export { default as injectionService } from './injectionService';
+export { default as dosingService } from './dosingService';
+export { default as holdingPressureService } from './holdingPressureService';
+export { default as cylinderHeatingService } from './cylinderHeatingService';
+export { excelService } from './excelService';
 
+export { default as httpClient } from './httpClient'; 

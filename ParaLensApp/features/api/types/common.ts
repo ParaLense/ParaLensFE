@@ -21,6 +21,12 @@ export interface FullScanDto {
   holdingPressure?: import('./holdingPressure').HoldingPressureDto;
   dosing?: import('./dosing').DosingDto;
   cylinderHeating?: import('./cylinderHeating').CylinderHeatingDto;
+  // Upload status fields
+  serverId?: number;
+  uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
+  uploadError?: string;
+  lastUploaded?: string; // ISO date string
+  lastModified?: string; // ISO date string - tracks when scan data was last modified
 }
 
 export interface ApiResponse<T> {
