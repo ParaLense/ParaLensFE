@@ -206,8 +206,21 @@ export default function CameraScreen() {
           >
             <Pressable
               onPress={(e) => e.stopPropagation()}
-              style={{ borderRadius: 12, padding: 16 }}
-              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+              style={{ 
+                borderRadius: 12, 
+                padding: 16,
+                backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+                minWidth: 280,
+                maxWidth: 400
+              }}
             >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("chooseFullScan") ?? "Full Scan auswählen"}
@@ -287,8 +300,21 @@ export default function CameraScreen() {
           >
             <Pressable
               onPress={(e) => e.stopPropagation()}
-              style={{ borderRadius: 12, padding: 16 }}
-              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+              style={{ 
+                borderRadius: 12, 
+                padding: 16,
+                backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+                minWidth: 280,
+                maxWidth: 400
+              }}
             >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("createNewFullScan") ?? "Neuen Full Scan erstellen"}
