@@ -30,8 +30,11 @@ export default function SettingsScreen() {
 
   return (
     <Box
-      style={{ flex: 1, padding: 24 }}
-      className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+      style={{ 
+        flex: 1, 
+        padding: 24,
+        backgroundColor: isDark ? '#121212' : '#ffffff'
+      }}
     >
       <Heading size="lg" className={`mb-6 ${isDark ? "text-typography-50" : "text-typography-900"}`}>
         {t("settings")}

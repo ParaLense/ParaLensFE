@@ -292,8 +292,11 @@ export default function HistoryScreen() {
 
     return (
         <Box
-            style={{ flex: 1, padding: 16 }}
-            className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+            style={{ 
+                flex: 1, 
+                padding: 16,
+                backgroundColor: isDark ? '#121212' : '#ffffff'
+            }}
         >
             <HStack style={{ alignItems: "center", justifyContent: "space-between" }} className="mb-3">
                 <Heading size="lg" className={isDark ? "text-typography-50" : "text-typography-900"}>
@@ -301,8 +304,13 @@ export default function HistoryScreen() {
                 </Heading>
 
                 {(ConnectivityTest?.testConnection || excelService?.ping) && (
-                    <Button variant="outline" action="secondary" onPress={doConnectivityTest}>
-                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
+                    <Button 
+                        variant="outline" 
+                        action="secondary" 
+                        onPress={doConnectivityTest}
+                        style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+                    >
+                        <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
                             Test Connection
                         </Text>
                     </Button>
@@ -404,8 +412,9 @@ export default function HistoryScreen() {
                                             action="primary"
                                             onPress={() => handleUpload(item.id)}
                                             disabled={isUploading}
+                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
                                         >
-                                            <Text className="text-typography-0">
+                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
                                                 {isUploading ? "Uploading..." : "Upload"}
                                             </Text>
                                         </Button>
@@ -417,8 +426,9 @@ export default function HistoryScreen() {
                                             action="secondary"
                                             onPress={() => handleUpdate(item.id)}
                                             disabled={isUploading}
+                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
                                         >
-                                            <Text className="text-typography-0">
+                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
                                                 {isUploading ? "Updating..." : "Update"}
                                             </Text>
                                         </Button>
@@ -430,8 +440,9 @@ export default function HistoryScreen() {
                                             action="secondary"
                                             onPress={() => handleUpdate(item.id)}
                                             disabled={isUploading}
+                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
                                         >
-                                            <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
+                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
                                                 {isUploading ? "Updating..." : "Re-upload"}
                                             </Text>
                                         </Button>
@@ -609,11 +620,17 @@ export default function HistoryScreen() {
                                         (getUploadStatus?.(selected.id) ?? "unknown") !== "uploaded" ||
                                         !excelService?.downloadExcel
                                     }
+                                    style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
                                 >
-                                    <Text className="text-typography-0">📥 Download Excel</Text>
+                                    <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>📥 Download Excel</Text>
                                 </Button>
-                                <Button variant="outline" action="secondary" onPress={() => setIsDetailsOpen(false)}>
-                                    <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
+                                <Button 
+                                    variant="outline" 
+                                    action="secondary" 
+                                    onPress={() => setIsDetailsOpen(false)}
+                                    style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+                                >
+                                    <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
                                         {t("close") ?? "Schließen"}
                                     </Text>
                                 </Button>

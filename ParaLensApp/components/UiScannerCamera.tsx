@@ -371,7 +371,14 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   };
 
   return (
-    <Box style={[styles.container, cameraStyleProp]} onLayout={handleLayout}>
+    <Box 
+      style={[
+        styles.container, 
+        cameraStyleProp,
+        { backgroundColor: '#000000' } // Ensure camera has black background
+      ]} 
+      onLayout={handleLayout}
+    >
       <Camera
         {...restCameraProps}
         style={StyleSheet.absoluteFill}
