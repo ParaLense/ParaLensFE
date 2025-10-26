@@ -137,13 +137,18 @@ export interface OverlayBox {
 }
 
 export interface FullScanDto {
-  id: number;
-  author: string;
-  date: string;
-  injection?: InjectionDto;
-  holdingPressure?: HoldingPressureDto;
-  dosing?: DosingDto;
-  cylinderHeating?: CylinderHeatingDto;
+    id: number;
+    author: string;
+    date: string;
+    injection?: InjectionDto;
+    holdingPressure?: HoldingPressureDto;
+    dosing?: DosingDto;
+    cylinderHeating?: CylinderHeatingDto;
+    serverId?: number;
+    uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
+    uploadError?: string;
+    lastUploaded?: string; // ISO date string
+    lastModified?: string; // ISO date string - tracks when scan data was last modified
 }
 
 export type ScanMenu =
