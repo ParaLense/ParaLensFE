@@ -88,14 +88,26 @@ class ScreenDetectorFrameProcessorPlugin(
       // Create edge maps for screen and detail detection
       val (screenEdges, detailEdges) = ImageProcessing.createEdgeMaps(normalized)
       
-      DebugHttpStreamer.updateMatGray("normalized", normalized, 60)
-      DebugHttpStreamer.updateMatGray("screenEdges", screenEdges, 60)
-      DebugHttpStreamer.updateMatGray("detailEdges", detailEdges, 60)
+      // Update debug streams less frequently to avoid overload
+      if (totalFrameCounter % 3 == 0) {
+        DebugHttpStreamer.updateMatGray("normalized", normalized, 60)
+        DebugHttpStreamer.updateMatGray("screenEdges", screenEdges, 60)
+        DebugHttpStreamer.updateMatGray("detailEdges", detailEdges, 60)
+      }
       
       // Find screen contours
       val screenContours = ArrayList<org.opencv.core.MatOfPoint>()
       val screenHierarchy = Mat()
       Imgproc.findContours(screenEdges, screenContours, screenHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+      // Find screen contour rectangles for debug visualization
+      val screenContourRects = ImageProcessing.findContourRects(screenEdges)
+      
+      // Debug: Draw detected screen contours (less frequent updates)
+      if (totalFrameCounter % 5 == 0) {
+        val debugScreenRects = ImageProcessing.drawDebugRects(img, screenContourRects, Scalar(0.0, 255.0, 0.0), 3)
+        DebugHttpStreamer.updateMatColor("screenContourRects", debugScreenRects, 60)
+      }
 
       // Find best screen candidate
       val (bestRect, bestQuad, bestScore) = ScreenDetection.findBestScreenCandidate(
@@ -104,6 +116,12 @@ class ScreenDetectorFrameProcessorPlugin(
       
       // Find detail contours for template matching
       val contourRects = ImageProcessing.findContourRects(detailEdges)
+
+      // Debug: Draw detected detail contours (less frequent updates)
+      if (totalFrameCounter % 5 == 0) {
+        val debugDetailRects = ImageProcessing.drawDebugRects(img, contourRects, Scalar(255.0, 0.0, 0.0), 2)
+        DebugHttpStreamer.updateMatColor("detailContourRects", debugDetailRects, 60)
+      }
 
       // Build homography matrix
       var H: Mat? = null
@@ -124,6 +142,16 @@ class ScreenDetectorFrameProcessorPlugin(
         )
         accuracy = acc
         matchedArr.addAll(matched)
+        
+        // Debug: Draw template boxes (less frequent updates)
+        if (totalFrameCounter % 7 == 0) {
+          val debugTemplateBoxes = ImageProcessing.drawDebugTemplateBoxes(img, templateBoxes, H, templateTargetW, templateTargetH, Scalar(0.0, 0.0, 255.0), 2)
+          DebugHttpStreamer.updateMatColor("templateBoxes", debugTemplateBoxes, 60)
+          
+          // Debug: Combined visualization with all elements
+          val combinedDebug = ImageProcessing.createCombinedDebugVisualization(img, screenEdges, detailEdges, screenContourRects, contourRects, templateBoxes, H, templateTargetW, templateTargetH)
+          DebugHttpStreamer.updateMatColor("combinedDebug", combinedDebug, 60)
+        }
       }
       
       val detected = (H != null && !H.empty()) && (
@@ -157,6 +185,12 @@ class ScreenDetectorFrameProcessorPlugin(
       if (detected && H != null && !H.empty() && runOcr && ocrBoxes != null && ocrBoxes.isNotEmpty()) {
         val warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
         Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+        
+        // Debug: Draw OCR template boxes on warped image (less frequent updates)
+        if (totalFrameCounter % 10 == 0) {
+          val ocrDebugImage = ImageProcessing.drawOcrTemplateBoxes(warped, ocrBoxes, outputW, outputH)
+          DebugHttpStreamer.updateMatColor("ocrTemplateBoxes", ocrDebugImage, 60)
+        }
         
         val ocrResults = OcrProcessor.processOcrBoxes(warped, ocrBoxes, outputW, outputH)
         data["ocr"] = hashMapOf("boxes" to ocrResults)
