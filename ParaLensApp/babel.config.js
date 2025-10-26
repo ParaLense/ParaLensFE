@@ -1,11 +1,22 @@
-module.exports = {
-  presets: ['module:@react-native/babel-preset'],
-  plugins: [
-    ['react-native-worklets-core/plugin'],
-    '@babel/plugin-proposal-optional-chaining',
-    '@babel/plugin-proposal-nullish-coalescing-operator',
-    [
-      //
-      'react-native-reanimated/plugin'], // MUSS das letzte Plugin sein!
-  ],
+module.exports = function (api) {
+  api.cache(true);
+
+  return {
+    presets: [['babel-preset-expo'], 'nativewind/babel'],
+
+    plugins: [
+      [
+        'module-resolver',
+        {
+          root: ['./'],
+
+          alias: {
+            '@': './',
+            'tailwind.config': './tailwind.config.js',
+          },
+        },
+      ],
+      'react-native-worklets/plugin',
+    ],
+  };
 };

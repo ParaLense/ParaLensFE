@@ -1,0 +1,26 @@
+[
+  {
+    "id": "specific_back_pressure_start",
+    "x": 8.26,
+    "y": 72.5,
+    "width": 2.92,
+    "height": 6.83,
+    "label": "Specific Back Pressure Start"
+  },
+  {
+    "id": "specific_back_pressure_items",
+    "x": 8.35,
+    "y": 72.5,
+    "width": 84.25,
+    "height": 6.83,
+    "label": "Specific Back Pressure Items"
+  },
+  {
+    "id": "specific_back_pressure_end",
+    "x": 87.54,
+    "y": 72.43,
+    "width": 4.99,
+    "height": 6.97,
+    "label": "Specific Back Pressure End"
+  }
+]

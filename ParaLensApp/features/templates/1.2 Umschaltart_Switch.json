@@ -1,0 +1,71 @@
+[
+  {
+    "id": "transshipment_position_checkbox",
+    "x": 12.61,
+    "y": 13.83,
+    "width": 2.7,
+    "height": 2.02,
+    "label": "Transshipment Position Checkbox",
+    "type": "checkbox",
+    "options": {
+      "checkboxThreshold": 0.5,
+      "readValue": true,
+      "valueBoxId": "transshipment_position"
+    }
+  },
+  {
+    "id": "transshipment_position",
+    "x": 72.55,
+    "y": 16.18,
+    "width": 13.75,
+    "height": 2.76,
+    "label": "Transshipment Position",
+    "type": "value"
+  },
+  {
+    "id": "switch_over_time_checkbox",
+    "x": 12.46,
+    "y": 25.29,
+    "width": 2.7,
+    "height": 2.14,
+    "label": "Switch Over Time Checkbox",
+    "type": "checkbox",
+    "options": {
+      "checkboxThreshold": 0.5,
+      "readValue": true,
+      "valueBoxId": "switch_over_time"
+    }
+  },
+  {
+    "id": "switch_over_time",
+    "x": 73.27,
+    "y": 27.8,
+    "width": 10.93,
+    "height": 2.93,
+    "label": "Switch Over Time",
+    "type": "value"
+  },
+  {
+    "id": "switching_pressure_checkbox",
+    "x": 12.42,
+    "y": 31.31,
+    "width": 2.77,
+    "height": 2.02,
+    "label": "Switching Pressure Checkbox",
+    "type": "checkbox",
+    "options": {
+      "checkboxThreshold": 0.5,
+      "readValue": true,
+      "valueBoxId": "switching_pressure"
+    }
+  },
+  {
+    "id": "switching_pressure",
+    "x": 73.4,
+    "y": 33.76,
+    "width": 12.53,
+    "height": 2.82,
+    "label": "Switching Pressure",
+    "type": "value"
+  }
+]

@@ -1,0 +1,39 @@
+[
+  {
+    "id": "injection_speed_start",
+    "x": 7.72,
+    "y": 72.37,
+    "width": 3.99,
+    "height": 6.7,
+    "label": "Injection Speed Start",
+    "type": "value"
+  },
+  {
+    "id": "injection_speed_items",
+    "x": 7.76,
+    "y": 72.28,
+    "width": 84.92,
+    "height": 6.82,
+    "label": "Injection Speed Items",
+    "type": "scrollbar",
+    "options": {
+      "orientation": "horizontal",
+      "cells": 10,
+      "valuesRegion": {
+        "x": 7.76,
+        "y": 79.1,
+        "width": 84.92,
+        "height": 6.0
+      }
+    }
+  },
+  {
+    "id": "injection_speed_end",
+    "x": 85.76,
+    "y": 72.36,
+    "width": 6.81,
+    "height": 6.66,
+    "label": "Injection Speed End",
+    "type": "value"
+  }
+]

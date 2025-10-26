@@ -1,3 +1,39 @@
 {
-  "extends": "@react-native/typescript-config"
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@/features/*": [
+        "./features/*"
+      ],
+      "@/components/*": [
+        "./components/*"
+      ],
+      "@/components": [
+        "./components"
+      ],
+      "@/features": [
+        "./features"
+      ],
+      "@/features/api": [
+        "./features/api"
+      ],
+      "@/features/fullscan": [
+        "./features/fullscan"
+      ],
+      "tailwind.config": [
+        "./tailwind.config.js"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ]
 }

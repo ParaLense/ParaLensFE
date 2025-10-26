@@ -1,0 +1,76 @@
+[
+  {
+    "id": "dosing_speed_start",
+    "x": 8.03,
+    "y": 62.6,
+    "width": 3.03,
+    "height": 6.36,
+    "label": "Dosing Speed Start",
+    "type": "value"
+  },
+  {
+    "id": "dosing_speed_items",
+    "x": 8.17,
+    "y": 62.64,
+    "width": 84.65,
+    "height": 6.29,
+    "label": "Dosing Speed Items",
+    "type": "scrollbar",
+    "options": {
+      "orientation": "horizontal",
+      "cells": 10,
+      "valuesRegion": {
+        "x": 8.17,
+        "y": 68.93,
+        "width": 84.65,
+        "height": 6.0
+      }
+    }
+  },
+  {
+    "id": "specific_back_pressure_start",
+    "x": 8.13,
+    "y": 72.41,
+    "width": 2.83,
+    "height": 6.74,
+    "label": "Specific Back Pressure Start",
+    "type": "value"
+  },
+  {
+    "id": "specific_back_pressure_items",
+    "x": 8.32,
+    "y": 72.11,
+    "width": 84.55,
+    "height": 7.2,
+    "label": "Specific Back Pressure Items",
+    "type": "scrollbar",
+    "options": {
+      "orientation": "horizontal",
+      "cells": 10,
+      "valuesRegion": {
+        "x": 8.32,
+        "y": 79.31,
+        "width": 84.55,
+        "height": 6.0
+      }
+    }
+  },
+  {
+    "id": "dosing_speed_end",
+    "x": 87.28,
+    "y": 62.62,
+    "width": 5.71,
+    "height": 6.53,
+    "label": "Dosing Speed End",
+    "type": "value"
+  },
+  {
+    "id": "specific_back_pressure_end",
+    "x": 87.21,
+    "y": 71.96,
+    "width": 5.58,
+    "height": 7.14,
+    "label": "Specific Back Pressure End",
+    "type": "value"
+  }
+]
