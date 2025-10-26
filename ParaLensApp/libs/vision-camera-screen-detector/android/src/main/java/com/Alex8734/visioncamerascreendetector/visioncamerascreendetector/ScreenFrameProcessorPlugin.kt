@@ -13,7 +13,6 @@ import org.opencv.core.Point
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import org.opencv.core.Scalar
-import org.opencv.core.CvType
 // Debug Streamer (falls vorhanden)
 import com.alex8734.visioncamerascreendetector.visioncamerascreendetector.DebugHttpStreamer
 
@@ -27,6 +26,7 @@ class ScreenDetectorFrameProcessorPlugin(
     private var detectionCounter = 0
     private var totalFrameCounter = 0
   }
+
 
   override fun callback(frame: Frame, arguments: Map<String, Any>?): HashMap<String, Any?>? {
     val data = HashMap<String, Any?>()
