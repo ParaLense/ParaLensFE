@@ -113,8 +113,13 @@ export default function CameraScreen() {
   if (!device) {
     return (
       <Box
-        style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}
-        className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+        style={{ 
+          flex: 1, 
+          padding: 24, 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: isDark ? '#121212' : '#ffffff'
+        }}
       >
         <Text className={`text-lg mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}>
           {t("loadingCamera") ?? "Loading camera..."}
@@ -139,8 +144,13 @@ export default function CameraScreen() {
   if (!selectedMenu) {
     return (
       <Box
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
-        className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
+        style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          padding: 24,
+          backgroundColor: isDark ? '#121212' : '#ffffff'
+        }}
       >
         <Heading size="lg" className={`mb-6 text-center ${isDark ? "text-typography-50" : "text-typography-900"}`}>
           {t("whatToScan") ?? "Was möchten Sie scannen?"}
@@ -163,8 +173,9 @@ export default function CameraScreen() {
               variant="solid"
               action="primary"
               onPress={() => setIsAddOpen(true)}
+              style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
             >
-              <Text className="font-bold text-typography-0">+</Text>
+              <Text style={{ color: isDark ? '#000000' : '#ffffff', fontWeight: 'bold' }}>+</Text>
             </Button>
           </HStack>
         </VStack>
@@ -186,8 +197,9 @@ export default function CameraScreen() {
                 if (menu === "holdingPressure") setHoldingMode(null);
                 if (menu === "dosing") setDosingMode(null);
               }}
+              style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
             >
-              <Text className="text-typography-0 capitalize">{menu}</Text>
+              <Text style={{ color: isDark ? '#000000' : '#ffffff', textTransform: 'capitalize' }}>{menu}</Text>
             </Button>
           ))}
         </VStack>
@@ -206,8 +218,21 @@ export default function CameraScreen() {
           >
             <Pressable
               onPress={(e) => e.stopPropagation()}
-              style={{ borderRadius: 12, padding: 16 }}
-              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+              style={{ 
+                borderRadius: 12, 
+                padding: 16,
+                backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+                minWidth: 280,
+                maxWidth: 400
+              }}
             >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("chooseFullScan") ?? "Full Scan auswählen"}
@@ -287,8 +312,21 @@ export default function CameraScreen() {
           >
             <Pressable
               onPress={(e) => e.stopPropagation()}
-              style={{ borderRadius: 12, padding: 16 }}
-              className={isDark ? "bg-backgroundDark800" : "bg-backgroundLight0"}
+              style={{ 
+                borderRadius: 12, 
+                padding: 16,
+                backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+                minWidth: 280,
+                maxWidth: 400
+              }}
             >
               <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                 {t("createNewFullScan") ?? "Neuen Full Scan erstellen"}
@@ -334,21 +372,35 @@ export default function CameraScreen() {
   if (selectedMenu === "injection" && injectionMode === null) {
     return (
       <Box
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
-        className="bg-backgroundDark950"
+        style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          padding: 24,
+          backgroundColor: isDark ? '#121212' : '#ffffff'
+        }}
       >
-        <Heading size="lg" className="mb-6 text-typography-0">
+        <Heading size="lg" className="mb-6" style={{ color: isDark ? '#ffffff' : '#000000' }}>
           Injection · Auswahl
         </Heading>
         <VStack className="w-5/6 gap-4">
-          <Button onPress={() => setInjectionMode("mainMenu")}>
-            <Text className="text-typography-0">Main Menu</Text>
+          <Button 
+            onPress={() => setInjectionMode("mainMenu")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Main Menu</Text>
           </Button>
-          <Button onPress={() => setInjectionMode("subMenuGraphic")}>
-            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          <Button 
+            onPress={() => setInjectionMode("subMenuGraphic")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Sub Menu Graphic</Text>
           </Button>
-          <Button onPress={() => setInjectionMode("switchType")}>
-            <Text className="text-typography-0">Switch Type</Text>
+          <Button 
+            onPress={() => setInjectionMode("switchType")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Switch Type</Text>
           </Button>
         </VStack>
         <Button
@@ -366,18 +418,29 @@ export default function CameraScreen() {
   if (selectedMenu === "holdingPressure" && holdingMode === null) {
     return (
       <Box
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
-        className="bg-backgroundDark950"
+        style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          padding: 24,
+          backgroundColor: isDark ? '#121212' : '#ffffff'
+        }}
       >
-        <Heading size="lg" className="mb-6 text-typography-0">
+        <Heading size="lg" className="mb-6" style={{ color: isDark ? '#ffffff' : '#000000' }}>
           Nachdruck · Auswahl
         </Heading>
         <VStack className="w-5/6 gap-4">
-          <Button onPress={() => setHoldingMode("mainMenu")}>
-            <Text className="text-typography-0">Main Menu</Text>
+          <Button 
+            onPress={() => setHoldingMode("mainMenu")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Main Menu</Text>
           </Button>
-          <Button onPress={() => setHoldingMode("subMenuGraphic")}>
-            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          <Button 
+            onPress={() => setHoldingMode("subMenuGraphic")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Sub Menu Graphic</Text>
           </Button>
         </VStack>
         <Button
@@ -395,18 +458,29 @@ export default function CameraScreen() {
   if (selectedMenu === "dosing" && dosingMode === null) {
     return (
       <Box
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
-        className="bg-backgroundDark950"
+        style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          padding: 24,
+          backgroundColor: isDark ? '#121212' : '#ffffff'
+        }}
       >
-        <Heading size="lg" className="mb-6 text-typography-0">
+        <Heading size="lg" className="mb-6" style={{ color: isDark ? '#ffffff' : '#000000' }}>
           Dosing · Auswahl
         </Heading>
         <VStack className="w-5/6 gap-4">
-          <Button onPress={() => setDosingMode("mainMenu")}>
-            <Text className="text-typography-0">Main Menu</Text>
+          <Button 
+            onPress={() => setDosingMode("mainMenu")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Main Menu</Text>
           </Button>
-          <Button onPress={() => setDosingMode("subMenuGraphic")}>
-            <Text className="text-typography-0">Sub Menu Graphic</Text>
+          <Button 
+            onPress={() => setDosingMode("subMenuGraphic")}
+            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+          >
+            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>Sub Menu Graphic</Text>
           </Button>
         </VStack>
         <Button
@@ -422,28 +496,26 @@ export default function CameraScreen() {
   }
 
   return (
-    <Box
-      style={{ flex: 1 }}
-      className={isDark ? "bg-backgroundDark950" : "bg-backgroundLight0"}
-    >
+    <Box style={{ flex: 1 }}>
       <UiScannerCamera
         currentLayout={currentLayout ?? TemplateLayout.ScreenDetection}
-        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+        style={{ flex: 1 }}
         isActive
         device={device}
       />
 
       <Box
         style={{ position: 'absolute', top: 24 + insets.top, left: 20 }}
-        className="rounded bg-backgroundDark700 px-3 py-2"
+        className={`rounded px-3 py-2 ${isDark ? "bg-backgroundDark700" : "bg-backgroundLight700"}`}
       >
         <Button
           size="sm"
           variant="solid"
-          action="secondary"
+          action="primary"
           onPress={resetToRootMenu}
+          style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
         >
-          <Text className="text-typography-0">
+          <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
             {headerLabel
               ? `${headerLabel} · ${t("change") ?? "Ändern"}`
               : t("change") ?? "Ändern"}

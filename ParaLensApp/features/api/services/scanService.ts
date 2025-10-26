@@ -1,7 +1,10 @@
-import httpClient from "./http-client";
-import { API_ENDPOINTS } from "@/features/config/api";
-import {FullScanDto} from "@/features/fullscan/types";
-import {CreateScanRequest, ScanDto} from "@/features/api/types/common";
+import httpClient from './httpClient';
+import {
+  ScanDto,
+  CreateScanRequest,
+  FullScanDto,
+} from '../types/api';
+import {API_ENDPOINTS} from "@/features/config/api";
 
 export class ScanService {
   /**

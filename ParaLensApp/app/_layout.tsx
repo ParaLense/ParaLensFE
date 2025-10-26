@@ -4,9 +4,21 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ApiProvider } from "@/features/api/api-context";
 import { FullScanProvider } from "@/features/fullscan/fullscan-context";
-import { SettingsProvider } from "@/features/settings/settings-context";
+import { SettingsProvider, useSettings } from "@/features/settings/settings-context";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import "@/global.css";
+
+function AppContent() {
+  const { theme } = useSettings();
+  
+  return (
+    <GluestackUIProvider mode={theme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </GluestackUIProvider>
+  );
+}
 
 export default function RootLayout() {
   return (
@@ -15,11 +27,7 @@ export default function RootLayout() {
         <SettingsProvider>
           <ApiProvider>
             <FullScanProvider>
-              <GluestackUIProvider>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                </Stack>
-              </GluestackUIProvider>
+              <AppContent />
             </FullScanProvider>
           </ApiProvider>
         </SettingsProvider>
