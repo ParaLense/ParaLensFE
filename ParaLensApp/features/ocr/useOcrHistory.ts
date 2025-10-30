@@ -9,7 +9,7 @@ export interface OcrBox {
   checked?: boolean;
   selectedValue?: any;
   positionPercent?: number;
-  values?: number[]; // Array of scrollbar values
+  values?: number[] | string[] | Record<string, string>; // Array of scrollbar values (legacy), text blocks (new), or HashMap
   cells?: number; // Number of cells in scrollbar
   orientation?: 'horizontal' | 'vertical'; // Scrollbar orientation
   valueBoxId?: string;
@@ -193,9 +193,34 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
         } else if (box.type === 'checkbox') {
           value = box.checked ? 'true' : 'false';
         } else if (box.type === 'scrollbar') {
-          // Handle scrollbar values as array
-          const scrollbarValues = box.values || (box.positionPercent ? [box.positionPercent] : []);
-          value = scrollbarValues.map(v => v.toFixed(2)).join(', ');
+          // Handle scrollbar values - can be array or HashMap
+          if (Array.isArray(box.values)) {
+            if (box.values.length > 0 && typeof box.values[0] === 'number') {
+              // Legacy: array of numbers
+              value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
+            } else {
+              // New: array of text blocks, convert to key-value pairs
+              const keyValueMap: Record<string, string> = {};
+              for (let i = 0; i < box.values.length; i += 2) {
+                const key = String(box.values[i] || '').trim();
+                const val = String(box.values[i + 1] || '').trim();
+                if (key) {
+                  keyValueMap[key] = val;
+                }
+              }
+              value = Object.entries(keyValueMap)
+                .map(([key, val]) => `${key}:${val}`)
+                .join(', ');
+            }
+          } else if (typeof box.values === 'object' && box.values !== null) {
+            // HashMap of string -> string
+            value = Object.entries(box.values)
+              .map(([key, val]) => `${key}:${val}`)
+              .join(', ');
+          } else if (box.positionPercent !== undefined) {
+            // Fallback to positionPercent
+            value = box.positionPercent.toFixed(2);
+          }
         }
         
         if (!value || value.trim() === '') return;
@@ -314,9 +339,34 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
       } else if (box.type === 'checkbox') {
         value = box.checked ? 'true' : 'false';
       } else if (box.type === 'scrollbar') {
-        // Handle scrollbar values as array
-        const scrollbarValues = box.values || (box.positionPercent ? [box.positionPercent] : []);
-        value = scrollbarValues.map(v => v.toFixed(2)).join(', ');
+        // Handle scrollbar values - can be array or HashMap
+        if (Array.isArray(box.values)) {
+          if (box.values.length > 0 && typeof box.values[0] === 'number') {
+            // Legacy: array of numbers
+            value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
+          } else {
+            // New: array of text blocks, convert to key-value pairs
+            const keyValueMap: Record<string, string> = {};
+            for (let i = 0; i < box.values.length; i += 2) {
+              const key = String(box.values[i] || '').trim();
+              const val = String(box.values[i + 1] || '').trim();
+              if (key) {
+                keyValueMap[key] = val;
+              }
+            }
+            value = Object.entries(keyValueMap)
+              .map(([key, val]) => `${key}:${val}`)
+              .join(', ');
+          }
+        } else if (typeof box.values === 'object' && box.values !== null) {
+          // HashMap of string -> string
+          value = Object.entries(box.values)
+            .map(([key, val]) => `${key}:${val}`)
+            .join(', ');
+        } else if (box.positionPercent !== undefined) {
+          // Fallback to positionPercent
+          value = box.positionPercent.toFixed(2);
+        }
       }
       
       if (!value || value.trim() === '') return;

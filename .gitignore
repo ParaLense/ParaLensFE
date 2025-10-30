@@ -1,3 +1,4 @@
 .idea/
-android/
+./ParaLensApp/android/
+./ParaLensApp/ios/
 node_modules/

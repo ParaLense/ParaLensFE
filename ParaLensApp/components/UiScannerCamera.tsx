@@ -247,6 +247,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
         if (scan.ocr?.boxes?.length) {
           const map: Record<string, string> = {};
+          const scrollbarBoxes: any[] = [];
+          
+          // First pass: process all non-scrollbar boxes to populate the map
           for (const b of scan.ocr.boxes as any[]) {
             if (!b || !b.id) continue;
             if (b.type === 'value') {
@@ -259,9 +262,49 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
               }
             } else if (b.type === 'scrollbar') {
-              // Handle scrollbar values as array
-              const scrollbarValues = b.values || (b.positionPercent ? [b.positionPercent] : []);
-              const scrollbarValue = scrollbarValues.map((v: number) => v.toFixed(2)).join(', ');
+              // Store scrollbar boxes for second pass
+              scrollbarBoxes.push(b);
+            }
+          }
+          
+          // Second pass: process scrollbar boxes now that we have all start values
+          for (const b of scrollbarBoxes) {
+            // Handle scrollbar values - convert array of text blocks to key-value pairs
+            const scrollbarValues = b.values;
+            if (Array.isArray(scrollbarValues)) {
+              // Check if this is a scrollbar with a corresponding _start field
+              const hasStartValue = b.id.endsWith('_items');
+              const startValueFieldId = hasStartValue ? b.id.replace('_items', '_start') : null;
+              
+              // Get start value from map if it exists
+              const startValue = startValueFieldId ? map[startValueFieldId] : null;
+              
+              // Filter out start value from the beginning of the array
+              let filteredValues = [...scrollbarValues];
+              if (startValue && filteredValues.length > 0) {
+                const startValueTrimmed = startValue.trim();
+                // Remove first value if it matches start value
+                if (filteredValues[0]?.trim() === startValueTrimmed) {
+                  filteredValues = filteredValues.slice(1);
+                } else if (filteredValues.length > 1 && filteredValues[1]?.trim() === startValueTrimmed) {
+                  // Remove second value if it matches start value
+                  filteredValues = filteredValues.slice(2);
+                }
+              }
+              
+              // Group into key-value pairs: block[0]=key, block[1]=value, block[2]=key, etc.
+              const keyValueMap: Record<string, string> = {};
+              for (let i = 0; i < filteredValues.length; i += 2) {
+                const key = filteredValues[i]?.trim() || '';
+                const value = filteredValues[i + 1]?.trim() || '';
+                if (key) {
+                  keyValueMap[key] = value;
+                }
+              }
+              // Format as key:value pairs
+              const scrollbarValue = Object.entries(keyValueMap)
+                .map(([key, val]) => `${key}:${val}`)
+                .join(', ');
               map[b.id] = scrollbarValue;
             }
           }
