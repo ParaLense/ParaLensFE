@@ -9,6 +9,7 @@ import {
     Platform,
     StyleSheet,
 } from "react-native";
+import Feather from "@expo/vector-icons/Feather";
 
 // Your Expo UI aliases
 import { Box } from "@/components/ui/box";
@@ -17,6 +18,8 @@ import { Heading } from "@/components/ui/heading";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
+import { Badge, BadgeText } from "@/components/ui/badge";
+import { Divider } from "@/components/ui/divider";
 
 // Contexts (Expo aliases)
 import { useFullScan } from "@/features/fullscan/fullscan-context";
@@ -88,35 +91,56 @@ export default function HistoryScreen() {
         [fullScans, selectedId],
     );
 
-    const getStatusEmoji = (status: UploadStatus) => {
+    const getStatusConfig = (status: UploadStatus) => {
         switch (status) {
             case "uploaded":
-                return "🟢";
+                return {
+                    icon: "check-circle" as const,
+                    color: isDark ? "#10b981" : "#059669",
+                    bgColor: isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(5, 150, 105, 0.1)",
+                    text: "Uploaded",
+                    badgeAction: "success" as const,
+                };
             case "needs_update":
-                return "🟠";
+                return {
+                    icon: "alert-circle" as const,
+                    color: isDark ? "#f59e0b" : "#d97706",
+                    bgColor: isDark ? "rgba(245, 158, 11, 0.15)" : "rgba(217, 119, 6, 0.1)",
+                    text: "Needs Update",
+                    badgeAction: "warning" as const,
+                };
             case "uploading":
-                return "🔄";
+                return {
+                    icon: "loader" as const,
+                    color: isDark ? "#3b82f6" : "#2563eb",
+                    bgColor: isDark ? "rgba(59, 130, 246, 0.15)" : "rgba(37, 99, 235, 0.1)",
+                    text: "Uploading...",
+                    badgeAction: "info" as const,
+                };
             case "error":
-                return "🔴";
-            default:
-                return "⚪";
-        }
-    };
-
-    const getStatusText = (status: UploadStatus) => {
-        switch (status) {
-            case "uploaded":
-                return "Uploaded";
-            case "needs_update":
-                return "Needs Update";
-            case "uploading":
-                return "Uploading...";
-            case "error":
-                return "Upload Failed";
+                return {
+                    icon: "x-circle" as const,
+                    color: isDark ? "#ef4444" : "#dc2626",
+                    bgColor: isDark ? "rgba(239, 68, 68, 0.15)" : "rgba(220, 38, 38, 0.1)",
+                    text: "Upload Failed",
+                    badgeAction: "error" as const,
+                };
             case "not_uploaded":
-                return "Not Uploaded";
+                return {
+                    icon: "circle" as const,
+                    color: isDark ? "#6b7280" : "#9ca3af",
+                    bgColor: isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(156, 163, 175, 0.1)",
+                    text: "Not Uploaded",
+                    badgeAction: "muted" as const,
+                };
             default:
-                return "Unknown";
+                return {
+                    icon: "help-circle" as const,
+                    color: isDark ? "#6b7280" : "#9ca3af",
+                    bgColor: isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(156, 163, 175, 0.1)",
+                    text: "Unknown",
+                    badgeAction: "muted" as const,
+                };
         }
     };
 
@@ -294,36 +318,93 @@ export default function HistoryScreen() {
         <Box
             style={{ 
                 flex: 1, 
-                padding: 16,
-                backgroundColor: isDark ? '#121212' : '#ffffff'
+                backgroundColor: isDark ? '#0f172a' : '#f8fafc'
             }}
         >
-            <HStack style={{ alignItems: "center", justifyContent: "space-between" }} className="mb-3">
-                <Heading size="lg" className={isDark ? "text-typography-50" : "text-typography-900"}>
-                    Full Scans
-                </Heading>
-
-                {(ConnectivityTest?.testConnection || excelService?.ping) && (
-                    <Button 
-                        variant="outline" 
-                        action="secondary" 
-                        onPress={doConnectivityTest}
-                        style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
-                    >
-                        <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
-                            Test Connection
+            {/* Header */}
+            <Box
+                style={{
+                    paddingHorizontal: 20,
+                    paddingTop: 20,
+                    paddingBottom: 16,
+                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                    borderBottomWidth: 1,
+                    borderBottomColor: isDark ? '#334155' : '#e2e8f0',
+                }}
+            >
+                <HStack style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <VStack>
+                        <Heading size="xl" className={isDark ? "text-typography-50" : "text-typography-900"}>
+                            Full Scans
+                        </Heading>
+                        <Text className={`mt-1 ${isDark ? "text-typography-400" : "text-typography-600"}`} style={{ fontSize: 12 }}>
+                            {fullScans?.length || 0} {fullScans?.length === 1 ? "scan" : "scans"}
                         </Text>
-                    </Button>
-                )}
-            </HStack>
+                    </VStack>
+
+                    {(ConnectivityTest?.testConnection || excelService?.ping) && (
+                        <Button 
+                            variant="outline" 
+                            action="secondary" 
+                            onPress={doConnectivityTest}
+                            style={{
+                                borderColor: isDark ? '#475569' : '#cbd5e1',
+                                backgroundColor: 'transparent',
+                            }}
+                        >
+                            <HStack style={{ alignItems: "center", gap: 6 }}>
+                                <Feather 
+                                    name="wifi" 
+                                    size={16} 
+                                    color={isDark ? '#cbd5e1' : '#64748b'} 
+                                />
+                                <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
+                                    Test
+                                </Text>
+                            </HStack>
+                        </Button>
+                    )}
+                </HStack>
+            </Box>
 
             <FlatList
                 data={fullScans}
                 keyExtractor={(item: any) => String(item.id)}
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
                 ListEmptyComponent={() => (
-                    <Text className={`mt-6 ${isDark ? "text-typography-200" : "text-typography-600"}`}>
-                        {t("noFullScans") ?? "Keine Full Scans vorhanden"}
-                    </Text>
+                    <VStack 
+                        style={{ 
+                            alignItems: "center", 
+                            justifyContent: "center", 
+                            paddingVertical: 60,
+                            paddingHorizontal: 20 
+                        }}
+                    >
+                        <Box
+                            style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: 40,
+                                backgroundColor: isDark ? '#1e293b' : '#e2e8f0',
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginBottom: 20,
+                            }}
+                        >
+                            <Feather 
+                                name="inbox" 
+                                size={40} 
+                                color={isDark ? '#475569' : '#94a3b8'} 
+                            />
+                        </Box>
+                        <Text className={`text-lg font-semibold mb-2 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+                            {t("noFullScans") ?? "Keine Full Scans vorhanden"}
+                        </Text>
+                        <Text className={`text-sm text-center ${isDark ? "text-typography-400" : "text-typography-500"}`}>
+                            Start a new scan to see it here
+                        </Text>
+                    </VStack>
                 )}
                 renderItem={({ item }: { item: any }) => {
                     const sectionStatuses = {
@@ -335,39 +416,145 @@ export default function HistoryScreen() {
 
                     const uploadStatus: UploadStatus = getUploadStatus?.(item.id) ?? "unknown";
                     const isUploading = uploadStatus === "uploading";
+                    const statusConfig = getStatusConfig(uploadStatus);
 
                     return (
                         <Box
-                            className={`${
-                                isDark
-                                    ? "bg-backgroundDark900 border border-backgroundDark800"
-                                    : "bg-backgroundLight100 border border-backgroundLight200"
-                            } p-3 rounded mb-2.5`}
+                            style={{
+                                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                borderRadius: 12,
+                                marginBottom: 16,
+                                borderWidth: 1,
+                                borderColor: isDark ? '#334155' : '#e2e8f0',
+                                ...(Platform.OS !== 'web' && {
+                                    shadowColor: isDark ? '#000000' : '#000000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: isDark ? 0.3 : 0.1,
+                                    shadowRadius: 4,
+                                    elevation: 3,
+                                }),
+                            }}
                         >
-                            <HStack style={{ alignItems: "center", justifyContent: "space-between" }}>
-                                <VStack style={{ flex: 1 }}>
-                                    <HStack style={{ alignItems: "center" }}>
-                                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
-                                            {item.author || t("unknown") || "Unbekannt"}
-                                        </Text>
-                                        <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
-                                            {"  "}
-                                            {getStatusEmoji(uploadStatus)} {getStatusText(uploadStatus)}
-                                        </Text>
-                                    </HStack>
+                            <VStack style={{ padding: 16 }} className="gap-4">
+                                {/* Header Row */}
+                                <HStack style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                                    <VStack style={{ flex: 1 }} className="gap-1">
+                                        <HStack style={{ alignItems: "center", gap: 8 }}>
+                                            <Feather 
+                                                name="user" 
+                                                size={16} 
+                                                color={isDark ? '#cbd5e1' : '#64748b'} 
+                                            />
+                                            <Text className={`font-semibold ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+                                                {item.author || t("unknown") || "Unbekannt"}
+                                            </Text>
+                                        </HStack>
+                                        
+                                        <HStack style={{ alignItems: "center", gap: 6 }}>
+                                            <Feather 
+                                                name="clock" 
+                                                size={14} 
+                                                color={isDark ? '#94a3b8' : '#94a3b8'} 
+                                            />
+                                            <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                                                {new Date(item.date).toLocaleString()}
+                                            </Text>
+                                        </HStack>
 
-                                    <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
-                                        {new Date(item.date).toLocaleString()}
-                                    </Text>
+                                        {!!item.serverId && (
+                                            <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                <Feather 
+                                                    name="server" 
+                                                    size={14} 
+                                                    color={isDark ? '#94a3b8' : '#94a3b8'} 
+                                                />
+                                                <Text className={`text-xs ${isDark ? "text-typography-500" : "text-typography-500"}`}>
+                                                    ID: {item.serverId}
+                                                </Text>
+                                            </HStack>
+                                        )}
+                                    </VStack>
 
-                                    {!!item.serverId && (
-                                        <Text className={isDark ? "text-typography-400" : "text-typography-600"}>
-                                            Server ID: {item.serverId}
-                                        </Text>
-                                    )}
-                                </VStack>
+                                    <Badge 
+                                        action={statusConfig.badgeAction} 
+                                        variant="solid"
+                                        style={{
+                                            backgroundColor: statusConfig.bgColor,
+                                            borderWidth: 0,
+                                        }}
+                                    >
+                                        <HStack style={{ alignItems: "center", gap: 4 }}>
+                                            <Feather 
+                                                name={statusConfig.icon} 
+                                                size={12} 
+                                                color={statusConfig.color}
+                                            />
+                                            <BadgeText 
+                                                style={{ 
+                                                    color: statusConfig.color,
+                                                    fontSize: 11,
+                                                }}
+                                            >
+                                                {statusConfig.text}
+                                            </BadgeText>
+                                        </HStack>
+                                    </Badge>
+                                </HStack>
 
-                                <HStack className="gap-2">
+                                <Divider orientation="horizontal" style={{
+                                    backgroundColor: isDark ? '#334155' : '#e2e8f0',
+                                    height: 1,
+                                }} />
+
+                                {/* Section chips */}
+                                <HStack className="flex-wrap" style={{ gap: 8 }}>
+                                    {Object.entries(sectionStatuses).map(([key, status]) => {
+                                        let bgColor, textColor, icon;
+                                        if (status === "complete") {
+                                            bgColor = isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(5, 150, 105, 0.1)';
+                                            textColor = isDark ? '#10b981' : '#059669';
+                                            icon = "check-circle";
+                                        } else if (status === "partial") {
+                                            bgColor = isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(217, 119, 6, 0.1)';
+                                            textColor = isDark ? '#f59e0b' : '#d97706';
+                                            icon = "alert-circle";
+                                        } else {
+                                            bgColor = isDark ? '#334155' : '#f1f5f9';
+                                            textColor = isDark ? '#94a3b8' : '#64748b';
+                                            icon = "circle";
+                                        }
+                                        return (
+                                            <HStack
+                                                key={key}
+                                                style={{
+                                                    backgroundColor: bgColor,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 6,
+                                                    borderRadius: 6,
+                                                    alignItems: "center",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                <Feather 
+                                                    name={icon as any} 
+                                                    size={12} 
+                                                    color={textColor}
+                                                />
+                                                <Text style={{ 
+                                                    color: textColor,
+                                                    fontSize: 11,
+                                                    fontWeight: '500',
+                                                    textTransform: 'capitalize',
+                                                }}>
+                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                </Text>
+                                            </HStack>
+                                        );
+                                    })}
+                                </HStack>
+
+                                {/* Action buttons */}
+                                <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
                                     <Button
                                         variant="outline"
                                         action="secondary"
@@ -375,80 +562,101 @@ export default function HistoryScreen() {
                                             setSelectedId(item.id);
                                             setIsDetailsOpen(true);
                                         }}
+                                        style={{
+                                            borderColor: isDark ? '#475569' : '#cbd5e1',
+                                            backgroundColor: 'transparent',
+                                            flex: 1,
+                                            marginRight: 8,
+                                        }}
                                     >
-                                        <Text>{t("details") ?? "Details"}</Text>
+                                        <HStack style={{ alignItems: "center", gap: 6 }}>
+                                            <Feather 
+                                                name="eye" 
+                                                size={14} 
+                                                color={isDark ? '#cbd5e1' : '#64748b'} 
+                                            />
+                                            <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
+                                                {t("details") ?? "Details"}
+                                            </Text>
+                                        </HStack>
                                     </Button>
-                                </HStack>
-                            </HStack>
 
-                            {/* Section chips */}
-                            <HStack className="mt-3 flex-wrap gap-2">
-                                {Object.entries(sectionStatuses).map(([key, status]) => {
-                                    let bg, text;
-                                    if (status === "complete") {
-                                        bg = "bg-success-600";
-                                        text = "text-typography-0";
-                                    } else if (status === "partial") {
-                                        bg = "bg-warning-500";
-                                        text = "text-typography-0";
-                                    } else {
-                                        bg = isDark ? "bg-backgroundDark800" : "bg-backgroundLight200";
-                                        text = isDark ? "text-typography-400" : "text-typography-600";
-                                    }
-                                    return (
-                                        <Box key={key} className={`px-2 py-1 rounded ${bg}`}>
-                                            <Text className={text}>{key}</Text>
-                                        </Box>
-                                    );
-                                })}
-                            </HStack>
-
-                            {/* Upload / Update buttons */}
-                            {(uploadScan || updateScan) && (
-                                <HStack className="mt-3" style={{ justifyContent: "flex-end" }}>
-                                    {(uploadStatus === "not_uploaded" || uploadStatus === "error") && uploadScan && (
-                                        <Button
-                                            variant="solid"
-                                            action="primary"
-                                            onPress={() => handleUpload(item.id)}
-                                            disabled={isUploading}
-                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
-                                        >
-                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
-                                                {isUploading ? "Uploading..." : "Upload"}
-                                            </Text>
-                                        </Button>
-                                    )}
-                                    {uploadStatus === "needs_update" && updateScan && (
-                                        <Button
-                                            className="ml-2"
-                                            variant="solid"
-                                            action="secondary"
-                                            onPress={() => handleUpdate(item.id)}
-                                            disabled={isUploading}
-                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
-                                        >
-                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
-                                                {isUploading ? "Updating..." : "Update"}
-                                            </Text>
-                                        </Button>
-                                    )}
-                                    {uploadStatus === "uploaded" && updateScan && (
-                                        <Button
-                                            className="ml-2"
-                                            variant="outline"
-                                            action="secondary"
-                                            onPress={() => handleUpdate(item.id)}
-                                            disabled={isUploading}
-                                            style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
-                                        >
-                                            <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
-                                                {isUploading ? "Updating..." : "Re-upload"}
-                                            </Text>
-                                        </Button>
+                                    {(uploadScan || updateScan) && (
+                                        <>
+                                            {(uploadStatus === "not_uploaded" || uploadStatus === "error") && uploadScan && (
+                                                <Button
+                                                    variant="solid"
+                                                    action="primary"
+                                                    onPress={() => handleUpload(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        backgroundColor: isDark ? '#3b82f6' : '#2563eb',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color="#ffffff" />
+                                                        ) : (
+                                                            <Feather name="upload" size={14} color="#ffffff" />
+                                                        )}
+                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
+                                                            {isUploading ? "Uploading..." : "Upload"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
+                                            )}
+                                            {uploadStatus === "needs_update" && updateScan && (
+                                                <Button
+                                                    variant="solid"
+                                                    action="secondary"
+                                                    onPress={() => handleUpdate(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        backgroundColor: isDark ? '#f59e0b' : '#d97706',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color="#ffffff" />
+                                                        ) : (
+                                                            <Feather name="refresh-cw" size={14} color="#ffffff" />
+                                                        )}
+                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
+                                                            {isUploading ? "Updating..." : "Update"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
+                                            )}
+                                            {uploadStatus === "uploaded" && updateScan && (
+                                                <Button
+                                                    variant="outline"
+                                                    action="secondary"
+                                                    onPress={() => handleUpdate(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        borderColor: isDark ? '#475569' : '#cbd5e1',
+                                                        backgroundColor: 'transparent',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
+                                                        ) : (
+                                                            <Feather name="refresh-cw" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
+                                                        )}
+                                                        <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
+                                                            {isUploading ? "Updating..." : "Re-upload"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
+                                            )}
+                                        </>
                                     )}
                                 </HStack>
-                            )}
+                            </VStack>
                         </Box>
                     );
                 }}
@@ -464,7 +672,7 @@ export default function HistoryScreen() {
                 <View
                     style={{
                         flex: 1,
-                        backgroundColor: "rgba(0,0,0,0.6)",
+                        backgroundColor: isDark ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.5)",
                         justifyContent: "center",
                         alignItems: "center",
                         paddingHorizontal: 20,
@@ -476,138 +684,211 @@ export default function HistoryScreen() {
                     {/* Card (non-pressable so scroll gestures work) */}
                     <View
                         style={{
-                            backgroundColor: isDark ? "#0f172a" : "#ffffff",
-                            padding: 20,
+                            backgroundColor: isDark ? "#1e293b" : "#ffffff",
                             borderRadius: 20,
                             maxHeight: "85%",
                             width: "90%",
+                            borderWidth: 1,
+                            borderColor: isDark ? "#334155" : "#e2e8f0",
+                            overflow: "hidden",
+                            ...(Platform.OS !== 'web' && {
+                                shadowColor: '#000000',
+                                shadowOffset: { width: 0, height: 8 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 12,
+                                elevation: 8,
+                            }),
                         }}
                     >
-                        <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
-                            {t("fullScanDetails") ?? "Full Scan Details"}
-                        </Heading>
-
-                        {/* Header info */}
-                        {selected && (
-                            <VStack
-                                className="mt-3 p-3 rounded"
-                                style={{
-                                    backgroundColor: isDark ? "#111827" : "#f8fafc",
-                                    borderWidth: 1,
-                                    borderColor: isDark ? "#1f2937" : "#e5e7eb",
-                                }}
-                            >
-                                <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
-                                    <VStack style={{ flex: 1 }}>
-                                        <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
-                                            {t("author") ?? "Autor"}
-                                        </Text>
-                                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
-                                            {selected.author || "Unbekannt"}
-                                        </Text>
-                                    </VStack>
-                                    <VStack style={{ alignItems: "flex-end" }}>
-                                        <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
-                                            {t("date") ?? "Datum"}
-                                        </Text>
-                                        <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                            {new Date(selected.date).toLocaleString()}
-                                        </Text>
-                                    </VStack>
-                                </HStack>
-                                {!!selected.serverId && (
-                                    <Text className={isDark ? "text-typography-400" : "text-typography-600"}>
-                                        Server ID: {selected.serverId}
-                                    </Text>
-                                )}
-                            </VStack>
-                        )}
+                        {/* Modal Header */}
+                        <Box
+                            style={{
+                                padding: 20,
+                                borderBottomWidth: 1,
+                                borderBottomColor: isDark ? "#334155" : "#e2e8f0",
+                                backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                            }}
+                        >
+                            <HStack style={{ alignItems: "center", justifyContent: "space-between" }}>
+                                <Heading size="lg" className={isDark ? "text-typography-50" : "text-typography-900"}>
+                                    {t("fullScanDetails") ?? "Full Scan Details"}
+                                </Heading>
+                                <Pressable
+                                    onPress={() => setIsDetailsOpen(false)}
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 16,
+                                        backgroundColor: isDark ? "#334155" : "#e2e8f0",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <Feather 
+                                        name="x" 
+                                        size={18} 
+                                        color={isDark ? "#cbd5e1" : "#64748b"} 
+                                    />
+                                </Pressable>
+                            </HStack>
+                        </Box>
 
                         <ScrollView
-                            style={{ marginTop: 16 }}
-                            contentContainerStyle={{ paddingBottom: 12 }}
+                            style={{ maxHeight: 500 }}
+                            contentContainerStyle={{ padding: 20 }}
                             nestedScrollEnabled
                             keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={true}
                         >
-                            {!selected ? (
-                                <Text className="text-typography-500">{t("noSelection") ?? "Keine Auswahl"}</Text>
-                            ) : (
+                            {selected ? (
                                 <VStack className="gap-4">
-                                    <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
+                                    {/* Header info */}
+                                    <VStack
+                                        style={{
+                                            padding: 16,
+                                            borderRadius: 12,
+                                            backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                                            borderWidth: 1,
+                                            borderColor: isDark ? "#334155" : "#e2e8f0",
+                                        }}
+                                        className="gap-3"
+                                    >
+                                        <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
+                                            <VStack style={{ flex: 1 }} className="gap-1">
+                                                <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                    <Feather 
+                                                        name="user" 
+                                                        size={14} 
+                                                        color={isDark ? "#94a3b8" : "#64748b"} 
+                                                    />
+                                                    <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                                                        {t("author") ?? "Autor"}
+                                                    </Text>
+                                                </HStack>
+                                                <Text className={`font-semibold ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+                                                    {selected.author || "Unbekannt"}
+                                                </Text>
+                                            </VStack>
+                                            <VStack style={{ alignItems: "flex-end" }} className="gap-1">
+                                                <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                    <Feather 
+                                                        name="clock" 
+                                                        size={14} 
+                                                        color={isDark ? "#94a3b8" : "#64748b"} 
+                                                    />
+                                                    <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                                                        {t("date") ?? "Datum"}
+                                                    </Text>
+                                                </HStack>
+                                                <Text className={`font-semibold ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+                                                    {new Date(selected.date).toLocaleString()}
+                                                </Text>
+                                            </VStack>
+                                        </HStack>
+                                        {!!selected.serverId && (
+                                            <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                <Feather 
+                                                    name="server" 
+                                                    size={14} 
+                                                    color={isDark ? "#94a3b8" : "#64748b"} 
+                                                />
+                                                <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                                                    Server ID: {selected.serverId}
+                                                </Text>
+                                            </HStack>
+                                        )}
+                                    </VStack>
+
+                                    {/* Sections */}
+                                    <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
                                         {t("savedSections") ?? "Gespeicherte Bereiche"}
                                     </Heading>
 
                                     {(["injection", "dosing", "holdingPressure", "cylinderHeating"] as const).map((key) => (
                                         <VStack
                                             key={key}
-                                            className="p-3 rounded gap-2"
                                             style={{
-                                                backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+                                                padding: 16,
+                                                borderRadius: 12,
+                                                backgroundColor: isDark ? "#0f172a" : "#f8fafc",
                                                 borderWidth: 1,
                                                 borderColor: isDark ? "#334155" : "#e2e8f0",
                                             }}
+                                            className="gap-3"
                                         >
-                                            <HStack style={{ alignItems: "center" }}>
+                                            <HStack style={{ alignItems: "center", gap: 8 }}>
                                                 <View
                                                     style={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        borderRadius: 9999,
+                                                        width: 12,
+                                                        height: 12,
+                                                        borderRadius: 6,
                                                         backgroundColor: selected[key]
-                                                            ? "#16a34a"
+                                                            ? (isDark ? "#10b981" : "#059669")
                                                             : isDark
-                                                                ? "#374151"
+                                                                ? "#475569"
                                                                 : "#cbd5e1",
-                                                        marginRight: 8,
                                                     }}
                                                 />
-                                                <Text className={isDark ? "text-typography-0" : "text-typography-900"}>{key}</Text>
+                                                <Text className={`font-semibold capitalize ${isDark ? "text-typography-50" : "text-typography-900"}`}>
+                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                </Text>
                                             </HStack>
 
                                             {!selected[key] ? (
-                                                <Text className="text-typography-400">{t("notAvailable") ?? "Nicht vorhanden"}</Text>
+                                                <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
+                                                    {t("notAvailable") ?? "Nicht vorhanden"}
+                                                </Text>
                                             ) : (
                                                 <SectionDetails sectionKey={key} data={(selected as any)[key]} isDark={isDark} />
                                             )}
                                         </VStack>
                                     ))}
                                 </VStack>
+                            ) : (
+                                <Text className={isDark ? "text-typography-400" : "text-typography-600"}>
+                                    {t("noSelection") ?? "Keine Auswahl"}
+                                </Text>
                             )}
                         </ScrollView>
 
                         {/* Footer with Download */}
-                        <HStack className="mt-4" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                            <VStack style={{ flex: 1, paddingRight: 8 }}>
-                                {isDownloading && (
-                                    <>
-                                        <HStack style={{ justifyContent: "space-between" }}>
-                                            <Text className={isDark ? "text-typography-300" : "text-typography-600"}>
-                                                Download Progress
-                                            </Text>
-                                            <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                                {Math.round(downloadProgress * 100)}%
-                                            </Text>
-                                        </HStack>
+                        <Box
+                            style={{
+                                padding: 20,
+                                borderTopWidth: 1,
+                                borderTopColor: isDark ? "#334155" : "#e2e8f0",
+                                backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                            }}
+                        >
+                            {isDownloading && (
+                                <VStack className="mb-4 gap-2">
+                                    <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
+                                        <Text className={`text-sm ${isDark ? "text-typography-300" : "text-typography-600"}`}>
+                                            Download Progress
+                                        </Text>
+                                        <Text className={`text-sm font-semibold ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+                                            {Math.round(downloadProgress * 100)}%
+                                        </Text>
+                                    </HStack>
+                                    <View
+                                        style={{
+                                            height: 6,
+                                            borderRadius: 3,
+                                            backgroundColor: isDark ? "#334155" : "#e2e8f0",
+                                            overflow: "hidden",
+                                        }}
+                                    >
                                         <View
                                             style={{
-                                                height: 8,
-                                                borderRadius: 8,
-                                                backgroundColor: isDark ? "#374151" : "#e5e7eb",
-                                                overflow: "hidden",
-                                                marginTop: 4,
+                                                height: 6,
+                                                width: `${Math.round(downloadProgress * 100)}%`,
+                                                backgroundColor: isDark ? "#3b82f6" : "#2563eb",
+                                                borderRadius: 3,
                                             }}
-                                        >
-                                            <View
-                                                style={{
-                                                    height: 8,
-                                                    width: `${Math.round(downloadProgress * 100)}%`,
-                                                    backgroundColor: isDark ? "#60a5fa" : "#2563eb",
-                                                }}
-                                            />
-                                        </View>
-                                    </>
-                                )}
-                            </VStack>
+                                        />
+                                    </View>
+                                </VStack>
+                            )}
 
                             <HStack style={{ gap: 12 }}>
                                 <Button
@@ -620,22 +901,39 @@ export default function HistoryScreen() {
                                         (getUploadStatus?.(selected.id) ?? "unknown") !== "uploaded" ||
                                         !excelService?.downloadExcel
                                     }
-                                    style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+                                    style={{ 
+                                        backgroundColor: isDark ? '#3b82f6' : '#2563eb',
+                                        flex: 1,
+                                        opacity: (
+                                            isDownloading ||
+                                            !selected ||
+                                            (getUploadStatus?.(selected.id) ?? "unknown") !== "uploaded" ||
+                                            !excelService?.downloadExcel
+                                        ) ? 0.5 : 1,
+                                    }}
                                 >
-                                    <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>📥 Download Excel</Text>
+                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                        <Feather name="download" size={16} color="#ffffff" />
+                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
+                                            Download Excel
+                                        </Text>
+                                    </HStack>
                                 </Button>
                                 <Button 
                                     variant="outline" 
                                     action="secondary" 
                                     onPress={() => setIsDetailsOpen(false)}
-                                    style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+                                    style={{
+                                        borderColor: isDark ? '#475569' : '#cbd5e1',
+                                        backgroundColor: 'transparent',
+                                    }}
                                 >
-                                    <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
+                                    <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
                                         {t("close") ?? "Schließen"}
                                     </Text>
                                 </Button>
                             </HStack>
-                        </HStack>
+                        </Box>
                     </View>
                 </View>
             </RNModal>
@@ -652,11 +950,54 @@ function SectionDetails({
     data: any;
     isDark: boolean;
 }) {
-    if (sectionKey === "injection") {
+    if (!data) {
+        return (
+            <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
+                No data available
+            </Text>
+        );
+    }
+
+    const hasContent = () => {
+        if (sectionKey === "injection") {
+            return !!(data?.mainMenu || data?.subMenuValues?.values || data?.switchType);
+        }
+        if (sectionKey === "holdingPressure") {
+            return !!(data?.mainMenu || data?.subMenusValues?.values);
+        }
+        if (sectionKey === "dosing") {
+            return !!(data?.mainMenu || data?.dosingSpeedsValues?.values || data?.dosingPressuresValues?.values);
+        }
+        if (sectionKey === "cylinderHeating") {
+            return !!data && Object.keys(data).length > 0;
+        }
+        return false;
+    };
+
+    if (!hasContent()) {
         return (
             <VStack className="gap-2">
-                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
-                {Array.isArray(data?.subMenuValues?.values) && (
+                <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
+                    Data structure not recognized
+                </Text>
+                {data && typeof data === 'object' && (
+                    <DataBlock 
+                        title="Raw Data" 
+                        entries={Object.entries(data)} 
+                        isDark={isDark} 
+                    />
+                )}
+            </VStack>
+        );
+    }
+
+    if (sectionKey === "injection") {
+        return (
+            <VStack className="gap-3">
+                {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
+                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                )}
+                {Array.isArray(data?.subMenuValues?.values) && data.subMenuValues.values.length > 0 && (
                     <ArrayBlock
                         title="Sub Menu · Werte"
                         entries={data.subMenuValues.values}
@@ -664,16 +1005,20 @@ function SectionDetails({
                         isDark={isDark}
                     />
                 )}
-                {data?.switchType && <DataBlock title="Switch Type" entries={Object.entries(data.switchType)} isDark={isDark} />}
+                {data?.switchType && Object.keys(data.switchType).length > 0 && (
+                    <DataBlock title="Switch Type" entries={Object.entries(data.switchType)} isDark={isDark} />
+                )}
             </VStack>
         );
     }
 
     if (sectionKey === "holdingPressure") {
         return (
-            <VStack className="gap-2">
-                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
-                {Array.isArray(data?.subMenusValues?.values) && (
+            <VStack className="gap-3">
+                {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
+                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                )}
+                {Array.isArray(data?.subMenusValues?.values) && data.subMenusValues.values.length > 0 && (
                     <ArrayBlock
                         title="Sub Menu · Werte"
                         entries={data.subMenusValues.values}
@@ -687,12 +1032,14 @@ function SectionDetails({
 
     if (sectionKey === "dosing") {
         return (
-            <VStack className="gap-2">
-                {data?.mainMenu && <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />}
-                {Array.isArray(data?.dosingSpeedsValues?.values) && (
+            <VStack className="gap-3">
+                {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
+                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                )}
+                {Array.isArray(data?.dosingSpeedsValues?.values) && data.dosingSpeedsValues.values.length > 0 && (
                     <ArrayBlock title="Speeds" entries={data.dosingSpeedsValues.values} columns={["index", "v", "v2"]} isDark={isDark} />
                 )}
-                {Array.isArray(data?.dosingPressuresValues?.values) && (
+                {Array.isArray(data?.dosingPressuresValues?.values) && data.dosingPressuresValues.values.length > 0 && (
                     <ArrayBlock
                         title="Pressures"
                         entries={data.dosingPressuresValues.values}
@@ -705,12 +1052,41 @@ function SectionDetails({
     }
 
     if (sectionKey === "cylinderHeating") {
+        if (!data || typeof data !== 'object') {
+            return (
+                <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
+                    Invalid data format
+                </Text>
+            );
+        }
+
+        const entries = Object.entries(data).filter(([_, value]) => value != null);
+        
+        if (entries.length === 0) {
+            return (
+                <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
+                    No data available
+                </Text>
+            );
+        }
+
         return (
-            <VStack className="gap-1">
-                {Object.entries(data).map(([label, value]) => (
-                    <HStack key={label} style={{ justifyContent: "space-between" }}>
-                        <Text className={isDark ? "text-typography-200" : "text-typography-600"}>{label}</Text>
-                        <Text className={isDark ? "text-typography-50" : "text-typography-900"}>{String(value)}</Text>
+            <VStack
+                style={{
+                    backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                    borderRadius: 8,
+                    padding: 12,
+                }}
+                className="gap-2"
+            >
+                {entries.map(([label, value]) => (
+                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "center" }}>
+                        <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                            {label}
+                        </Text>
+                        <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
+                            {String(value)}
+                        </Text>
                     </HStack>
                 ))}
             </VStack>
@@ -730,14 +1106,29 @@ function DataBlock({
     isDark: boolean;
 }) {
     return (
-        <VStack className="gap-1">
-            <Text className={`mb-1 ${isDark ? "text-typography-200" : "text-typography-600"}`}>{title}</Text>
-            {entries.map(([label, value]) => (
-                <HStack key={label} style={{ justifyContent: "space-between" }}>
-                    <Text className={isDark ? "text-typography-200" : "text-typography-600"}>{label}</Text>
-                    <Text className={isDark ? "text-typography-50" : "text-typography-900"}>{String(value)}</Text>
-                </HStack>
-            ))}
+        <VStack className="gap-2">
+            <Text className={`text-sm font-semibold mb-1 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+                {title}
+            </Text>
+            <VStack
+                style={{
+                    backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                    borderRadius: 8,
+                    padding: 12,
+                }}
+                className="gap-2"
+            >
+                {entries.map(([label, value]) => (
+                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "center" }}>
+                        <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                            {label}
+                        </Text>
+                        <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
+                            {String(value)}
+                        </Text>
+                    </HStack>
+                ))}
+            </VStack>
         </VStack>
     );
 }
@@ -754,20 +1145,52 @@ function ArrayBlock({
     isDark: boolean;
 }) {
     return (
-        <VStack className="gap-1">
-            <Text className={`mb-1 ${isDark ? "text-typography-200" : "text-typography-600"}`}>{title}</Text>
-            <VStack className="gap-1">
-                <HStack style={{ justifyContent: "space-between" }}>
+        <VStack className="gap-2">
+            <Text className={`text-sm font-semibold mb-1 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
+                {title}
+            </Text>
+            <VStack
+                style={{
+                    backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                    borderRadius: 8,
+                    padding: 12,
+                }}
+                className="gap-2"
+            >
+                {/* Header Row */}
+                <HStack 
+                    style={{ 
+                        justifyContent: "space-between",
+                        paddingBottom: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: isDark ? "#334155" : "#e2e8f0",
+                    }}
+                >
                     {columns.map((col) => (
-                        <Text key={col} className={isDark ? "text-typography-200" : "text-typography-600"}>
+                        <Text 
+                            key={col} 
+                            className={`text-xs font-semibold uppercase ${isDark ? "text-typography-400" : "text-typography-500"}`}
+                            style={{ flex: 1 }}
+                        >
                             {col}
                         </Text>
                     ))}
                 </HStack>
+                {/* Data Rows */}
                 {entries.map((row, idx) => (
-                    <HStack key={idx} style={{ justifyContent: "space-between" }}>
+                    <HStack 
+                        key={idx} 
+                        style={{ 
+                            justifyContent: "space-between",
+                            paddingVertical: 4,
+                        }}
+                    >
                         {columns.map((col) => (
-                            <Text key={col} className={isDark ? "text-typography-50" : "text-typography-900"}>
+                            <Text 
+                                key={col} 
+                                className={`text-sm ${isDark ? "text-typography-200" : "text-typography-700"}`}
+                                style={{ flex: 1 }}
+                            >
                                 {String(row[col] ?? (col === "index" ? idx + 1 : "-"))}
                             </Text>
                         ))}
