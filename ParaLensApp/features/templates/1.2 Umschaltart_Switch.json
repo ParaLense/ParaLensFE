@@ -8,7 +8,7 @@
     "label": "Transshipment Position Checkbox",
     "type": "checkbox",
     "options": {
-      "checkboxThreshold": 214.0,
+      "blackRatioMin": 0.3,
       "readValue": true,
       "valueBoxId": "transshipment_position"
     }
@@ -31,7 +31,7 @@
     "label": "Switch Over Time Checkbox",
     "type": "checkbox",
     "options": {
-      "checkboxThreshold": 214.0,
+      "blackRatioMin": 0.3,
       "readValue": true,
       "valueBoxId": "switch_over_time"
     }
@@ -54,7 +54,7 @@
     "label": "Switching Pressure Checkbox",
     "type": "checkbox",
     "options": {
-      "checkboxThreshold": 214.0,
+      "blackRatioMin": 0.3,
       "readValue": true,
       "valueBoxId": "switching_pressure"
     }

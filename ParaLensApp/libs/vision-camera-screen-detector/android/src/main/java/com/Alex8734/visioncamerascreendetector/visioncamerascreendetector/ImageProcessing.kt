@@ -199,6 +199,84 @@ object ImageProcessing {
 
     /**
      * Draw OCR template boxes on image for debug visualization
+     * @param cameraFeedImage The camera feed image (grayscale) to draw on
+     * @param ocrBoxes OCR boxes with coordinates in warped space (percentage)
+     * @param outputW Width of warped image
+     * @param outputH Height of warped image
+     * @param H Homography matrix from canonical (warped) to camera feed (H: canonical -> image)
+     */
+    fun drawOcrTemplateBoxesOnCameraFeed(cameraFeedImage: Mat, ocrBoxes: List<OcrBox>, 
+                                         outputW: Int, outputH: Int, H: Mat?): Mat {
+        // Convert grayscale to BGR for color visualization
+        val debugImage = Mat()
+        Imgproc.cvtColor(cameraFeedImage, debugImage, Imgproc.COLOR_GRAY2BGR)
+        
+        if (H == null || H.empty()) return debugImage
+        
+        for (box in ocrBoxes) {
+            // Box coordinates in warped/canonical space (as percentage)
+            val warpedX = (box.x / 100.0) * outputW
+            val warpedY = (box.y / 100.0) * outputH
+            val warpedW = (box.w / 100.0) * outputW
+            val warpedH = (box.h / 100.0) * outputH
+            
+            // Create points in canonical/warped space
+            val canonicalPts = MatOfPoint2f(
+                Point(warpedX, warpedY),
+                Point(warpedX + warpedW, warpedY),
+                Point(warpedX + warpedW, warpedY + warpedH),
+                Point(warpedX, warpedY + warpedH)
+            )
+            
+            // Project to camera feed using H (canonical -> image)
+            val cameraPts = MatOfPoint2f()
+            Core.perspectiveTransform(canonicalPts, cameraPts, H)
+            val arr = cameraPts.toArray()
+            
+            var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
+            var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+            for (p in arr) {
+                if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y
+                if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y
+            }
+            
+            val rx = max(0, minX.toInt())
+            val ry = max(0, minY.toInt())
+            val rw = min(debugImage.width() - rx, (maxX - minX).toInt())
+            val rh = min(debugImage.height() - ry, (maxY - minY).toInt())
+            
+            if (rw > 0 && rh > 0) {
+                // Choose color based on box type
+                val color = when (box.type) {
+                    "checkbox" -> Scalar(0.0, 255.0, 0.0)  // Green for checkboxes
+                    "scrollbar" -> Scalar(255.0, 0.0, 255.0)  // Magenta for scrollbars
+                    else -> Scalar(0.0, 255.0, 255.0)  // Yellow for value boxes
+                }
+                
+                // Draw rectangle as polygon to handle perspective
+                val poly = MatOfPoint(
+                    Point(arr[0].x, arr[0].y),
+                    Point(arr[1].x, arr[1].y),
+                    Point(arr[2].x, arr[2].y),
+                    Point(arr[3].x, arr[3].y)
+                )
+                Imgproc.polylines(debugImage, listOf(poly), true, color, 2)
+                
+                // Draw box ID as text at top-left corner
+                val textX = arr[0].x
+                val textY = arr[0].y - 5
+                if (textY > 10) {
+                    Imgproc.putText(debugImage, box.id, Point(textX, textY), 
+                                  Imgproc.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                }
+            }
+        }
+        
+        return debugImage
+    }
+
+    /**
+     * Draw OCR template boxes on warped image for debug visualization (legacy method)
      */
     fun drawOcrTemplateBoxes(image: Mat, ocrBoxes: List<OcrBox>, outputW: Int, outputH: Int): Mat {
         // Convert grayscale to BGR for color visualization
@@ -229,6 +307,118 @@ object ImageProcessing {
             if (textY > 10) {
                 Imgproc.putText(debugImage, box.id, Point(rx.toDouble(), textY.toDouble()), 
                               Imgproc.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+            }
+        }
+        
+        return debugImage
+    }
+    
+    /**
+     * Draw matched boxes from warped space on camera feed
+     * @param cameraFeedImage The camera feed image (grayscale) to draw on
+     * @param matchedArr Matched boxes with coordinates in warped space (x, y, w, h)
+     * @param templateBoxes Template boxes for getting canonical coordinates
+     * @param outputW Width of warped image
+     * @param outputH Height of warped image
+     * @param H Homography matrix from canonical (warped) to camera feed (H: canonical -> image)
+     */
+    fun drawMatchedBoxesOnCameraFeed(cameraFeedImage: Mat, matchedArr: List<Any?>, 
+                                     templateBoxes: List<Box>?, outputW: Int, outputH: Int, 
+                                     H: Mat?): Mat {
+        // Convert grayscale to BGR for color visualization
+        val debugImage = Mat()
+        Imgproc.cvtColor(cameraFeedImage, debugImage, Imgproc.COLOR_GRAY2BGR)
+        
+        if (H == null || H.empty() || templateBoxes == null) return debugImage
+        
+        // Draw matched boxes (green for detected, yellow for template)
+        for (i in matchedArr.indices) {
+            val m = matchedArr[i]
+            val box = templateBoxes.getOrNull(i) ?: continue
+            
+            if (m is HashMap<*, *>) {
+                // This box was matched - draw in green
+                val warpedX = (m["x"] as? Number)?.toDouble() ?: continue
+                val warpedY = (m["y"] as? Number)?.toDouble() ?: continue
+                val warpedW = (m["w"] as? Number)?.toDouble() ?: continue
+                val warpedH = (m["h"] as? Number)?.toDouble() ?: continue
+                
+                // Create points in canonical/warped space
+                val canonicalPts = MatOfPoint2f(
+                    Point(warpedX, warpedY),
+                    Point(warpedX + warpedW, warpedY),
+                    Point(warpedX + warpedW, warpedY + warpedH),
+                    Point(warpedX, warpedY + warpedH)
+                )
+                
+                // Project to camera feed using H (canonical -> image)
+                val cameraPts = MatOfPoint2f()
+                Core.perspectiveTransform(canonicalPts, cameraPts, H)
+                val arr = cameraPts.toArray()
+                
+                // Draw as polygon to handle perspective
+                val poly = MatOfPoint(
+                    Point(arr[0].x, arr[0].y),
+                    Point(arr[1].x, arr[1].y),
+                    Point(arr[2].x, arr[2].y),
+                    Point(arr[3].x, arr[3].y)
+                )
+                Imgproc.polylines(debugImage, listOf(poly), true, Scalar(0.0, 255.0, 0.0), 3)
+                
+                // Draw box ID and score with background for readability
+                val boxId = (m["boxId"] as? String) ?: box.id
+                val score = (m["score"] as? Number)?.toDouble()
+
+                val baseX = arr[0].x
+                val baseY = arr[0].y
+                var textX = Math.max(2.0, baseX)
+                var textY = Math.max(14.0, baseY - 6.0)
+
+                val label = if (score != null) "$boxId  ${String.format("%.2f", score)}" else boxId
+                val textSize = Imgproc.getTextSize(label, Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, 2, null)
+                val bgW = textSize.width + 10
+                val bgH = textSize.height + 8
+
+                // Clamp background within image bounds
+                val bgX1 = Math.max(0.0, textX - 4)
+                val bgY1 = Math.max(0.0, textY - textSize.height - 6)
+                val bgX2 = Math.min(debugImage.width().toDouble() - 1, bgX1 + bgW)
+                val bgY2 = Math.min(debugImage.height().toDouble() - 1, bgY1 + bgH)
+
+                // Background rectangle (solid dark)
+                Imgproc.rectangle(
+                    debugImage,
+                    Point(bgX1, bgY1),
+                    Point(bgX2, bgY2),
+                    Scalar(10.0, 10.0, 10.0),
+                    Imgproc.FILLED
+                )
+
+                // Draw text with thicker stroke for contrast
+                Imgproc.putText(
+                    debugImage,
+                    label,
+                    Point(textX, bgY2 - 6),
+                    Imgproc.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    Scalar(255.0, 255.0, 255.0),
+                    2
+                )
+            } else {
+                // This box was not matched - draw template in yellow (dashed)
+                val canonicalPts = MatOfPoint2f(*percentBoxToPts(box, outputW, outputH))
+                val cameraPts = MatOfPoint2f()
+                Core.perspectiveTransform(canonicalPts, cameraPts, H)
+                val arr = cameraPts.toArray()
+                
+                // Draw as dashed polygon (by drawing lines)
+                val poly = MatOfPoint(
+                    Point(arr[0].x, arr[0].y),
+                    Point(arr[1].x, arr[1].y),
+                    Point(arr[2].x, arr[2].y),
+                    Point(arr[3].x, arr[3].y)
+                )
+                Imgproc.polylines(debugImage, listOf(poly), true, Scalar(0.0, 255.0, 255.0), 1)
             }
         }
         

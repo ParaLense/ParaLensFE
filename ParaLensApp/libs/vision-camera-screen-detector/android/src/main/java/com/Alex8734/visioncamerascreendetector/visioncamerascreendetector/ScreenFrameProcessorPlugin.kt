@@ -130,27 +130,50 @@ class ScreenDetectorFrameProcessorPlugin(
         H = ScreenDetection.buildScreenHomography(bestQuad, templateTargetW, templateTargetH)
       }
       
-      // Match template boxes
+      // Create warped image early for template matching
+      var warped: Mat? = null
+      if (H != null && !H.empty()) {
+        warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
+        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+        DebugHttpStreamer.updateMatGray("warped", warped, 80)
+      }
+      
+      // Match template boxes using improved warped image method
       var accuracy = 0.0
       val matchedArr = ArrayList<Any?>()
       val templatePixelRectsArr = ArrayList<HashMap<String, Any?>>()
       
-      if (H != null && !H.empty() && templateBoxes != null && templateBoxes.isNotEmpty()) {
-        val (acc, matched) = ScreenDetection.matchTemplateBoxes(
-          templateBoxes, H, contourRects, frameW, frameH, 
-          templateTargetW, templateTargetH, minIouForMatch
+      if (warped != null && templateBoxes != null && templateBoxes.isNotEmpty()) {
+        // Use new improved method: match in warped image with padding
+        val (acc, matched, pixelRects) = ScreenDetection.matchTemplateBoxesInWarped(
+          templateBoxes, warped, outputW, outputH,
+          paddingPercent = 1.0,  // 1% padding
+          minScoreForMatch = 0.4
         )
         accuracy = acc
+        templatePixelRectsArr.addAll(pixelRects)
         matchedArr.addAll(matched)
         
-        // Debug: Draw template boxes (less frequent updates)
-        if (totalFrameCounter % 7 == 0) {
+        // Debug: Draw matched boxes on camera feed (less frequent updates)
+        if (totalFrameCounter % 7 == 0 && H != null && !H.empty()) {
+          // Draw matched boxes on camera feed with IDs and scores
+          val matchedBoxesDebug = ImageProcessing.drawMatchedBoxesOnCameraFeed(
+            img, matchedArr, templateBoxes, outputW, outputH, H
+          )
+          DebugHttpStreamer.updateMatColor("matchedBoxes", matchedBoxesDebug, 85)
+          
+          // Log summary of matched boxes
+          val matchedCount = matchedArr.count { it != null }
+          val totalCount = templateBoxes.size
+          Log.d("ScreenDetector", "Matched boxes visualization: $matchedCount/$totalCount boxes detected (accuracy: ${String.format("%.2f", accuracy * 100)}%)")
+          
+          // Debug: Template boxes projected on camera feed
           val debugTemplateBoxes = ImageProcessing.drawDebugTemplateBoxes(img, templateBoxes, H, templateTargetW, templateTargetH, Scalar(0.0, 0.0, 255.0), 2)
-          DebugHttpStreamer.updateMatColor("templateBoxes", debugTemplateBoxes, 60)
+          DebugHttpStreamer.updateMatColor("templateBoxes", debugTemplateBoxes, 80)
           
           // Debug: Combined visualization with all elements
           val combinedDebug = ImageProcessing.createCombinedDebugVisualization(img, screenEdges, detailEdges, screenContourRects, contourRects, templateBoxes, H, templateTargetW, templateTargetH)
-          DebugHttpStreamer.updateMatColor("combinedDebug", combinedDebug, 60)
+          DebugHttpStreamer.updateMatColor("combinedDebug", combinedDebug, 80)
         }
       }
       
@@ -162,38 +185,46 @@ class ScreenDetectorFrameProcessorPlugin(
       totalFrameCounter++
       if (detected) detectionCounter++
 
-      // Create warped image for OCR if needed
+      // Encode warped image for base64 if needed
       var warpedImageBase64: String? = null
-      if (detected && returnWarpedImage && H != null && !H.empty()) {
-        val warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
-        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
-        
-        DebugHttpStreamer.updateMatGray("warped", warped, 80)
-        
-        warpedImageBase64 = ImageProcessing.warpAndEncodeGrayToBase64(img, H.inv(), outputW, outputH, imageQuality)
+      if (detected && returnWarpedImage && warped != null) {
+        warpedImageBase64 = ImageProcessing.warpAndEncodeGrayToBase64(img, H!!.inv(), outputW, outputH, imageQuality)
         warpedImageBase64?.let {
           val preview = if (it.length > 120) it.substring(0, 120) + "…" else it
           Log.d("ScreenDetector", "warped image len=${it.length}, preview=$preview")
         }
-      } else if (H != null && !H.empty()) {
-        val warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
-        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
-        DebugHttpStreamer.updateMatGray("warped", warped, 80)
       }
 
-      // Process OCR if requested
-      if (detected && H != null && !H.empty() && runOcr && ocrBoxes != null && ocrBoxes.isNotEmpty()) {
-        val warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
-        Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+      // Process OCR if requested (reuse warped image if available)
+      if (detected && runOcr && ocrBoxes != null && ocrBoxes.isNotEmpty()) {
+        val ocrWarped = warped ?: if (H != null && !H.empty()) {
+          val temp = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
+          Imgproc.warpPerspective(img, temp, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
+          temp
+        } else null
         
-        // Debug: Draw OCR template boxes on warped image (less frequent updates)
-        if (totalFrameCounter % 10 == 0) {
-          val ocrDebugImage = ImageProcessing.drawOcrTemplateBoxes(warped, ocrBoxes, outputW, outputH)
-          DebugHttpStreamer.updateMatColor("ocrTemplateBoxes", ocrDebugImage, 60)
+        if (ocrWarped != null && H != null && !H.empty()) {
+          // Debug: Draw OCR template boxes on camera feed (less frequent updates)
+          if (totalFrameCounter % 10 == 0) {
+            // Draw on camera feed (with perspective projection)
+            val ocrDebugCameraFeed = ImageProcessing.drawOcrTemplateBoxesOnCameraFeed(
+              img, ocrBoxes, outputW, outputH, H
+            )
+            DebugHttpStreamer.updateMatColor("ocrTemplateBoxes", ocrDebugCameraFeed, 60)
+            
+            // Also draw on warped image for comparison
+            val ocrDebugWarped = ImageProcessing.drawOcrTemplateBoxes(ocrWarped, ocrBoxes, outputW, outputH)
+            DebugHttpStreamer.updateMatColor("ocrTemplateBoxesWarped", ocrDebugWarped, 60)
+          }
+          
+          val ocrResults = OcrProcessor.processOcrBoxes(ocrWarped, ocrBoxes, outputW, outputH)
+          data["ocr"] = hashMapOf("boxes" to ocrResults)
+          
+          // Clean up if we created a separate warped image for OCR
+          if (ocrWarped != warped) {
+            ocrWarped.release()
+          }
         }
-        
-        val ocrResults = OcrProcessor.processOcrBoxes(warped, ocrBoxes, outputW, outputH)
-        data["ocr"] = hashMapOf("boxes" to ocrResults)
       }
 
       // Create screen data
@@ -205,13 +236,22 @@ class ScreenDetectorFrameProcessorPlugin(
         warpedImageBase64, outputW, outputH
       )
 
-      // Create debug overlay
+      // Create debug overlay with matched boxes projected on camera feed
       try {
         val overlayColor = ImageProcessing.createOverlayImage(
           img, detected, detectionCounter, totalFrameCounter,
           roiOuterPx, roiInnerPx, bestQuad, templateBoxes, H, matchedArr
         )
-        DebugHttpStreamer.updateMatColor("overlay", overlayColor, 80)
+        
+        // Overlay matched boxes if available
+        if (H != null && !H.empty() && templateBoxes != null && matchedArr.isNotEmpty()) {
+          val matchedOverlay = ImageProcessing.drawMatchedBoxesOnCameraFeed(
+            overlayColor, matchedArr, templateBoxes, outputW, outputH, H
+          )
+          DebugHttpStreamer.updateMatColor("overlay", matchedOverlay, 90)
+        } else {
+          DebugHttpStreamer.updateMatColor("overlay", overlayColor, 90)
+        }
       } catch (_: Throwable) {}
 
       data["screen"] = screenData

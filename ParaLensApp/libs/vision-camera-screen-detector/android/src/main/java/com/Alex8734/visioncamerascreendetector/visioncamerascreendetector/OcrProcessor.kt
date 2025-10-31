@@ -39,6 +39,12 @@ object OcrProcessor {
             val type = m["type"] as? String
             @Suppress("UNCHECKED_CAST")
             val options = m["options"] as? Map<String, Any>
+            
+            // Debug: Log if options are present
+            if (options != null && options.isNotEmpty()) {
+                Log.d("OcrProcessor", "Parsing box $id with options: $options")
+            }
+            
             if (x != null && y != null && w != null && h != null) out.add(OcrBox(id, x, y, w, h, type, options))
         }
         return if (out.isEmpty()) null else out
@@ -88,39 +94,53 @@ object OcrProcessor {
      * Process checkbox detection
      */
     private fun processCheckbox(roi: Mat, box: OcrBox, result: HashMap<String, Any?>) {
-        // Improved checkbox detection based on mean pixel value
-        val blur = Mat()
-        Imgproc.GaussianBlur(roi, blur, Size(3.0,3.0), 0.0)
-        
-        // Calculate mean pixel value
-        val mean = Core.mean(blur)
-        val meanValue = mean.`val`[0]
-        
-        // Threshold from template config, default based on your values:
-        // Checked: ~194, Unchecked: ~235
-        // Threshold should be around 214 (middle between 194 and 235)
-        val threshold = ((box.options?.get("checkboxThreshold") as? Number)?.toDouble() ?: 214.0).coerceIn(0.0, 255.0)
-        val readValue = (box.options?.get("readValue") as? Boolean) ?: false
-        val valueBoxId = box.options?.get("valueBoxId") as? String
-        
-        result["type"] = "checkbox"
-        // Lower mean value = darker = checked
-        result["checked"] = meanValue <= threshold
-        result["confidence"] = Math.abs(meanValue - threshold) / 255.0
-        result["meanValue"] = meanValue
-        result["threshold"] = threshold
-        
-        // Debug: Log checkbox detection details
-        Log.d("CheckboxDetection", "Box ${box.id}: meanValue=$meanValue, threshold=$threshold, checked=${meanValue <= threshold}")
-        
-        // If checkbox is checked and readValue is true, also read the associated value
-        if (meanValue <= threshold && readValue && valueBoxId != null) {
-            // Note: This would need access to the full OCR boxes list to find the value box
-            // For now, we'll leave this as a placeholder
-            result["valueBoxId"] = valueBoxId
-            result["valueText"] = null
-            result["valueNumber"] = null
+        // Simplified fixed method: adaptive Otsu binarization + black pixel ratio only
+        // 1) Local normalization (CLAHE) + light blur
+        val normalized = Mat()
+        try {
+            val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
+            clahe.apply(roi, normalized)
+        } catch (_: Throwable) {
+            roi.copyTo(normalized)
         }
+        val smooth = Mat()
+        Imgproc.GaussianBlur(normalized, smooth, Size(3.0, 3.0), 0.0)
+
+        val w = smooth.cols()
+        val h = smooth.rows()
+        val area = Math.max(1, w * h)
+
+        // 2) Adaptive binarization (Otsu, invert so dark=white) → black ratio
+        val bin = Mat()
+        Imgproc.threshold(smooth, bin, 0.0, 255.0, Imgproc.THRESH_BINARY_INV or Imgproc.THRESH_OTSU)
+        val whiteCount = Core.countNonZero(bin)
+        val blackRatio = whiteCount.toDouble() / area.toDouble()
+
+        // 3) Decision by single threshold (use Utils.getDouble for consistent parsing)
+        val blackRatioMin = Utils.getDouble(box.options, "blackRatioMin", 0.30).coerceIn(0.0, 1.0)
+        val isChecked = blackRatio >= blackRatioMin
+        
+        // Debug log to verify option is being read
+        Log.d("CheckboxDetection", "Box ${box.id}: options=${box.options}, blackRatioMin=$blackRatioMin (from template)")
+
+        // Confidence from distance to threshold
+        fun clamp01(v: Double) = Math.max(0.0, Math.min(1.0, v))
+        val confidence = clamp01((blackRatio - blackRatioMin) / 0.40)
+
+        result["type"] = "checkbox"
+        result["checked"] = isChecked
+        result["confidence"] = confidence
+        result["blackRatio"] = blackRatio
+        result["blackRatioMin"] = blackRatioMin
+
+        // Enhanced logging with all useful values
+        val mean = Core.mean(smooth).`val`[0]
+        val minMax = Core.minMaxLoc(smooth)
+        Log.d(
+            "CheckboxDetection",
+            "Box ${box.id}: blackRatio=%.3f (threshold=%.2f) | mean=%.1f min=%.1f max=%.1f | checked=%s conf=%.2f"
+                .format(blackRatio, blackRatioMin, mean, minMax.minVal, minMax.maxVal, isChecked, confidence)
+        )
     }
     
     /**

@@ -329,6 +329,71 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     }
   }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addOcrToHistoryJS, addFullScanResultJS, viewHeight, viewWidth]);
 
+  // Helper function to apply homography transformation to a point
+  const applyHomography = (h: number[][], point: { x: number; y: number }): { x: number; y: number } => {
+    if (!h || h.length !== 3 || !h[0] || h[0].length !== 3) {
+      return point;
+    }
+    
+    const x = point.x;
+    const y = point.y;
+    const w = h[2][0] * x + h[2][1] * y + h[2][2];
+    
+    if (Math.abs(w) < 1e-10) {
+      return point; // Avoid division by zero
+    }
+    
+    return {
+      x: (h[0][0] * x + h[0][1] * y + h[0][2]) / w,
+      y: (h[1][0] * x + h[1][1] * y + h[1][2]) / w,
+    };
+  };
+
+  // Transform box from warped space to camera feed space using homography
+  const transformWarpedBoxToCameraFeed = (
+    box: { x: any; y: any; w: any; h: any },
+    homography: number[][] | null | undefined,
+    outputW: number,
+    outputH: number
+  ): { x: number; y: number; w: number; h: number } | null => {
+    if (!homography || !Array.isArray(homography)) {
+      return null;
+    }
+    
+    const warpedX = toNumber(box.x);
+    const warpedY = toNumber(box.y);
+    const warpedW = toNumber(box.w);
+    const warpedH = toNumber(box.h);
+    
+    // Transform the four corners of the box
+    const corners = [
+      { x: warpedX, y: warpedY },
+      { x: warpedX + warpedW, y: warpedY },
+      { x: warpedX + warpedW, y: warpedY + warpedH },
+      { x: warpedX, y: warpedY + warpedH },
+    ];
+    
+    const transformedCorners = corners.map(corner => applyHomography(homography, corner));
+    
+    // Find bounding box of transformed corners
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const corner of transformedCorners) {
+      if (corner.x < minX) minX = corner.x;
+      if (corner.x > maxX) maxX = corner.x;
+      if (corner.y < minY) minY = corner.y;
+      if (corner.y > maxY) maxY = corner.y;
+    }
+    
+    return {
+      x: Math.max(0, minX),
+      y: Math.max(0, minY),
+      w: Math.max(0, maxX - minX),
+      h: Math.max(0, maxY - minY),
+    };
+  };
+
   const mapBoxToViewStyle = (box: { x: any; y: any; w: any; h: any }) => {
     if (!frameToViewTransform) return null;
 
@@ -344,6 +409,18 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       width: Math.max(0, w * scaleX),
       height: Math.max(0, h * scaleY),
     };
+  };
+
+  // Map box from warped space to view style (with homography projection)
+  const mapWarpedBoxToViewStyle = (
+    box: { x: any; y: any; w: any; h: any },
+    homography: number[][] | null | undefined,
+    outputW: number,
+    outputH: number
+  ) => {
+    const cameraFeedBox = transformWarpedBoxToCameraFeed(box, homography, outputW, outputH);
+    if (!cameraFeedBox) return null;
+    return mapBoxToViewStyle(cameraFeedBox);
   };
 
   return (
@@ -535,7 +612,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       {screenResult?.matched_boxes?.map(
         (box: { x: any; y: any; w: any; h: any }, idx: number) => {
           if (!box) return null;
-          const style = mapBoxToViewStyle(box);
+          
+          // Transform from warped space to camera feed space
+          const outputW = toNumber(screenResult?.template_target_size?.w, 1200);
+          const outputH = toNumber(screenResult?.template_target_size?.h, 1600);
+          const homography = screenResult?.homography;
+          
+          const style = mapWarpedBoxToViewStyle(box, homography, outputW, outputH);
           if (!style) return null;
 
           return (
