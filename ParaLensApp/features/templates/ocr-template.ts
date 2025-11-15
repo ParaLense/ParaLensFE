@@ -12,12 +12,11 @@ export type OcrTemplateBox = {
     orientation?: 'horizontal' | 'vertical';
     cells?: number;
     valuesRegion?: { x: number; y: number; width: number; height: number };
-    checkboxThreshold?: number;
+    blackRatioMin?: number;
   };
 };
 
-// Default loader: reuse existing template boxes and default type to 'value'.
-// You can later specialize this per layout and annotate JSONs with per-box `type` and `options`.
+// Load OCR template with proper type mapping from JSON configuration
 export function loadOcrTemplate(layout: TemplateLayout): OcrTemplateBox[] {
   return loadTemplateConfig(layout).map((b) => ({
     id: b.id,
@@ -25,7 +24,8 @@ export function loadOcrTemplate(layout: TemplateLayout): OcrTemplateBox[] {
     y: b.y,
     width: b.width,
     height: b.height,
-    type: 'value',
+    type: b.type || 'value', // Use the type from JSON, default to 'value'
+    options: b.options, // Include options for checkboxes and scrollbars
   }));
 }
 

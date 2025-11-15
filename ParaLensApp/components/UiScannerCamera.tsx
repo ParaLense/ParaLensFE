@@ -5,8 +5,6 @@ import {
 } from 'react-native-vision-camera';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AppState,
-  AppStateStatus,
   Dimensions,
   Image,
   LayoutChangeEvent,
@@ -21,6 +19,8 @@ import { useRunOnJS } from 'react-native-worklets-core';
 import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-template-layout';
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
+import { useOcrHistory } from '@/features/ocr';
+import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
 
 const TARGET_FPS = 10;
@@ -33,13 +33,6 @@ const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   currentLayout: TemplateLayout;
 }
-
-type CameraPermissionStatus =
-  | 'authorized'
-  | 'denied'
-  | 'not-determined'
-  | 'restricted'
-  | 'granted';
 
 interface FrameToViewTransform {
   scaleX: number;
@@ -83,8 +76,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
-  const [hasPermission, setHasPermission] = useState<CameraPermissionStatus>('not-determined');
-  const [debugStatus, setDebugStatus] = useState<string>('');
   const [cameraLayoutSize, setCameraLayoutSize] = useState<{ width: number; height: number } | null>(null);
 
   const cameraFormat = useMemo(() => {
@@ -106,6 +97,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const setScreenResultJS = useRunOnJS(setScreenResult, []);
   const setBase64ImageJS = useRunOnJS(setBase64Image, []);
 
+  // OCR History Hook for filtering and storing recognized values
+  const ocrHistory = useOcrHistory({
+    maxHistoryPerField: 30,
+    minOccurrencesForMajority: 3,
+    commaRequired: true, // Keep comma requirement for value fields
+  });
+
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     if (!width || !height) return;
@@ -117,6 +115,18 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       return { width, height };
     });
   }, []);
+
+  // Function to add OCR values to history - wrapped with useRunOnJS
+  const addOcrToHistory = useCallback((ocrMap: Record<string, string>) => {
+    ocrHistory.addScanResult(ocrMap);
+  }, [ocrHistory]);
+  const addOcrToHistoryJS = useRunOnJS(addOcrToHistory, []);
+
+  // Function to add full scan result to history - wrapped with useRunOnJS
+  const addFullScanResult = useCallback((scanResult: any) => {
+    ocrHistory.addFullScanResult(scanResult);
+  }, [ocrHistory]);
+  const addFullScanResultJS = useRunOnJS(addFullScanResult, []);
 
   const screenTemplate = useMemo(
     () =>
@@ -132,45 +142,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   // TODO: load OCR template for currentLayout (percent over warped image)
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkAndRequestPermission = async () => {
-      try {
-        const current = await Camera.getCameraPermissionStatus();
-        if (!isMounted) return;
-
-        if (current === 'not-determined') {
-          const status = await Camera.requestCameraPermission();
-          if (!isMounted) return;
-          setHasPermission(status);
-          setDebugStatus(`Camera.requestCameraPermission() returned: ${status}`);
-        } else {
-          setHasPermission(current as CameraPermissionStatus);
-          setDebugStatus(`Camera.getCameraPermissionStatus() returned: ${current}`);
-        }
-      } catch (error) {
-        if (!isMounted) return;
-        setDebugStatus(`Permission check error: ${String(error)}`);
-      }
-    };
-
-    checkAndRequestPermission();
-
-    const onAppStateChange = (state: AppStateStatus) => {
-      if (state === 'active') {
-        checkAndRequestPermission();
-      }
-    };
-
-    const sub = AppState.addEventListener('change', onAppStateChange);
-
-    return () => {
-      isMounted = false;
-      sub.remove();
-    };
-  }, []);
 
   const frameDimensions = useMemo(() => {
     const frameW = toNumber(screenResult?.width, 0);
@@ -258,7 +229,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         templateTargetW: 1200,
         templateTargetH: 1600,
         returnWarpedImage: true,
-        accuracyThreshold: 0.50,
+        accuracyThreshold: 0.40,
         // ROI in normalized coordinates (defaults equivalent to main2.py)
         roiOuter: { x: 0.10, y: 0.05, width: 0.80, height: 0.90 },
         roiInner: { x: 0.30, y: 0.20, width: 0.45, height: 0.60 },
@@ -276,6 +247,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
         if (scan.ocr?.boxes?.length) {
           const map: Record<string, string> = {};
+          const scrollbarBoxes: any[] = [];
+          
+          // First pass: process all non-scrollbar boxes to populate the map
           for (const b of scan.ocr.boxes as any[]) {
             if (!b || !b.id) continue;
             if (b.type === 'value') {
@@ -288,19 +262,137 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
               }
             } else if (b.type === 'scrollbar') {
-              const val = b.selectedValue ?? b.positionPercent;
-              map[b.id] = String(val ?? '');
+              // Store scrollbar boxes for second pass
+              scrollbarBoxes.push(b);
+            }
+          }
+          
+          // Second pass: process scrollbar boxes now that we have all start values
+          for (const b of scrollbarBoxes) {
+            // Handle scrollbar values - convert array of text blocks to key-value pairs
+            const scrollbarValues = b.values;
+            if (Array.isArray(scrollbarValues)) {
+              // Check if this is a scrollbar with a corresponding _start field
+              const hasStartValue = b.id.endsWith('_items');
+              const startValueFieldId = hasStartValue ? b.id.replace('_items', '_start') : null;
+              
+              // Get start value from map if it exists
+              const startValue = startValueFieldId ? map[startValueFieldId] : null;
+              
+              // Filter out start value from the beginning of the array
+              let filteredValues = [...scrollbarValues];
+              if (startValue && filteredValues.length > 0) {
+                const startValueTrimmed = startValue.trim();
+                // Remove first value if it matches start value
+                if (filteredValues[0]?.trim() === startValueTrimmed) {
+                  filteredValues = filteredValues.slice(1);
+                } else if (filteredValues.length > 1 && filteredValues[1]?.trim() === startValueTrimmed) {
+                  // Remove second value if it matches start value
+                  filteredValues = filteredValues.slice(2);
+                }
+              }
+              
+              // Group into key-value pairs: block[0]=key, block[1]=value, block[2]=key, etc.
+              const keyValueMap: Record<string, string> = {};
+              for (let i = 0; i < filteredValues.length; i += 2) {
+                const key = filteredValues[i]?.trim() || '';
+                const value = filteredValues[i + 1]?.trim() || '';
+                if (key) {
+                  keyValueMap[key] = value;
+                }
+              }
+              // Format as key:value pairs
+              const scrollbarValue = Object.entries(keyValueMap)
+                .map(([key, val]) => `${key}:${val}`)
+                .join(', ');
+              map[b.id] = scrollbarValue;
             }
           }
           if (Object.keys(map).length > 0) {
             setOcrMapJS(map);
+            // Add to OCR history for filtering (legacy method)
+            addOcrToHistoryJS(map);
+            
+            // Add full scan result to history with complete box information
+            const fullScanResult = {
+              timestamp: Date.now(),
+              boxes: scan.ocr.boxes,
+              screenDetected: true, // We know screen was detected if we're here
+              accuracy: 0.5, // Default accuracy since we don't have direct access
+            };
+            addFullScanResultJS(fullScanResult);
           }
         }
       }
     } catch (error) {
       console.error(`Frame Processor Error: ${error}`);
     }
-  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, viewHeight, viewWidth]);
+  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addOcrToHistoryJS, addFullScanResultJS, viewHeight, viewWidth]);
+
+  // Helper function to apply homography transformation to a point
+  const applyHomography = (h: number[][], point: { x: number; y: number }): { x: number; y: number } => {
+    if (!h || h.length !== 3 || !h[0] || h[0].length !== 3) {
+      return point;
+    }
+    
+    const x = point.x;
+    const y = point.y;
+    const w = h[2][0] * x + h[2][1] * y + h[2][2];
+    
+    if (Math.abs(w) < 1e-10) {
+      return point; // Avoid division by zero
+    }
+    
+    return {
+      x: (h[0][0] * x + h[0][1] * y + h[0][2]) / w,
+      y: (h[1][0] * x + h[1][1] * y + h[1][2]) / w,
+    };
+  };
+
+  // Transform box from warped space to camera feed space using homography
+  const transformWarpedBoxToCameraFeed = (
+    box: { x: any; y: any; w: any; h: any },
+    homography: number[][] | null | undefined,
+    outputW: number,
+    outputH: number
+  ): { x: number; y: number; w: number; h: number } | null => {
+    if (!homography || !Array.isArray(homography)) {
+      return null;
+    }
+    
+    const warpedX = toNumber(box.x);
+    const warpedY = toNumber(box.y);
+    const warpedW = toNumber(box.w);
+    const warpedH = toNumber(box.h);
+    
+    // Transform the four corners of the box
+    const corners = [
+      { x: warpedX, y: warpedY },
+      { x: warpedX + warpedW, y: warpedY },
+      { x: warpedX + warpedW, y: warpedY + warpedH },
+      { x: warpedX, y: warpedY + warpedH },
+    ];
+    
+    const transformedCorners = corners.map(corner => applyHomography(homography, corner));
+    
+    // Find bounding box of transformed corners
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const corner of transformedCorners) {
+      if (corner.x < minX) minX = corner.x;
+      if (corner.x > maxX) maxX = corner.x;
+      if (corner.y < minY) minY = corner.y;
+      if (corner.y > maxY) maxY = corner.y;
+    }
+    
+    return {
+      x: Math.max(0, minX),
+      y: Math.max(0, minY),
+      w: Math.max(0, maxX - minX),
+      h: Math.max(0, maxY - minY),
+    };
+  };
 
   const mapBoxToViewStyle = (box: { x: any; y: any; w: any; h: any }) => {
     if (!frameToViewTransform) return null;
@@ -319,20 +411,38 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     };
   };
 
-  if (!['authorized', 'granted'].includes(hasPermission)) {
-    return (
-      <Box className="flex-1 items-center justify-center bg-background-950 px-6">
-        <Heading size="md" className="text-typography-50">
-          No camera permission ({hasPermission})
-        </Heading>
-        <Heading size="sm" className="text-typography-50 mt-2">
-          {debugStatus}
-        </Heading>
-      </Box>
-    );
-  }
+  // Map box from warped space to view style (with homography projection)
+  const mapWarpedBoxToViewStyle = (
+    box: { x: any; y: any; w: any; h: any },
+    homography: number[][] | null | undefined,
+    outputW: number,
+    outputH: number
+  ) => {
+    const cameraFeedBox = transformWarpedBoxToCameraFeed(box, homography, outputW, outputH);
+    if (!cameraFeedBox) return null;
+    return mapBoxToViewStyle(cameraFeedBox);
+  };
 
-  const renderTemplateOverlays = () => {
+  return (
+    <CameraPermissionProvider>
+      {({ hasPermission, debugStatus, showPermissionDialog, setShowPermissionDialog, requestPermission }) => {
+        // Check permission and render appropriate UI
+        if (!['authorized', 'granted'].includes(hasPermission)) {
+          return (
+            <>
+              <Box className="flex-1 items-center justify-center bg-background-950 px-6">
+                <Heading size="md" className="text-typography-50">
+                  Kamera-Berechtigung erforderlich
+                </Heading>
+                <Heading size="sm" className="text-typography-50 mt-2">
+                  Um die Kamera zu verwenden, benötigen wir Ihre Erlaubnis.
+                </Heading>
+              </Box>
+            </>
+          );
+        }
+
+        const renderTemplateOverlays = () => {
     if (templateViewport) {
       return (
         <>
@@ -458,20 +568,57 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
             detected: {String(screenResult?.detected)} | acc:{' '}
             {(screenResult?.accuracy ?? 0).toFixed?.(2) ?? screenResult?.accuracy}
           </GluestackText>
-          {base64Image && (
-            <Image
-              source={{ uri: `data:image/jpeg;base64,${base64Image}` }}
-              style={{ width: 120, height: 160, marginTop: 8, borderRadius: 6 }}
-              resizeMode="cover"
-            />
-          )}
+        </Box>
+      )}
+
+      {/* OCR History Debug Info */}
+      {Object.keys(ocrMap).length > 0 && (
+        <Box
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 12,
+            zIndex: 300,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: 8,
+            borderRadius: 8,
+            maxWidth: 200,
+          }}
+        >
+          <GluestackText className="text-typography-50 text-xs">
+            OCR History:
+          </GluestackText>
+          {Object.keys(ocrMap).slice(0, 3).map(fieldId => {
+            const stats = ocrHistory.getFieldStats(fieldId);
+            const filteredValue = ocrHistory.getFilteredValue(fieldId);
+            const typeBreakdown = stats.typeBreakdown;
+            return (
+              <GluestackText key={fieldId} className="text-typography-50 text-xs">
+                {fieldId}: {stats.totalScans} scans, {stats.uniqueValues} unique
+                <GluestackText className="text-blue-400">
+                  {' '}(V:{typeBreakdown.value} C:{typeBreakdown.checkbox} S:{typeBreakdown.scrollbar})
+                </GluestackText>
+                {filteredValue && (
+                  <GluestackText className="text-green-400">
+                    {' '}→ {filteredValue}
+                  </GluestackText>
+                )}
+              </GluestackText>
+            );
+          })}
         </Box>
       )}
 
       {screenResult?.matched_boxes?.map(
         (box: { x: any; y: any; w: any; h: any }, idx: number) => {
           if (!box) return null;
-          const style = mapBoxToViewStyle(box);
+          
+          // Transform from warped space to camera feed space
+          const outputW = toNumber(screenResult?.template_target_size?.w, 1200);
+          const outputH = toNumber(screenResult?.template_target_size?.h, 1600);
+          const homography = screenResult?.homography;
+          
+          const style = mapWarpedBoxToViewStyle(box, homography, outputW, outputH);
           if (!style) return null;
 
           return (
@@ -518,8 +665,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       {/* No template-pixel boxes overlay anymore */}
 
       {ocrLayoutBoxes.map(box => {
-        const text = ocrMap[box.id];
-        if (!text) return null;
+        // Use filtered value from history instead of raw OCR map
+        const filteredValue = ocrHistory.getFilteredValue(box.id);
+        const rawValue = ocrMap[box.id];
+        
+        // Show filtered value if available, otherwise show raw value
+        const displayValue = filteredValue || rawValue;
+        if (!displayValue) return null;
 
         const labelTop = box.y + box.height - 24;
         return (
@@ -529,7 +681,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
               position: 'absolute',
               left: box.x,
               top: labelTop + 30,
-              width: box.width,
               alignItems: 'center',
               zIndex: 200,
             }}
@@ -540,16 +691,32 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 borderRadius: 8,
                 paddingVertical: 4,
                 paddingHorizontal: 8,
+                minWidth: 40,
+                maxWidth: Math.max(box.width * 1.5, 120), // Allow 50% more width or minimum 120px
               }}
             >
-              <GluestackText className="text-typography-50 text-sm text-center">
-                {text}
+              <GluestackText 
+                className={`text-sm text-center ${
+                  filteredValue ? 'text-green-400' : 'text-yellow-400'
+                }`}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {displayValue}
+                {filteredValue && rawValue !== filteredValue && (
+                  <GluestackText className="text-xs text-gray-400">
+                    {' '}(filtered)
+                  </GluestackText>
+                )}
               </GluestackText>
             </Box>
           </Box>
         );
       })}
     </Box>
+        );
+      }}
+    </CameraPermissionProvider>
   );
 };
 

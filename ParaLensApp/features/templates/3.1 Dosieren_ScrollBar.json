@@ -1,12 +1,11 @@
 [
   {
     "id": "dosing_speed_start",
-    "x": 8.03,
+    "x": 6.16,
     "y": 62.6,
-    "width": 3.03,
+    "width": 4.9,
     "height": 6.36,
-    "label": "Dosing Speed Start",
-    "type": "value"
+    "label": "Dosing Speed Start"
   },
   {
     "id": "dosing_speed_items",
@@ -29,9 +28,9 @@
   },
   {
     "id": "specific_back_pressure_start",
-    "x": 8.13,
+    "x": 6.36,
     "y": 72.41,
-    "width": 2.83,
+    "width": 4.6,
     "height": 6.74,
     "label": "Specific Back Pressure Start",
     "type": "value"
