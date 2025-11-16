@@ -19,14 +19,14 @@
   },
   {
     "id": "increase_specific_point_printer_checkbox",
-    "x": 78.66,
-    "y": 50.44,
-    "width": 3.5,
-    "height": 2.5,
+    "x": 79.21,
+    "y": 50.61,
+    "width": 2.86,
+    "height": 2.09,
     "label": "Increase Specific Point Printer Checkbox",
     "type": "checkbox",
     "options": {
-      "checkboxThreshold": 0.5,
+      "checkboxThreshold": 214.0,
       "readValue": false
     }
   }
