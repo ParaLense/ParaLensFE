@@ -41,66 +41,7 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         ws.getColumn(5).width = 12; // Unit 2
 
         // ========================
-        // Injection (static labels)
-        // ========================
-        set(ws, "A2", "Injection"); merge(ws, "A2:A8"); center(ws.getCell("A2"));
-        set(ws, "B2", "Mainpage"); merge(ws, "B2:B3"); center(ws.getCell("B2"));
-        set(ws, "C2", "Injection Pressure"); set(ws, "D2", "bar");
-        set(ws, "C3", "IsIncreasedSpecificPressure"); set(ws, "D3", "bool");
-
-        set(ws, "C4", "Injection Speed"); set(ws, "D4", "cm^3/s"); set(ws, "E4", "cm^3");
-        set(ws, "B4", "Undermenu"); merge(ws, "B4:B5"); center(ws.getCell("B4"));
-        set(ws, "C5", "Actual Value (List)");
-
-        set(ws, "C6", "Way"); set(ws, "D6", "mm");
-        set(ws, "B6", "Switch Over"); merge(ws, "B6:B8"); center(ws.getCell("B6"));
-        set(ws, "C7", "Time"); set(ws, "D7", "s");
-        set(ws, "C8", "Hydraulic Pressure"); set(ws, "D8", "bar");
-
-        // ========================
-        // Holding Pressure (static)
-        // ========================
-        set(ws, "A10", "Holding Pressure"); merge(ws, "A10:A14"); center(ws.getCell("A10"));
-        set(ws, "B10", "Mainpage"); merge(ws, "B10:B12"); center(ws.getCell("B10"));
-        set(ws, "C10", "ReprintTime"); set(ws, "D10", "s");
-        set(ws, "C11", "CoolTime"); set(ws, "D11", "s");
-        set(ws, "C12", "ScrewDiameter"); set(ws, "D12", "mm");
-
-        set(ws, "C13", "Holding Pressure"); set(ws, "D13", "t"); set(ws, "E13", "p");
-        set(ws, "B13", "Undermenu"); merge(ws, "B13:B14"); center(ws.getCell("B13"));
-        set(ws, "C14", "Actual Value (List)");
-
-        // ========================
-        // Dosing (static)
-        // ========================
-        set(ws, "A16", "Dosing"); merge(ws, "A16:A25"); center(ws.getCell("A16"));
-        set(ws, "B16", "Mainpage"); merge(ws, "B16:B21"); center(ws.getCell("B16"));
-
-        set(ws, "C16", "DosingStroke"); set(ws, "D16", "mm");
-        set(ws, "C17", "DosingDelayTime"); set(ws, "D17", "s");
-        set(ws, "C18", "RelieveDosing"); set(ws, "D18", "bar");
-        set(ws, "C19", "RelieveAfterDosing"); set(ws, "D19", "bar");
-        set(ws, "C20", "DischargeSpeedBeforeDosing"); set(ws, "D20", "cm^3/s");
-        set(ws, "C21", "DischargeSpeedAfterDosing"); set(ws, "D21", "cm^3/s");
-
-        set(ws, "B22", "Undermenu"); merge(ws, "B22:B24"); center(ws.getCell("B22"));
-        set(ws, "C22", "DosingSpeed"); set(ws, "D22", "V"); set(ws, "E22", "v");
-        set(ws, "C23", "Actual Value (List)");
-        set(ws, "C24", "DosingPressure"); set(ws, "D24", "V"); set(ws, "E24", "p");
-
-        // ========================
-        // Cylinder Heating (static)
-        // ========================
-        set(ws, "A29", "Cylinder Heating"); merge(ws, "A29:A33"); center(ws.getCell("A29"));
-        set(ws, "B29", "Mainpage"); merge(ws, "B29:B33"); center(ws.getCell("B29"));
-        set(ws, "C29", "Sollwert1"); set(ws, "D29", "°C");
-        set(ws, "C30", "Sollwert2"); set(ws, "D30", "°C");
-        set(ws, "C31", "Sollwert3"); set(ws, "D31", "°C");
-        set(ws, "C32", "Sollwert4"); set(ws, "D32", "°C");
-        set(ws, "C33", "Sollwert5"); set(ws, "D33", "°C");
-
-        // ========================
-        // Dynamic inserts (match backend logic)
+        // Calculate counts and row positions FIRST
         // ========================
         const valuesStartCol = 6; // F
 
@@ -134,12 +75,85 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
 
         const hpListStartRow = hpHeaderRow + 1 + injCount;
         const hpMainStartRow = 10 + injCount;
+        const hpUndermenuStartRow = 13 + injCount;
+        const hpHeaderRowAfter = hpHeaderRow + injCount;
 
         const dosingMainStartRow = 16 + injCount + hpCount;
+        const dosingUndermenuStartRow = 22 + injCount + hpCount;
         const dosingSpeedListStartRow = dosingSpeedHeaderRow + 1 + injCount + hpCount;
-        const dosingPressureListStartRow = dosingPressureHeaderRow + 1 + injCount + hpCount + dosingSpeedCount;
+        const dosingPressureHeaderRowAdjusted = dosingPressureHeaderRow + injCount + hpCount + dosingSpeedCount;
+        const dosingPressureListStartRow = dosingPressureHeaderRowAdjusted + 1;
 
         const cylStartRow = 29 + injCount + hpCount + dosingSpeedCount + dosingPressureCount;
+        const cylEndRow = cylStartRow + 4; // 5 rows total (rows 0-4)
+
+        // ========================
+        // Now set all labels and merges with correct row numbers
+        // ========================
+        
+        // Injection section
+        const injEndRow = 8 + injCount;
+        set(ws, "A2", "Injection"); merge(ws, `A2:A${injEndRow}`); center(ws.getCell("A2"));
+        set(ws, "B2", "Mainpage"); merge(ws, "B2:B3"); center(ws.getCell("B2"));
+        set(ws, "C2", "Injection Pressure"); set(ws, "D2", "bar");
+        set(ws, "C3", "IsIncreasedSpecificPressure"); set(ws, "D3", "bool");
+
+        set(ws, "C4", "Injection Speed"); set(ws, "D4", "cm^3/s"); set(ws, "E4", "cm^3");
+        set(ws, "B4", "Undermenu"); merge(ws, `B4:B${injHeaderRow}`); center(ws.getCell("B4"));
+        set(ws, "C5", "Actual Value (List)");
+
+        set(ws, "B6", "Switch Over"); merge(ws, `B6:B${injEndRow}`); center(ws.getCell("B6"));
+        set(ws, `C${injWayRow}`, "Way"); set(ws, `D${injWayRow}`, "mm");
+        set(ws, `C${injTimeRow}`, "Time"); set(ws, `D${injTimeRow}`, "s");
+        set(ws, `C${injHydRow}`, "Hydraulic Pressure"); set(ws, `D${injHydRow}`, "bar");
+
+        // Holding Pressure section
+        const hpEndRow = 14 + injCount + hpCount;
+        set(ws, `A${hpMainStartRow}`, "Holding Pressure"); merge(ws, `A${hpMainStartRow}:A${hpEndRow}`); center(ws.getCell(`A${hpMainStartRow}`));
+        set(ws, `B${hpMainStartRow}`, "Mainpage"); merge(ws, `B${hpMainStartRow}:B${hpMainStartRow + 2}`); center(ws.getCell(`B${hpMainStartRow}`));
+        set(ws, `C${hpMainStartRow}`, "ReprintTime"); set(ws, `D${hpMainStartRow}`, "s");
+        set(ws, `C${hpMainStartRow + 1}`, "CoolTime"); set(ws, `D${hpMainStartRow + 1}`, "s");
+        set(ws, `C${hpMainStartRow + 2}`, "ScrewDiameter"); set(ws, `D${hpMainStartRow + 2}`, "mm");
+
+        set(ws, `C${hpUndermenuStartRow}`, "Holding Pressure"); set(ws, `D${hpUndermenuStartRow}`, "t"); set(ws, `E${hpUndermenuStartRow}`, "p");
+        set(ws, `B${hpUndermenuStartRow}`, "Undermenu"); merge(ws, `B${hpUndermenuStartRow}:B${hpHeaderRowAfter}`); center(ws.getCell(`B${hpUndermenuStartRow}`));
+        set(ws, `C${hpHeaderRowAfter}`, "Actual Value (List)");
+
+        // Dosing section
+        // Calculate end row for dosing section (dosingPressureHeaderRowAdjusted is already calculated above)
+        const dosingPressureEndRow = dosingPressureHeaderRowAdjusted + dosingPressureCount;
+        const dosingEndRow = dosingPressureEndRow;
+        
+        set(ws, `A${dosingMainStartRow}`, "Dosing"); merge(ws, `A${dosingMainStartRow}:A${dosingEndRow}`); center(ws.getCell(`A${dosingMainStartRow}`));
+        set(ws, `B${dosingMainStartRow}`, "Mainpage"); merge(ws, `B${dosingMainStartRow}:B${dosingMainStartRow + 5}`); center(ws.getCell(`B${dosingMainStartRow}`));
+
+        set(ws, `C${dosingMainStartRow}`, "DosingStroke"); set(ws, `D${dosingMainStartRow}`, "mm");
+        set(ws, `C${dosingMainStartRow + 1}`, "DosingDelayTime"); set(ws, `D${dosingMainStartRow + 1}`, "s");
+        set(ws, `C${dosingMainStartRow + 2}`, "RelieveDosing"); set(ws, `D${dosingMainStartRow + 2}`, "bar");
+        set(ws, `C${dosingMainStartRow + 3}`, "RelieveAfterDosing"); set(ws, `D${dosingMainStartRow + 3}`, "bar");
+        set(ws, `C${dosingMainStartRow + 4}`, "DischargeSpeedBeforeDosing"); set(ws, `D${dosingMainStartRow + 4}`, "cm^3/s");
+        set(ws, `C${dosingMainStartRow + 5}`, "DischargeSpeedAfterDosing"); set(ws, `D${dosingMainStartRow + 5}`, "cm^3/s");
+
+        // Dosing Speed section
+        set(ws, `B${dosingUndermenuStartRow}`, "Undermenu"); 
+        set(ws, `C${dosingUndermenuStartRow}`, "DosingSpeed"); set(ws, `D${dosingUndermenuStartRow}`, "V"); set(ws, `E${dosingUndermenuStartRow}`, "v");
+        set(ws, `C${dosingSpeedHeaderRow + injCount + hpCount}`, "Actual Value (List)");
+        
+        // Dosing Pressure section - positioned after dosing speeds
+        set(ws, `C${dosingPressureHeaderRowAdjusted}`, "DosingPressure"); set(ws, `D${dosingPressureHeaderRowAdjusted}`, "V"); set(ws, `E${dosingPressureHeaderRowAdjusted}`, "p");
+        
+        // Merge Undermenu to include both dosing speed and dosing pressure sections
+        merge(ws, `B${dosingUndermenuStartRow}:B${dosingPressureEndRow}`);
+        center(ws.getCell(`B${dosingUndermenuStartRow}`));
+
+        // Cylinder Heating section
+        set(ws, `A${cylStartRow}`, "Cylinder Heating"); merge(ws, `A${cylStartRow}:A${cylEndRow}`); center(ws.getCell(`A${cylStartRow}`));
+        set(ws, `B${cylStartRow}`, "Mainpage"); merge(ws, `B${cylStartRow}:B${cylEndRow}`); center(ws.getCell(`B${cylStartRow}`));
+        set(ws, `C${cylStartRow}`, "Sollwert1"); set(ws, `D${cylStartRow}`, "°C");
+        set(ws, `C${cylStartRow + 1}`, "Sollwert2"); set(ws, `D${cylStartRow + 1}`, "°C");
+        set(ws, `C${cylStartRow + 2}`, "Sollwert3"); set(ws, `D${cylStartRow + 2}`, "°C");
+        set(ws, `C${cylStartRow + 3}`, "Sollwert4"); set(ws, `D${cylStartRow + 3}`, "°C");
+        set(ws, `C${cylStartRow + 4}`, "Sollwert5"); set(ws, `D${cylStartRow + 4}`, "°C");
 
         // ========================
         // Populate scalar values (column F)
@@ -148,7 +162,9 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         const injSwitchType = injection?.switchType || injection?.SwitchType;
         const hpMainMenu = holdingPressure?.mainMenu || holdingPressure?.MainMenu;
         const dosingMainMenu = dosing?.mainMenu || dosing?.MainMenu;
-        const cylMainMenu = cylinderHeating?.mainMenu || cylinderHeating?.MainMenu;
+        // CylinderHeating might have mainMenu nested, or the setpoint values directly on the object
+        const cylMainMenu = cylinderHeating?.mainMenu || cylinderHeating?.MainMenu || 
+            (cylinderHeating && (cylinderHeating.setpoint1 !== undefined || cylinderHeating.Setpoint1 !== undefined) ? cylinderHeating : null);
 
         if (injMainMenu) {
             ws.getRow(2).getCell(valuesStartCol).value = injMainMenu.sprayPressureLimit ?? injMainMenu.SprayPressureLimit ?? null; // F2
@@ -177,11 +193,18 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         }
 
         if (cylMainMenu) {
-            ws.getRow(cylStartRow + 0).getCell(valuesStartCol).value = cylMainMenu.setpoint1 ?? cylMainMenu.Setpoint1 ?? null;
-            ws.getRow(cylStartRow + 1).getCell(valuesStartCol).value = cylMainMenu.setpoint2 ?? cylMainMenu.Setpoint2 ?? null;
-            ws.getRow(cylStartRow + 2).getCell(valuesStartCol).value = cylMainMenu.setpoint3 ?? cylMainMenu.Setpoint3 ?? null;
-            ws.getRow(cylStartRow + 3).getCell(valuesStartCol).value = cylMainMenu.setpoint4 ?? cylMainMenu.Setpoint4 ?? null;
-            ws.getRow(cylStartRow + 4).getCell(valuesStartCol).value = cylMainMenu.setpoint5 ?? cylMainMenu.Setpoint5 ?? null;
+            // Handle both camelCase and PascalCase, and also handle 0 as a valid value
+            const getSetpoint = (obj: any, num: number) => {
+                const camelKey = `setpoint${num}`;
+                const pascalKey = `Setpoint${num}`;
+                return obj[camelKey] !== undefined ? obj[camelKey] : (obj[pascalKey] !== undefined ? obj[pascalKey] : null);
+            };
+            
+            ws.getRow(cylStartRow + 0).getCell(valuesStartCol).value = getSetpoint(cylMainMenu, 1);
+            ws.getRow(cylStartRow + 1).getCell(valuesStartCol).value = getSetpoint(cylMainMenu, 2);
+            ws.getRow(cylStartRow + 2).getCell(valuesStartCol).value = getSetpoint(cylMainMenu, 3);
+            ws.getRow(cylStartRow + 3).getCell(valuesStartCol).value = getSetpoint(cylMainMenu, 4);
+            ws.getRow(cylStartRow + 4).getCell(valuesStartCol).value = getSetpoint(cylMainMenu, 5);
         }
 
         // ========================
@@ -316,26 +339,68 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
                     onPress: async () => {
                         try {
                             if (Platform.OS === 'android') {
-                                // Request storage permission for Android
-                                const hasPermission = await PermissionsAndroid.request(
-                                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                                    {
-                                        title: 'Storage Permission',
-                                        message: 'This app needs access to storage to save the file.',
-                                        buttonNeutral: 'Ask Me Later',
-                                        buttonNegative: 'Cancel',
-                                        buttonPositive: 'OK',
-                                    }
-                                );
+                                // For Android 13+ (API 33+), we don't need storage permissions for Downloads folder
+                                const androidVersion = Platform.Version as number;
+                                let hasPermission = true;
 
-                                if (hasPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+                                if (androidVersion < 33) {
+                                    // For older Android versions (API < 33), we need storage permissions
+                                    const granted = await PermissionsAndroid.request(
+                                        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                                        {
+                                            title: 'Storage Permission',
+                                            message: 'This app needs access to storage to save the file.',
+                                            buttonNeutral: 'Ask Me Later',
+                                            buttonNegative: 'Cancel',
+                                            buttonPositive: 'OK',
+                                        }
+                                    );
+                                    hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+                                }
+
+                                if (!hasPermission) {
                                     Alert.alert("Permission Denied", "Storage permission is required to save the file.");
                                     return;
                                 }
 
                                 // Save to Downloads directory on Android
                                 const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-                                await RNFS.copyFile(fileUri, downloadPath);
+                                
+                                // Read the file content from cache and write directly to Downloads
+                                // This avoids potential path format issues with copyFile
+                                try {
+                                    // Read file as base64 from cache
+                                    const cacheFile = new File(fileUri);
+                                    const fileContent = await cacheFile.read({ encoding: 'base64' });
+                                    
+                                    // Write directly to Downloads folder
+                                    await RNFS.writeFile(downloadPath, fileContent, 'base64');
+                                    
+                                    // Verify file was written
+                                    const fileExists = await RNFS.exists(downloadPath);
+                                    if (!fileExists) {
+                                        Alert.alert("Error", "Failed to save file. Please check storage permissions.");
+                                        return;
+                                    }
+                                } catch (writeError: any) {
+                                    // Fallback: try copying if direct write fails
+                                    console.warn('Direct write failed, trying copy:', writeError);
+                                    const sourceExists = await RNFS.exists(fileUri);
+                                    if (!sourceExists) {
+                                        Alert.alert("Error", "Source file not found. Please try again.");
+                                        return;
+                                    }
+                                    await RNFS.copyFile(fileUri, downloadPath);
+                                }
+                                
+                                // Trigger media scan to make file visible in Downloads app
+                                try {
+                                    await RNFS.scanFile(downloadPath);
+                                } catch (scanError) {
+                                    // Don't fail if scan fails, file is still saved
+                                    console.warn('Failed to scan file:', scanError);
+                                }
+                                
                                 Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
                             } else {
                                 // For iOS, use document directory and share to Files app
