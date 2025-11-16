@@ -16,11 +16,17 @@ import { useI18n } from "@/features/settings/i18n";
 import { useSettings } from "@/features/settings/settings-context";
 import { useCameraDevice, useCameraDevices, type CameraDevice } from "react-native-vision-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { OcrFieldResult } from "@/features/ocr/useOcrHistory";
 
 type ScanMenu = "injection" | "dosing" | "holdingPressure" | "cylinderHeating";
 type InjectionMode = "mainMenu" | "subMenuGraphic" | "switchType" | null;
 type HoldingPressureMode = "mainMenu" | "subMenuGraphic" | null;
 type DosingMode = "mainMenu" | "subMenuGraphic" | null;
+
+type OcrSnapshot = {
+  bestFields: OcrFieldResult[];
+  ocrMap: Record<string, string>;
+} | null;
 
 export default function CameraScreen() {
   const { theme } = useSettings();
@@ -34,6 +40,8 @@ export default function CameraScreen() {
 
   const { fullScans, selectedFullScanId, selectFullScan, createFullScan } =
     useFullScan();
+
+  const [ocrSnapshot, setOcrSnapshot] = useState<OcrSnapshot>(null);
 
   const [selectedMenu, setSelectedMenu] = useState<ScanMenu | null>(null);
   const [injectionMode, setInjectionMode] = useState<InjectionMode>(null);
@@ -99,14 +107,27 @@ export default function CameraScreen() {
   };
 
   const goReview = () => {
+    const params: Record<string, string> = {
+      selectedMenu: selectedMenu ?? "",
+      injectionMode: injectionMode ?? "",
+      holdingMode: holdingMode ?? "",
+      dosingMode: dosingMode ?? "",
+    };
+
+    if (ocrSnapshot && ocrSnapshot.bestFields.length > 0) {
+      try {
+        params.ocrData = JSON.stringify({
+          bestFields: ocrSnapshot.bestFields,
+          ocrMap: ocrSnapshot.ocrMap,
+        });
+      } catch {
+        // Ignore serialization errors and navigate without OCR data
+      }
+    }
+
     router.push({
       pathname: "/scan-review",
-      params: {
-        selectedMenu: selectedMenu ?? "",
-        injectionMode: injectionMode ?? "",
-        holdingMode: holdingMode ?? "",
-        dosingMode: dosingMode ?? "",
-      },
+      params,
     });
   };
 
@@ -506,6 +527,7 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         isActive
         device={device}
+        onOcrUpdate={(payload) => setOcrSnapshot(payload)}
       />
 
       <Box

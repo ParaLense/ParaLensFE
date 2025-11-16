@@ -1,508 +1,534 @@
 import { useCallback, useMemo, useState } from 'react';
 
-export interface OcrBox {
+// ---------------------------------------------------------------------------
+// Shared OCR types for field-level aggregation
+// ---------------------------------------------------------------------------
+
+export type OcrFieldType = 'scrollbar' | 'value' | 'checkbox';
+
+// Parsed representation of a scrollbar field across multiple scans.
+// Each index (0, 1, 2, ...) represents one key/value-pair of the scrollbar.
+// We keep *all* numeric candidates that passed the filter in arrays so that
+// we can later apply majority voting.
+export type ParsedScrollbarValue = Record<
+  number, // index: 0, 1, 2, ...
+  {
+    key: number[];   // all filtered "key"/start values (e.g. 0.00, 0.00, ...)
+    value: number[]; // all filtered "value"/end values  (e.g. 8.00, 8.01, ...)
+  }
+>;
+
+export type OcrFieldResult = {
+  box_id: string;
+  type: OcrFieldType;
+  // For scrollbars we return the structured ParsedScrollbarValue,
+  // for value/checkbox a simple string representation.
+  value: string | ParsedScrollbarValue;
+};
+
+// Shape of a single OCR box as emitted by the screen detector.
+// This mirrors the structure used in UiScannerCamera (scan.ocr.boxes).
+export type OcrBox = {
   id: string;
-  type: 'value' | 'checkbox' | 'scrollbar';
-  value?: string;
-  number?: number;
+  type: OcrFieldType;
   text?: string;
+  number?: number;
+  // checkbox specific
   checked?: boolean;
-  selectedValue?: any;
-  positionPercent?: number;
-  values?: number[] | string[] | Record<string, string>; // Array of scrollbar values (legacy), text blocks (new), or HashMap
-  cells?: number; // Number of cells in scrollbar
-  orientation?: 'horizontal' | 'vertical'; // Scrollbar orientation
-  valueBoxId?: string;
   valueText?: string;
   valueNumber?: number;
-  confidence?: number;
-}
+  valueBoxId?: string;
+  // scrollbar specific
+  positionPercent?: number;
+  // Raw values array as delivered by the native module.
+  // Can be a simple string[] or a mixed structure – we normalise later.
+  values?: any[];
+};
 
-export interface OcrScanResult {
+export type OcrScanResult = {
   timestamp: number;
   boxes: OcrBox[];
-  screenDetected?: boolean;
-  accuracy?: number;
-}
+  screenDetected: boolean;
+  accuracy: number;
+};
 
-export interface OcrValue {
+// Public history entry type that callers can use if they want to inspect
+// raw scans together with already parsed/aggregated field values.
+export type OcrValue = OcrFieldResult;
+
+export type OcrHistoryEntry = {
+  scan: OcrScanResult;
+  fields: OcrValue[];
+};
+
+// Start box should contain: V, v, P, t (we lower-case when matching)
+const START_KEYWORDS = ['v', 'p', 't'];
+// End box should contain: cm, bar, m/s, s
+const END_KEYWORDS = ['cm', 'bar', 'm/s', 's'];
+
+// ---------------------------------------------------------------------------
+// Generic helper functions for numeric filtering + fuzzy unit detection
+// ---------------------------------------------------------------------------
+
+const NUMERIC_TOKEN_REGEX = /^[+-]?\d+(?:[.,]\d+)?$/;
+
+const DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY = 15;
+
+export const isValidNumericToken = (token: string, commaRequired = false): boolean => {
+  if (!token) return false;
+  const trimmed = String(token).trim();
+  if (trimmed.length === 0) return false;
+  if (commaRequired && !trimmed.includes(',') && !trimmed.includes('.')) return false;
+  // Reject if there are any letters
+  if (/[a-zA-Z]/.test(trimmed)) return false;
+  return NUMERIC_TOKEN_REGEX.test(trimmed.replace(/\s+/g, ''));
+};
+
+export const normalizeNumber = (token: string): number | null => {
+  if (!token) return null;
+  const normalized = token.replace(',', '.').trim();
+  if (!NUMERIC_TOKEN_REGEX.test(normalized.replace(/\s+/g, ''))) return null;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const pickMajorityValue = (values: number[], minOccurrences = DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY): number | null => {
+  if (!values || values.length === 0) return null;
+
+  const counts = new Map<string, { value: number; count: number }>();
+  for (const v of values) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    // Use fixed precision so 0.00 and 0.0 are treated as same value
+    const key = v.toFixed(2);
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(key, { value: v, count: 1 });
+    }
+  }
+
+  let best: { value: number; count: number } | null = null;
+  for (const entry of counts.values()) {
+    if (!best || entry.count > best.count) {
+      best = entry;
+    }
+  }
+
+  if (!best || best.count < minOccurrences) return null;
+  return best.value;
+};
+
+// Fuzzy detection of units / start-keywords like "v", "cm", "bar", "m/s", "s".
+// Handles common OCR mistakes such as "cms" -> "cm", "ms" -> "m/s".
+export const detectMatchingEinheit = (raw: string, keywords: string[]): string | null => {
+  if (!raw) return null;
+  const cleaned = raw.toLowerCase().replace(/[^a-z/]/g, '');
+  if (!cleaned) return null;
+
+  for (const kw of keywords) {
+    const kwClean = kw.toLowerCase().replace(/[^a-z/]/g, '');
+    if (!kwClean) continue;
+
+    // Normalise by removing slashes for comparison
+    const cleanedNoSlash = cleaned.replace(/\//g, '');
+    const kwNoSlash = kwClean.replace(/\//g, '');
+
+    // Exact or substring match (e.g. "cms" contains "cm", "ms" == "ms")
+    if (
+      cleanedNoSlash === kwNoSlash ||
+      cleanedNoSlash.startsWith(kwNoSlash) ||
+      cleanedNoSlash.endsWith(kwNoSlash) ||
+      cleanedNoSlash.includes(kwNoSlash)
+    ) {
+      // Return the canonical keyword (e.g. always "m/s" instead of "ms")
+      return kw;
+    }
+  }
+
+  return null;
+};
+
+// ---------------------------------------------------------------------------
+// Field-level aggregation helpers
+// ---------------------------------------------------------------------------
+
+type FieldTypeBreakdown = {
+  value: number;
+  checkbox: number;
+  scrollbar: number;
+};
+
+type FieldAggregation = {
   id: string;
-  value: string;
-  timestamp: number;
-  confidence?: number;
-}
+  totalScans: number;
+  uniqueValues: number;
+  rawValues: string[];
+  typeBreakdown: FieldTypeBreakdown;
+  scrollbar?: ParsedScrollbarValue;
+};
 
-export interface OcrHistoryEntry {
-  fieldId: string;
-  values: OcrValue[];
-  scanResults: OcrScanResult[];
-  lastSeen: number;
-}
-
-interface UseOcrHistoryOptions {
+export type UseOcrHistoryConfig = {
   maxHistoryPerField?: number;
   minOccurrencesForMajority?: number;
   commaRequired?: boolean;
-}
+};
 
-interface UseOcrHistoryReturn {
-  // Core functions
-  addScanResult: (ocrMap: Record<string, string>) => void;
-  addFullScanResult: (scanResult: OcrScanResult) => void;
-  getFilteredValue: (fieldId: string) => string | null;
-  getFieldHistory: (fieldId: string) => OcrValue[];
-  getFieldScanResults: (fieldId: string) => OcrScanResult[];
-  
-  // Filtering functions
-  hasComma: (value: string) => boolean;
-  getMajorityValue: (fieldId: string) => string | null;
-  getMajorityValueByType: (fieldId: string, type: 'value' | 'checkbox' | 'scrollbar') => string | null;
-  
-  // Statistics
-  getFieldStats: (fieldId: string) => {
-    totalScans: number;
-    uniqueValues: number;
-    mostCommonValue: string | null;
-    hasCommaValues: number;
-    lastSeen: number | null;
-    typeBreakdown: {
-      value: number;
-      checkbox: number;
-      scrollbar: number;
+const DEFAULT_MAX_HISTORY_PER_FIELD = 30;
+
+const mergeParsedScrollbar = (
+  existing: ParsedScrollbarValue | undefined,
+  incoming: ParsedScrollbarValue
+): ParsedScrollbarValue => {
+  const result: ParsedScrollbarValue = existing ? { ...existing } : {};
+  for (const [indexKey, segment] of Object.entries(incoming)) {
+    const idx = Number(indexKey);
+    const current = result[idx] ?? { key: [], value: [] };
+    if (Array.isArray(segment.key)) current.key.push(...segment.key);
+    if (Array.isArray(segment.value)) current.value.push(...segment.value);
+    result[idx] = current;
+  }
+  return result;
+};
+
+const computeMajorityString = (values: string[], minOccurrences: number): string | null => {
+  if (!values || values.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const v of values) {
+    const key = String(v);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best: { value: string; count: number } | null = null;
+  for (const [value, count] of counts.entries()) {
+    if (!best || count > best.count) {
+      best = { value, count };
+    }
+  }
+  if (!best || best.count < minOccurrences) return null;
+  return best.value;
+};
+
+const computeBestScrollbar = (
+  agg: ParsedScrollbarValue,
+  minOccurrences: number
+): { parsed: ParsedScrollbarValue; formatted: string } | null => {
+  if (!agg) return null;
+  const indices = Object.keys(agg)
+    .map((k) => Number(k))
+    .sort((a, b) => a - b);
+
+  const bestParsed: ParsedScrollbarValue = {};
+  const parts: string[] = [];
+
+  for (const idx of indices) {
+    const segment = agg[idx];
+    if (!segment) continue;
+    const bestKey = pickMajorityValue(segment.key, minOccurrences);
+    const bestValue = pickMajorityValue(segment.value, minOccurrences);
+    if (bestKey == null || bestValue == null) continue;
+
+    bestParsed[idx] = {
+      key: [bestKey],
+      value: [bestValue],
     };
+    parts.push(`${idx}: (${bestKey.toFixed(2)},${bestValue.toFixed(2)})`);
+  }
+
+  if (parts.length === 0) return null;
+  return {
+    parsed: bestParsed,
+    formatted: parts.join(', '),
   };
-  
-  // Management
-  clearFieldHistory: (fieldId: string) => void;
-  clearAllHistory: () => void;
-}
+};
 
-export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistoryReturn => {
-  const {
-    maxHistoryPerField = 50,
-    minOccurrencesForMajority = 3,
-    commaRequired = true,
-  } = options;
+// Extract numeric tokens from a scrollbar box and build ParsedScrollbarValue
+const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): ParsedScrollbarValue | null => {
+  if (!box || box.type !== 'scrollbar' || !Array.isArray(box.values)) return null;
 
-  const [history, setHistory] = useState<Record<string, OcrHistoryEntry>>({});
-
-  // Helper function to check if a value has a comma
-  const hasComma = useCallback((value: string): boolean => {
-    return value.includes(',') || value.includes('.');
-  }, []);
-
-  // Check if a value is a checkbox value (true/false)
-  const isCheckboxValue = useCallback((value: string): boolean => {
-    const normalized = value.toLowerCase().trim();
-    return normalized === 'true' || normalized === 'false';
-  }, []);
-
-  // Check if a value is a valid scrollbar unit
-  const isValidScrollbarUnit = useCallback((value: string, fieldId: string): boolean => {
-    const normalized = value.toLowerCase().trim();
-    const isStartBox = fieldId.includes('_start');
-    const isEndBox = fieldId.includes('_end');
-    
-    if (!isStartBox && !isEndBox) {
-      return true; // Not a scrollbar unit box, so it's valid
+  // Normalise all values to string tokens
+  const rawTokens: string[] = [];
+  for (const v of box.values ?? []) {
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t.length > 0) rawTokens.push(t);
+    } else if (typeof v === 'number') {
+      rawTokens.push(String(v));
+    } else if (v && typeof v === 'object') {
+      const text = (v as any).text;
+      const num = (v as any).number;
+      if (typeof text === 'string' && text.trim().length > 0) {
+        rawTokens.push(text.trim());
+      } else if (typeof num === 'number') {
+        rawTokens.push(String(num));
+      }
     }
-    
-    if (isStartBox) {
-      // Start box should contain: V, v, P, t
-      return normalized.includes('v') || normalized.includes('p') || normalized.includes('t');
+  }
+
+  if (rawTokens.length === 0) return null;
+
+  // Remove potential unit/start tokens at the beginning (START_KEYWORDS)
+  const tokens = [...rawTokens];
+  for (let i = 0; i < Math.min(2, tokens.length); i++) {
+    const unit = detectMatchingEinheit(tokens[i], START_KEYWORDS);
+    if (unit) {
+      tokens.splice(i, 1);
+      i -= 1;
     } else {
-      // End box should contain: cm, bar, m/s, s
-      return normalized.includes('cm') || normalized.includes('bar') || 
-             normalized.includes('m/s') || normalized.includes('s');
+      break;
     }
-  }, []);
+  }
 
-  // Helper function to normalize values for comparison
-  const normalizeValue = useCallback((value: string): string => {
-    return value.trim().toLowerCase();
-  }, []);
+  // Remove potential unit tokens at the end (END_KEYWORDS)
+  for (let removed = 0; removed < 2 && tokens.length > 0; removed++) {
+    const lastIdx = tokens.length - 1;
+    const unit = detectMatchingEinheit(tokens[lastIdx], END_KEYWORDS);
+    if (unit) {
+      tokens.splice(lastIdx, 1);
+    } else {
+      break;
+    }
+  }
 
-  // Add new scan results to history (legacy method for backward compatibility)
-  const addScanResult = useCallback((ocrMap: Record<string, string>) => {
-    const timestamp = Date.now();
-    
-    setHistory(prevHistory => {
-      const newHistory = { ...prevHistory };
-      
-      Object.entries(ocrMap).forEach(([fieldId, value]) => {
-        if (!value || value.trim() === '') return;
-        
-        // Skip values without comma if commaRequired is true, but allow checkbox values and valid scrollbar units
-        if (commaRequired && !hasComma(value) && !isCheckboxValue(value) && !isValidScrollbarUnit(value, fieldId)) {
-          return;
-        }
-        
-        const normalizedValue = normalizeValue(value);
-        
-        if (!newHistory[fieldId]) {
-          newHistory[fieldId] = {
-            fieldId,
-            values: [],
-            scanResults: [],
-            lastSeen: timestamp,
-          };
-        }
-        
-        const entry = newHistory[fieldId];
-        
-        // Check if this exact value was already added recently (within 1 second)
-        const recentValue = entry.values.find(
-          v => normalizeValue(v.value) === normalizedValue && 
-               (timestamp - v.timestamp) < 1000
-        );
-        
-        if (!recentValue) {
-          entry.values.push({
-            id: `${fieldId}_${timestamp}_${Math.random()}`,
-            value,
-            timestamp,
-          });
-          
-          // Keep only the most recent values
-          if (entry.values.length > maxHistoryPerField) {
-            entry.values = entry.values
-              .sort((a, b) => b.timestamp - a.timestamp)
-              .slice(0, maxHistoryPerField);
+  const parsed: ParsedScrollbarValue = {};
+
+  // VERY IMPORTANT: we do not filter tokens *before* pairing, otherwise
+  // the index/order of pairs would shift when a value is rejected.
+  // Instead we iterate in fixed 2er-Schritten and decide per Paar, ob
+  // key/value in die Arrays aufgenommen werden.
+  for (let i = 0; i + 1 < tokens.length; i += 2) {
+    const keyToken = tokens[i];
+    const valueToken = tokens[i + 1];
+
+    let keyNum: number | null = null;
+    let valueNum: number | null = null;
+
+    if (isValidNumericToken(keyToken, commaRequired)) {
+      keyNum = normalizeNumber(keyToken);
+    }
+    if (isValidNumericToken(valueToken, commaRequired)) {
+      valueNum = normalizeNumber(valueToken);
+    }
+
+    // Wenn beide ungültig sind, nichts für dieses Paar hinzufügen
+    if (keyNum == null && valueNum == null) continue;
+
+    const pairIndex = i / 2; // 0-based index: 0 -> first pair, 1 -> second pair, ...
+    const segment = parsed[pairIndex] ?? { key: [], value: [] };
+
+    if (keyNum != null && Number.isFinite(keyNum)) {
+      segment.key.push(keyNum);
+    }
+    if (valueNum != null && Number.isFinite(valueNum)) {
+      segment.value.push(valueNum);
+    }
+
+    // Nur speichern, wenn mindestens eine Seite etwas bekommen hat
+    if (segment.key.length > 0 || segment.value.length > 0) {
+      parsed[pairIndex] = segment;
+    }
+  }
+
+  return Object.keys(parsed).length > 0 ? parsed : null;
+};
+
+// Parse a simple numeric value box
+const parseValueFromScan = (box: OcrBox, commaRequired: boolean): string | null => {
+  if (!box || box.type !== 'value') return null;
+  const raw =
+    (typeof box.number === 'number' ? String(box.number) : undefined) ??
+    (typeof box.text === 'string' && box.text.trim().length > 0 ? box.text.trim() : undefined);
+  if (!raw) return null;
+  if (!isValidNumericToken(raw, commaRequired)) return null;
+  const num = normalizeNumber(raw);
+  if (num == null) return null;
+  return num.toString();
+};
+
+// Parse checkbox state into a stable string value
+const parseCheckboxFromScan = (box: OcrBox): string | null => {
+  if (!box || box.type !== 'checkbox') return null;
+  if (typeof box.checked !== 'boolean') return null;
+  return box.checked ? 'checked' : 'unchecked';
+};
+
+// ---------------------------------------------------------------------------
+// Main hook
+// ---------------------------------------------------------------------------
+
+export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
+  // Field-level aggregation based on full scan results
+  const [scanHistory, setScanHistory] = useState<OcrScanResult[]>([]);
+  const [fieldAggregations, setFieldAggregations] = useState<Record<string, FieldAggregation>>({});
+
+  const maxHistoryPerField = config?.maxHistoryPerField ?? DEFAULT_MAX_HISTORY_PER_FIELD;
+  const minOccurrencesForMajority = config?.minOccurrencesForMajority ?? DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY;
+  const commaRequired = !!config?.commaRequired;
+
+  // Add a full OCR scan result (with boxes) and update field aggregations
+  const addFullScanResult = useCallback(
+    (scanResult: OcrScanResult) => {
+      setScanHistory((prev) => [scanResult, ...prev]);
+
+      setFieldAggregations((prev) => {
+        const next: Record<string, FieldAggregation> = { ...prev };
+
+        for (const box of scanResult.boxes ?? []) {
+          if (!box || !box.id || !box.type) continue;
+          const fieldId = box.id;
+          const type = box.type;
+
+          let agg = next[fieldId];
+          if (!agg) {
+            agg = {
+              id: fieldId,
+              totalScans: 0,
+              uniqueValues: 0,
+              rawValues: [],
+              typeBreakdown: { value: 0, checkbox: 0, scrollbar: 0 },
+            };
           }
-          
-          entry.lastSeen = timestamp;
-        }
-      });
-      
-      return newHistory;
-    });
-  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, isValidScrollbarUnit, normalizeValue]);
 
-  // Add full scan result with complete box information
-  const addFullScanResult = useCallback((scanResult: OcrScanResult) => {
-    setHistory(prevHistory => {
-      const newHistory = { ...prevHistory };
-      
-      scanResult.boxes.forEach(box => {
-        if (!box.id) return;
-        
-        // Extract value based on type
-        let value: string | null = null;
-        if (box.type === 'value') {
-          value = (box.number != null ? String(box.number) : (box.text ?? '')) ?? '';
-        } else if (box.type === 'checkbox') {
-          value = box.checked ? 'true' : 'false';
-        } else if (box.type === 'scrollbar') {
-          // Handle scrollbar values - can be array or HashMap
-          if (Array.isArray(box.values)) {
-            if (box.values.length > 0 && typeof box.values[0] === 'number') {
-              // Legacy: array of numbers
-              value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
-            } else {
-              // New: array of text blocks, convert to key-value pairs
-              const keyValueMap: Record<string, string> = {};
-              for (let i = 0; i < box.values.length; i += 2) {
-                const key = String(box.values[i] || '').trim();
-                const val = String(box.values[i + 1] || '').trim();
-                if (key) {
-                  keyValueMap[key] = val;
-                }
+          agg.totalScans += 1;
+          if (type === 'value' || type === 'checkbox' || type === 'scrollbar') {
+            agg.typeBreakdown[type] += 1;
+          }
+
+          if (type === 'value') {
+            const valueStr = parseValueFromScan(box, commaRequired);
+            if (valueStr != null) {
+              agg.rawValues = [valueStr, ...agg.rawValues];
+              if (agg.rawValues.length > maxHistoryPerField) {
+                agg.rawValues = agg.rawValues.slice(0, maxHistoryPerField);
               }
-              value = Object.entries(keyValueMap)
-                .map(([key, val]) => `${key}:${val}`)
-                .join(', ');
+              agg.uniqueValues = new Set(agg.rawValues).size;
             }
-          } else if (typeof box.values === 'object' && box.values !== null) {
-            // HashMap of string -> string
-            value = Object.entries(box.values)
-              .map(([key, val]) => `${key}:${val}`)
-              .join(', ');
-          } else if (box.positionPercent !== undefined) {
-            // Fallback to positionPercent
-            value = box.positionPercent.toFixed(2);
-          }
-        }
-        
-        if (!value || value.trim() === '') return;
-        
-        const fieldId = box.id;
-        
-        // Skip values without comma if commaRequired is true, but allow checkbox values and valid scrollbar units
-        if (commaRequired && !hasComma(value) && !isCheckboxValue(value) && !isValidScrollbarUnit(value, fieldId)) {
-          return;
-        }
-        const normalizedValue = normalizeValue(value);
-        
-        if (!newHistory[fieldId]) {
-          newHistory[fieldId] = {
-            fieldId,
-            values: [],
-            scanResults: [],
-            lastSeen: scanResult.timestamp,
-          };
-        }
-        
-        const entry = newHistory[fieldId];
-        
-        // Check if this exact value was already added recently (within 1 second)
-        const recentValue = entry.values.find(
-          v => normalizeValue(v.value) === normalizedValue && 
-               (scanResult.timestamp - v.timestamp) < 1000
-        );
-        
-        if (!recentValue) {
-          entry.values.push({
-            id: `${fieldId}_${scanResult.timestamp}_${Math.random()}`,
-            value,
-            timestamp: scanResult.timestamp,
-            confidence: box.confidence,
-          });
-          
-          // Keep only the most recent values
-          if (entry.values.length > maxHistoryPerField) {
-            entry.values = entry.values
-              .sort((a, b) => b.timestamp - a.timestamp)
-              .slice(0, maxHistoryPerField);
-          }
-          
-          entry.lastSeen = scanResult.timestamp;
-        }
-        
-        // Add full scan result
-        entry.scanResults.push(scanResult);
-        
-        // Keep only the most recent scan results
-        if (entry.scanResults.length > maxHistoryPerField) {
-          entry.scanResults = entry.scanResults
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, maxHistoryPerField);
-        }
-      });
-      
-      return newHistory;
-    });
-  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, isValidScrollbarUnit, normalizeValue]);
-
-  // Get the majority value for a field
-  const getMajorityValue = useCallback((fieldId: string): string | null => {
-    const entry = history[fieldId];
-    if (!entry || entry.values.length === 0) return null;
-    
-    // Count occurrences of each normalized value
-    const valueCounts: Record<string, { count: number; originalValue: string }> = {};
-    
-    entry.values.forEach(ocrValue => {
-      const normalized = normalizeValue(ocrValue.value);
-      if (!valueCounts[normalized]) {
-        valueCounts[normalized] = { count: 0, originalValue: ocrValue.value };
-      }
-      valueCounts[normalized].count++;
-    });
-    
-    // Find the value with the highest count
-    let maxCount = 0;
-    let majorityValue: string | null = null;
-    
-    Object.entries(valueCounts).forEach(([normalized, data]) => {
-      if (data.count > maxCount && data.count >= minOccurrencesForMajority) {
-        maxCount = data.count;
-        majorityValue = data.originalValue;
-      }
-    });
-    
-    return majorityValue;
-  }, [history, minOccurrencesForMajority, normalizeValue]);
-
-  // Get the majority value for a field filtered by type
-  const getMajorityValueByType = useCallback((fieldId: string, type: 'value' | 'checkbox' | 'scrollbar'): string | null => {
-    const entry = history[fieldId];
-    if (!entry || entry.scanResults.length === 0) return null;
-    
-    // Get all boxes of the specified type for this field
-    const typeBoxes: OcrBox[] = [];
-    entry.scanResults.forEach(scanResult => {
-      const box = scanResult.boxes.find(b => b.id === fieldId && b.type === type);
-      if (box) {
-        typeBoxes.push(box);
-      }
-    });
-    
-    if (typeBoxes.length === 0) return null;
-    
-    // Count occurrences of each normalized value for this type
-    const valueCounts: Record<string, { count: number; originalValue: string }> = {};
-    
-    typeBoxes.forEach(box => {
-      let value: string | null = null;
-      if (box.type === 'value') {
-        value = (box.number != null ? String(box.number) : (box.text ?? '')) ?? '';
-      } else if (box.type === 'checkbox') {
-        value = box.checked ? 'true' : 'false';
-      } else if (box.type === 'scrollbar') {
-        // Handle scrollbar values - can be array or HashMap
-        if (Array.isArray(box.values)) {
-          if (box.values.length > 0 && typeof box.values[0] === 'number') {
-            // Legacy: array of numbers
-            value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
-          } else {
-            // New: array of text blocks, convert to key-value pairs
-            const keyValueMap: Record<string, string> = {};
-            for (let i = 0; i < box.values.length; i += 2) {
-              const key = String(box.values[i] || '').trim();
-              const val = String(box.values[i + 1] || '').trim();
-              if (key) {
-                keyValueMap[key] = val;
+          } else if (type === 'checkbox') {
+            const valueStr = parseCheckboxFromScan(box);
+            if (valueStr != null) {
+              agg.rawValues = [valueStr, ...agg.rawValues];
+              if (agg.rawValues.length > maxHistoryPerField) {
+                agg.rawValues = agg.rawValues.slice(0, maxHistoryPerField);
               }
+              agg.uniqueValues = new Set(agg.rawValues).size;
             }
-            value = Object.entries(keyValueMap)
-              .map(([key, val]) => `${key}:${val}`)
-              .join(', ');
+          } else if (type === 'scrollbar') {
+            const parsedScrollbar = parseScrollbarFromScan(box, commaRequired);
+            if (parsedScrollbar) {
+              agg.scrollbar = mergeParsedScrollbar(agg.scrollbar, parsedScrollbar);
+            }
           }
-        } else if (typeof box.values === 'object' && box.values !== null) {
-          // HashMap of string -> string
-          value = Object.entries(box.values)
-            .map(([key, val]) => `${key}:${val}`)
-            .join(', ');
-        } else if (box.positionPercent !== undefined) {
-          // Fallback to positionPercent
-          value = box.positionPercent.toFixed(2);
+
+          next[fieldId] = agg;
         }
+
+        return next;
+      });
+
+      return scanResult;
+    },
+    [commaRequired, maxHistoryPerField]
+  );
+
+  // Convenience alias that matches the wording from the plan
+  const addScanResult = useCallback(
+    (scanResult: OcrScanResult) => {
+      return addFullScanResult(scanResult);
+    },
+    [addFullScanResult]
+  );
+
+  const getFieldStats = useCallback(
+    (fieldId: string) => {
+      const agg = fieldAggregations[fieldId];
+      if (!agg) {
+        return {
+          totalScans: 0,
+          uniqueValues: 0,
+          typeBreakdown: { value: 0, checkbox: 0, scrollbar: 0 },
+        };
       }
-      
-      if (!value || value.trim() === '') return;
-      
-      const normalized = normalizeValue(value);
-      if (!valueCounts[normalized]) {
-        valueCounts[normalized] = { count: 0, originalValue: value };
-      }
-      valueCounts[normalized].count++;
-    });
-    
-    // Find the value with the highest count
-    let maxCount = 0;
-    let majorityValue: string | null = null;
-    
-    Object.entries(valueCounts).forEach(([normalized, data]) => {
-      if (data.count > maxCount && data.count >= minOccurrencesForMajority) {
-        maxCount = data.count;
-        majorityValue = data.originalValue;
-      }
-    });
-    
-    return majorityValue;
-  }, [history, minOccurrencesForMajority, normalizeValue]);
-
-  // Get filtered value (majority value if available, otherwise most recent)
-  const getFilteredValue = useCallback((fieldId: string): string | null => {
-    const majorityValue = getMajorityValue(fieldId);
-    if (majorityValue) return majorityValue;
-    
-    // Fallback to most recent value
-    const entry = history[fieldId];
-    if (!entry || entry.values.length === 0) return null;
-    
-    const mostRecent = entry.values
-      .sort((a, b) => b.timestamp - a.timestamp)[0];
-    
-    return mostRecent?.value || null;
-  }, [getMajorityValue, history]);
-
-  // Get history for a specific field
-  const getFieldHistory = useCallback((fieldId: string): OcrValue[] => {
-    const entry = history[fieldId];
-    return entry ? [...entry.values].sort((a, b) => b.timestamp - a.timestamp) : [];
-  }, [history]);
-
-  // Get scan results for a specific field
-  const getFieldScanResults = useCallback((fieldId: string): OcrScanResult[] => {
-    const entry = history[fieldId];
-    return entry ? [...entry.scanResults].sort((a, b) => b.timestamp - a.timestamp) : [];
-  }, [history]);
-
-  // Get statistics for a field
-  const getFieldStats = useCallback((fieldId: string) => {
-    const entry = history[fieldId];
-    if (!entry || entry.values.length === 0) {
       return {
-        totalScans: 0,
-        uniqueValues: 0,
-        mostCommonValue: null,
-        hasCommaValues: 0,
-        lastSeen: null,
-        typeBreakdown: {
-          value: 0,
-          checkbox: 0,
-          scrollbar: 0,
-        },
+        totalScans: agg.totalScans,
+        uniqueValues: agg.uniqueValues,
+        typeBreakdown: { ...agg.typeBreakdown },
       };
-    }
-    
-    const valueCounts: Record<string, number> = {};
-    let hasCommaCount = 0;
-    const typeBreakdown = {
-      value: 0,
-      checkbox: 0,
-      scrollbar: 0,
-    };
-    
-    entry.values.forEach(ocrValue => {
-      const normalized = normalizeValue(ocrValue.value);
-      valueCounts[normalized] = (valueCounts[normalized] || 0) + 1;
-      
-      if (hasComma(ocrValue.value)) {
-        hasCommaCount++;
-      }
-    });
-    
-    // Count types from scan results
-    entry.scanResults.forEach(scanResult => {
-      const box = scanResult.boxes.find(b => b.id === fieldId);
-      if (box) {
-        if (box.type === 'value') typeBreakdown.value++;
-        else if (box.type === 'checkbox') typeBreakdown.checkbox++;
-        else if (box.type === 'scrollbar') typeBreakdown.scrollbar++;
-      }
-    });
-    
-    const uniqueValues = Object.keys(valueCounts).length;
-    const mostCommonValue = Object.entries(valueCounts)
-      .sort(([, a], [, b]) => b - a)[0]?.[0] || null;
-    
-    return {
-      totalScans: entry.values.length,
-      uniqueValues,
-      mostCommonValue,
-      hasCommaValues: hasCommaCount,
-      lastSeen: entry.lastSeen,
-      typeBreakdown,
-    };
-  }, [history, hasComma, normalizeValue]);
+    },
+    [fieldAggregations]
+  );
 
-  // Clear history for a specific field
-  const clearFieldHistory = useCallback((fieldId: string) => {
-    setHistory(prevHistory => {
-      const newHistory = { ...prevHistory };
-      delete newHistory[fieldId];
-      return newHistory;
-    });
-  }, []);
+  const getFilteredValue = useCallback(
+    (fieldId: string): string | undefined => {
+      const agg = fieldAggregations[fieldId];
+      if (!agg) return undefined;
 
-  // Clear all history
-  const clearAllHistory = useCallback(() => {
-    setHistory({});
-  }, []);
+      // Scrollbar: try to compute best numeric ranges and format them
+      if (agg.scrollbar) {
+        const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
+        if (best) return best.formatted;
+      }
+
+      if (!agg.rawValues || agg.rawValues.length === 0) return undefined;
+      const bestString = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
+      return bestString ?? undefined;
+    },
+    [fieldAggregations, minOccurrencesForMajority]
+  );
+
+  const getBestFields = useCallback(
+    (): OcrFieldResult[] => {
+      const results: OcrFieldResult[] = [];
+
+      for (const [fieldId, agg] of Object.entries(fieldAggregations)) {
+        // Scrollbar fields: return structured ParsedScrollbarValue
+        if (agg.scrollbar) {
+          const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
+          if (best) {
+            results.push({
+              box_id: fieldId,
+              type: 'scrollbar',
+              value: best.parsed,
+            });
+          }
+          continue;
+        }
+
+        if (!agg.rawValues || agg.rawValues.length === 0) continue;
+        const bestString = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
+        if (!bestString) continue;
+
+        const tb = agg.typeBreakdown;
+        let dominantType: OcrFieldType = 'value';
+        if (tb.scrollbar >= tb.value && tb.scrollbar >= tb.checkbox) {
+          dominantType = 'scrollbar';
+        } else if (tb.checkbox >= tb.value && tb.checkbox >= tb.scrollbar) {
+          dominantType = 'checkbox';
+        } else {
+          dominantType = 'value';
+        }
+
+        results.push({
+          box_id: fieldId,
+          type: dominantType,
+          value: bestString,
+        });
+      }
+
+      return results;
+    },
+    [fieldAggregations, minOccurrencesForMajority]
+  );
 
   return {
-    addScanResult,
+    // Scan + field aggregation API
+    scanHistory,
+    fieldAggregations,
     addFullScanResult,
-    getFilteredValue,
-    getFieldHistory,
-    getFieldScanResults,
-    hasComma,
-    getMajorityValue,
-    getMajorityValueByType,
+    addScanResult,
     getFieldStats,
-    clearFieldHistory,
-    clearAllHistory,
-  };
+    getFilteredValue,
+    getBestFields,
+    // also export the keyword lists in case callers want to re-use them
+    START_KEYWORDS,
+    END_KEYWORDS,
+  } as const;
 };

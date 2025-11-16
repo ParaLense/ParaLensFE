@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
@@ -14,11 +14,57 @@ import {Input, InputField} from "@/components/ui/input";
 import { Heading } from "@/components/ui/heading";
 import {Button, ButtonText} from "@/components/ui/button";
 import {HStack} from "@/components/ui/hstack";
+import type { OcrFieldResult, ParsedScrollbarValue } from "@/features/ocr/useOcrHistory";
+import { isValidNumericToken, normalizeNumber } from "@/features/ocr/useOcrHistory";
 
 type ScanMenu = "injection" | "dosing" | "holdingPressure" | "cylinderHeating";
 type InjectionMode = "mainMenu" | "subMenuGraphic" | "switchType" | "";
 type HoldingPressureMode = "mainMenu" | "subMenuGraphic" | "";
 type DosingMode = "mainMenu" | "subMenuGraphic" | "";
+
+type OcrSnapshot = {
+  bestFields: OcrFieldResult[];
+  ocrMap: Record<string, string>;
+} | null;
+
+const buildRowsFromScrollbar = (scrollbar: ParsedScrollbarValue | undefined): IndexValuePair[] => {
+  if (!scrollbar) return [{ index: "1" }];
+
+  const indices = Object.keys(scrollbar)
+    .map((k) => Number(k))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+
+  if (indices.length === 0) return [{ index: "1" }];
+
+  return indices.map((idx) => {
+    const seg = scrollbar[idx];
+    const row: IndexValuePair = { index: String(idx + 1) };
+    const key = seg?.key?.[0];
+    const val = seg?.value?.[0];
+    if (typeof key === "number" && Number.isFinite(key)) {
+      row.v = key.toFixed(2);
+    }
+    if (typeof val === "number" && Number.isFinite(val)) {
+      row.v2 = val.toFixed(2);
+    }
+    return row;
+  });
+};
+
+const extractNumberStrings = (raw: string | undefined | null, maxCount: number): string[] => {
+  if (!raw) return [];
+  const tokens = String(raw).split(/[\s,;]+/).filter(Boolean);
+  const result: string[] = [];
+  for (const token of tokens) {
+    if (!isValidNumericToken(token, false)) continue;
+    const num = normalizeNumber(token);
+    if (num == null || !Number.isFinite(num)) continue;
+    result.push(num.toString());
+    if (result.length >= maxCount) break;
+  }
+  return result;
+};
 
 export default function ScanReviewScreen() {
   const params = useLocalSearchParams<{
@@ -26,6 +72,7 @@ export default function ScanReviewScreen() {
     injectionMode?: InjectionMode;
     holdingMode?: HoldingPressureMode;
     dosingMode?: DosingMode;
+    ocrData?: string;
   }>();
   const router = useRouter();
   const { selectedFullScanId, upsertSection } = useFullScan();
@@ -37,6 +84,9 @@ export default function ScanReviewScreen() {
   const injectionMode = params.injectionMode ?? null;
   const holdingMode = params.holdingMode ?? null;
   const dosingMode = params.dosingMode ?? null;
+
+  const [ocrSnapshot, setOcrSnapshot] = useState<OcrSnapshot>(null);
+  const [ocrApplied, setOcrApplied] = useState(false);
 
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
@@ -88,6 +138,167 @@ export default function ScanReviewScreen() {
     setpoint4: "",
     setpoint5: "",
   });
+
+  // Parse OCR data once on mount (if provided via navigation)
+  useEffect(() => {
+    if (ocrApplied) return;
+    if (!params.ocrData) return;
+    try {
+      const parsed = JSON.parse(String(params.ocrData)) as {
+        bestFields?: OcrFieldResult[];
+        ocrMap?: Record<string, string>;
+      };
+      if (parsed && parsed.bestFields && parsed.ocrMap) {
+        setOcrSnapshot({
+          bestFields: parsed.bestFields,
+          ocrMap: parsed.ocrMap,
+        });
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [params.ocrData, ocrApplied]);
+
+  // Helper accessors for OCR snapshot
+  const findField = (boxId: string): OcrFieldResult | undefined =>
+    ocrSnapshot?.bestFields?.find((f) => f.box_id === boxId);
+
+  const getFieldValueString = (boxId: string): string | undefined => {
+    const f = findField(boxId);
+    if (!f) return undefined;
+    return typeof f.value === "string" ? f.value : undefined;
+  };
+
+  const getScrollbarValue = (boxId: string): ParsedScrollbarValue | undefined => {
+    const f = findField(boxId);
+    if (!f || f.type !== "scrollbar" || !f.value || typeof f.value === "string") return undefined;
+    return f.value as ParsedScrollbarValue;
+  };
+
+  // Apply OCR snapshot to form states once (when available)
+  useEffect(() => {
+    if (ocrApplied || !ocrSnapshot) return;
+
+    // Injection · Main Menu
+    if (selectedMenu === "injection" && injectionMode === "mainMenu") {
+      setInjMainForm((prev) => {
+        const spray = getFieldValueString("spray_pessure_limit");
+        const incCheckbox = getFieldValueString("increase_specific_point_printer_checkbox");
+        return {
+          sprayPressureLimit: spray ?? prev.sprayPressureLimit,
+          increasedSpecificPointPrinter:
+            incCheckbox === "checked"
+              ? "1"
+              : incCheckbox === "unchecked"
+              ? "0"
+              : prev.increasedSpecificPointPrinter,
+        };
+      });
+    }
+
+    // Injection · Sub Menu Graphic (scrollbar: v, v2)
+    if (selectedMenu === "injection" && injectionMode === "subMenuGraphic") {
+      const scroll = getScrollbarValue("injection_speed_items");
+      setInjGraphicValues(buildRowsFromScrollbar(scroll));
+    }
+
+    // Injection · Switch Type
+    if (selectedMenu === "injection" && injectionMode === "switchType") {
+      setInjSwitchForm((prev) => {
+        const transshipment = getFieldValueString("transshipment_position");
+        const switchTime = getFieldValueString("switch_over_time");
+        const switchingPressure = getFieldValueString("switching_pressure");
+        return {
+          transshipmentPosition: transshipment ?? prev.transshipmentPosition,
+          switchOverTime: switchTime ?? prev.switchOverTime,
+          switchingPressure: switchingPressure ?? prev.switchingPressure,
+        };
+      });
+    }
+
+    // Holding Pressure · Main Menu
+    if (selectedMenu === "holdingPressure" && holdingMode === "mainMenu") {
+      setHoldMainForm((prev) => {
+        const holdingTime = getFieldValueString("holding_pressure_time");
+        const coolTime = getFieldValueString("cooling_time");
+        const screwDiameter = getFieldValueString("screw_diameter");
+        return {
+          holdingTime: holdingTime ?? prev.holdingTime,
+          coolTime: coolTime ?? prev.coolTime,
+          screwDiameter: screwDiameter ?? prev.screwDiameter,
+        };
+      });
+    }
+
+    // Holding Pressure · Sub Menu Graphic (scrollbar: t, p)
+    if (selectedMenu === "holdingPressure" && holdingMode === "subMenuGraphic") {
+      const scroll = getScrollbarValue("specific_back_pressure_items");
+      setHoldGraphicValues(
+        buildRowsFromScrollbar(scroll).map((row) => ({
+          index: row.index,
+          t: row.v,
+          p: row.v2,
+        })),
+      );
+    }
+
+    // Dosing · Main Menu
+    if (selectedMenu === "dosing" && dosingMode === "mainMenu") {
+      setDoseMainForm((prev) => {
+        const dosingStroke = getFieldValueString("dosing_stroke");
+        const dosingDelayTime = getFieldValueString("dosing_delay_time");
+        const relieveDosing = getFieldValueString("relieve_dosing");
+        const relieveAfterDosing = getFieldValueString("relieve_after_dosing");
+        const dischargeBefore = getFieldValueString("discharge_speed_before");
+        const dischargeAfter = getFieldValueString("discharge_speed_after");
+        return {
+          dosingStroke: dosingStroke ?? prev.dosingStroke,
+          dosingDelayTime: dosingDelayTime ?? prev.dosingDelayTime,
+          relieveDosing: relieveDosing ?? prev.relieveDosing,
+          relieveAfterDosing: relieveAfterDosing ?? prev.relieveAfterDosing,
+          dischargeSpeedBeforeDosing:
+            dischargeBefore ?? prev.dischargeSpeedBeforeDosing,
+          dischargeSpeedAfterDosing:
+            dischargeAfter ?? prev.dischargeSpeedAfterDosing,
+        };
+      });
+    }
+
+    // Dosing · Sub Menu Graphic
+    if (selectedMenu === "dosing" && dosingMode === "subMenuGraphic") {
+      const dosingSpeedScroll = getScrollbarValue("dosing_speed_items");
+      const dosingPressureScroll = getScrollbarValue("specific_back_pressure_items");
+
+      setDoseSpeedValues(buildRowsFromScrollbar(dosingSpeedScroll));
+      setDosePressureValues(buildRowsFromScrollbar(dosingPressureScroll));
+    }
+
+    // Cylinder Heating · Main Menu
+    if (selectedMenu === "cylinderHeating") {
+      const raw =
+        ocrSnapshot.ocrMap["cylinder_heating_items"] ??
+        getFieldValueString("cylinder_heating_items");
+      const nums = extractNumberStrings(raw, 5);
+      setCylinderForm((prev) => ({
+        setpoint1: nums[0] ?? prev.setpoint1,
+        setpoint2: nums[1] ?? prev.setpoint2,
+        setpoint3: nums[2] ?? prev.setpoint3,
+        setpoint4: nums[3] ?? prev.setpoint4,
+        setpoint5: nums[4] ?? prev.setpoint5,
+      }));
+    }
+
+    setOcrApplied(true);
+  }, [
+    ocrSnapshot,
+    ocrApplied,
+    selectedMenu,
+    injectionMode,
+    holdingMode,
+    dosingMode,
+    getFieldValueString,
+    getScrollbarValue,
+  ]);
 
   const onBack = () => router.back();
   const onSave = () => router.back();

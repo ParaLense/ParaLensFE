@@ -20,6 +20,7 @@ import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-temp
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
 import { useOcrHistory } from '@/features/ocr';
+import type { OcrFieldResult } from '@/features/ocr/useOcrHistory';
 import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
 
@@ -32,6 +33,14 @@ const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   currentLayout: TemplateLayout;
+  /**
+   * Optional callback to expose the current best OCR field values and raw map
+   * to parent components (e.g. CameraScreen for scan-review prefill).
+   */
+  onOcrUpdate?: (payload: {
+    bestFields: OcrFieldResult[];
+    ocrMap: Record<string, string>;
+  }) => void;
 }
 
 interface FrameToViewTransform {
@@ -73,6 +82,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   currentLayout,
   style: cameraStyleProp,
   device,
+  onOcrUpdate,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -96,12 +106,20 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const setOcrMapJS = useRunOnJS(setOcrMap, []);
   const setScreenResultJS = useRunOnJS(setScreenResult, []);
   const setBase64ImageJS = useRunOnJS(setBase64Image, []);
+  const onOcrUpdateJS = useRunOnJS(
+    (payload: { bestFields: OcrFieldResult[]; ocrMap: Record<string, string> }) => {
+      if (onOcrUpdate) {
+        onOcrUpdate(payload);
+      }
+    },
+    [onOcrUpdate]
+  );
 
   // OCR History Hook for filtering and storing recognized values
   const ocrHistory = useOcrHistory({
     maxHistoryPerField: 30,
     minOccurrencesForMajority: 3,
-    commaRequired: true, // Keep comma requirement for value fields
+    commaRequired: true, // Keep comma requirement for numeric value fields
   });
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -116,17 +134,20 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     });
   }, []);
 
-  // Function to add OCR values to history - wrapped with useRunOnJS
-  const addOcrToHistory = useCallback((ocrMap: Record<string, string>) => {
-    ocrHistory.addScanResult(ocrMap);
+  // Function to add full OCR scan (including boxes) to history - wrapped with useRunOnJS
+  const addScanResult = useCallback((scanResult: any) => {
+    // scanResult is shaped like OcrScanResult (timestamp, boxes, screenDetected, accuracy)
+    ocrHistory.addScanResult(scanResult);
   }, [ocrHistory]);
-  const addOcrToHistoryJS = useRunOnJS(addOcrToHistory, []);
+  const addScanResultJS = useRunOnJS(addScanResult, []);
 
-  // Function to add full scan result to history - wrapped with useRunOnJS
-  const addFullScanResult = useCallback((scanResult: any) => {
-    ocrHistory.addFullScanResult(scanResult);
-  }, [ocrHistory]);
-  const addFullScanResultJS = useRunOnJS(addFullScanResult, []);
+  // Whenever OCR history / map change, compute best fields and notify parent (on JS thread)
+  useEffect(() => {
+    if (!onOcrUpdate) return;
+    const bestFields = ocrHistory.getBestFields();
+    if (!bestFields || bestFields.length === 0) return;
+    onOcrUpdateJS({ bestFields, ocrMap });
+  }, [ocrHistory, ocrMap, onOcrUpdate, onOcrUpdateJS]);
 
   const screenTemplate = useMemo(
     () =>
@@ -247,11 +268,12 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
         if (scan.ocr?.boxes?.length) {
           const map: Record<string, string> = {};
-          const scrollbarBoxes: any[] = [];
-          
-          // First pass: process all non-scrollbar boxes to populate the map
+
+          // Build a simple debug map with raw values for each box.
+          // All heavy filtering/majority logic now lives in useOcrHistory.
           for (const b of scan.ocr.boxes as any[]) {
             if (!b || !b.id) continue;
+
             if (b.type === 'value') {
               map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
             } else if (b.type === 'checkbox') {
@@ -262,72 +284,49 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
               }
             } else if (b.type === 'scrollbar') {
-              // Store scrollbar boxes for second pass
-              scrollbarBoxes.push(b);
-            }
-          }
-          
-          // Second pass: process scrollbar boxes now that we have all start values
-          for (const b of scrollbarBoxes) {
-            // Handle scrollbar values - convert array of text blocks to key-value pairs
-            const scrollbarValues = b.values;
-            if (Array.isArray(scrollbarValues)) {
-              // Check if this is a scrollbar with a corresponding _start field
-              const hasStartValue = b.id.endsWith('_items');
-              const startValueFieldId = hasStartValue ? b.id.replace('_items', '_start') : null;
-              
-              // Get start value from map if it exists
-              const startValue = startValueFieldId ? map[startValueFieldId] : null;
-              
-              // Filter out start value from the beginning of the array
-              let filteredValues = [...scrollbarValues];
-              if (startValue && filteredValues.length > 0) {
-                const startValueTrimmed = startValue.trim();
-                // Remove first value if it matches start value
-                if (filteredValues[0]?.trim() === startValueTrimmed) {
-                  filteredValues = filteredValues.slice(1);
-                } else if (filteredValues.length > 1 && filteredValues[1]?.trim() === startValueTrimmed) {
-                  // Remove second value if it matches start value
-                  filteredValues = filteredValues.slice(2);
+              const values = Array.isArray(b.values) ? b.values : [];
+              const tokens: string[] = [];
+
+              for (const v of values) {
+                if (typeof v === 'string') {
+                  const t = v.trim();
+                  if (t.length > 0) tokens.push(t);
+                } else if (typeof v === 'number') {
+                  tokens.push(String(v));
+                } else if (v && typeof v === 'object') {
+                  const text = (v as any).text;
+                  const num = (v as any).number;
+                  if (typeof text === 'string' && text.trim().length > 0) {
+                    tokens.push(text.trim());
+                  } else if (typeof num === 'number') {
+                    tokens.push(String(num));
+                  }
                 }
               }
-              
-              // Group into key-value pairs: block[0]=key, block[1]=value, block[2]=key, etc.
-              const keyValueMap: Record<string, string> = {};
-              for (let i = 0; i < filteredValues.length; i += 2) {
-                const key = filteredValues[i]?.trim() || '';
-                const value = filteredValues[i + 1]?.trim() || '';
-                if (key) {
-                  keyValueMap[key] = value;
-                }
+
+              if (tokens.length > 0) {
+                map[b.id] = tokens.join(', ');
               }
-              // Format as key:value pairs
-              const scrollbarValue = Object.entries(keyValueMap)
-                .map(([key, val]) => `${key}:${val}`)
-                .join(', ');
-              map[b.id] = scrollbarValue;
             }
           }
           if (Object.keys(map).length > 0) {
             setOcrMapJS(map);
-            // Add to OCR history for filtering (legacy method)
-            addOcrToHistoryJS(map);
-            
-            // Add full scan result to history with complete box information
+
+            // Add full scan result (with complete box information) to OCR history
             const fullScanResult = {
               timestamp: Date.now(),
               boxes: scan.ocr.boxes,
               screenDetected: true, // We know screen was detected if we're here
               accuracy: 0.5, // Default accuracy since we don't have direct access
             };
-            addFullScanResultJS(fullScanResult);
+            addScanResultJS(fullScanResult);
           }
         }
       }
     } catch (error) {
       console.error(`Frame Processor Error: ${error}`);
     }
-  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addOcrToHistoryJS, addFullScanResultJS, viewHeight, viewWidth]);
+  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addScanResultJS, viewHeight, viewWidth]);
 
   // Helper function to apply homography transformation to a point
   const applyHomography = (h: number[][], point: { x: number; y: number }): { x: number; y: number } => {
