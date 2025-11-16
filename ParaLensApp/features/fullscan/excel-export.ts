@@ -255,19 +255,29 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         }
 
         // ========================
-        // Thin borders & vertical align center (sheet-wide)
+        // Thin borders & vertical align center (only for used rows)
         // ========================
-        const dim = ws.dimensions; // { top, left, bottom, right }
-        for (let r = dim.top; r <= dim.bottom; r++) {
-            for (let c = dim.left; c <= dim.right; c++) {
-                const cell = ws.getRow(r).getCell(c);
-                cell.alignment = { ...(cell.alignment ?? {}), vertical: "middle" };
-                cell.border = {
-                    top: { style: "thin" },
-                    left: { style: "thin" },
-                    right: { style: "thin" },
-                    bottom: { style: "thin" },
-                };
+        // Limit to actual used rows to avoid stack overflow
+        const maxRow = Math.max(cylEndRow, dosingEndRow, hpEndRow, injEndRow);
+        const usedColumns = [1, 2, 3, 4, 5, 6]; // A through F
+        
+        for (let r = 1; r <= maxRow; r++) {
+            for (const c of usedColumns) {
+                try {
+                    const cell = ws.getRow(r).getCell(c);
+                    if (cell) {
+                        cell.alignment = { ...(cell.alignment ?? {}), vertical: "middle" };
+                        cell.border = {
+                            top: { style: "thin" },
+                            left: { style: "thin" },
+                            right: { style: "thin" },
+                            bottom: { style: "thin" },
+                        };
+                    }
+                } catch (e) {
+                    // Skip cells that can't be accessed (e.g., merged cells)
+                    continue;
+                }
             }
         }
 
@@ -366,12 +376,17 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
                                 // Save to Downloads directory on Android
                                 const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
                                 
-                                // Read the file content from cache and write directly to Downloads
-                                // This avoids potential path format issues with copyFile
+                                // Read file content using RNFS and write to Downloads
                                 try {
-                                    // Read file as base64 from cache
-                                    const cacheFile = new File(fileUri);
-                                    const fileContent = await cacheFile.read({ encoding: 'base64' });
+                                    // Check if source file exists
+                                    const sourceExists = await RNFS.exists(fileUri);
+                                    if (!sourceExists) {
+                                        Alert.alert("Error", "Source file not found. Please try again.");
+                                        return;
+                                    }
+                                    
+                                    // Read file as base64 from cache using RNFS
+                                    const fileContent = await RNFS.readFile(fileUri, 'base64');
                                     
                                     // Write directly to Downloads folder
                                     await RNFS.writeFile(downloadPath, fileContent, 'base64');

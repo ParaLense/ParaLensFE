@@ -114,6 +114,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setInjMainForm({ ...injMainForm, sprayPressureLimit: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -127,6 +128,7 @@ export default function ScanReviewScreen() {
                   increasedSpecificPointPrinter: t,
                 })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
         </VStack>
@@ -134,13 +136,14 @@ export default function ScanReviewScreen() {
 
       {selectedMenu === "injection" && injectionMode === "subMenuGraphic" && (
         <VStack className="gap-4">
-          <Heading size="sm" className="text-typography-50">
+          <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
             Werte (Index, v, v2)
           </Heading>
           <DynamicValueList
             rows={injGraphicValues}
             setRows={setInjGraphicValues}
             labels={{ v: "v", v2: "v2" }}
+            isDark={isDark}
           />
         </VStack>
       )}
@@ -155,6 +158,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setInjSwitchForm({ ...injSwitchForm, transshipmentPosition: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -165,6 +169,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setInjSwitchForm({ ...injSwitchForm, switchOverTime: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -175,6 +180,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setInjSwitchForm({ ...injSwitchForm, switchingPressure: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
         </VStack>
@@ -190,6 +196,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setHoldMainForm({ ...holdMainForm, holdingTime: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -200,6 +207,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setHoldMainForm({ ...holdMainForm, coolTime: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -210,6 +218,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setHoldMainForm({ ...holdMainForm, screwDiameter: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
         </VStack>
@@ -217,13 +226,14 @@ export default function ScanReviewScreen() {
 
       {selectedMenu === "holdingPressure" && holdingMode === "subMenuGraphic" && (
         <VStack className="gap-4">
-          <Heading size="sm" className="text-typography-50">
+          <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
             Werte (Index, t, p)
           </Heading>
           <DynamicValueList
             rows={holdGraphicValues}
             setRows={setHoldGraphicValues}
             labels={{ t: "t", p: "p" }}
+            isDark={isDark}
           />
         </VStack>
       )}
@@ -238,6 +248,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setDoseMainForm({ ...doseMainForm, dosingStroke: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -248,6 +259,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setDoseMainForm({ ...doseMainForm, dosingDelayTime: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -258,6 +270,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setDoseMainForm({ ...doseMainForm, relieveDosing: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -268,6 +281,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setDoseMainForm({ ...doseMainForm, relieveAfterDosing: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -281,6 +295,7 @@ export default function ScanReviewScreen() {
                   dischargeSpeedBeforeDosing: t,
                 })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -294,6 +309,7 @@ export default function ScanReviewScreen() {
                   dischargeSpeedAfterDosing: t,
                 })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
         </VStack>
@@ -302,23 +318,25 @@ export default function ScanReviewScreen() {
       {selectedMenu === "dosing" && dosingMode === "subMenuGraphic" && (
         <VStack className="gap-6">
           <VStack className="gap-4">
-            <Heading size="sm" className="text-typography-50">
+            <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
               Dosing Speed (Index, v, v2)
             </Heading>
             <DynamicValueList
               rows={doseSpeedValues}
               setRows={setDoseSpeedValues}
               labels={{ v: "v", v2: "v2" }}
+              isDark={isDark}
             />
           </VStack>
           <VStack className="gap-4">
-            <Heading size="sm" className="text-typography-50">
+            <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
               Dosing Pressure (Index, v, v2)
             </Heading>
             <DynamicValueList
               rows={dosePressureValues}
               setRows={setDosePressureValues}
               labels={{ v: "v", v2: "v2" }}
+              isDark={isDark}
             />
           </VStack>
         </VStack>
@@ -334,6 +352,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setCylinderForm({ ...cylinderForm, setpoint1: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -344,6 +363,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setCylinderForm({ ...cylinderForm, setpoint2: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -354,6 +374,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setCylinderForm({ ...cylinderForm, setpoint3: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -364,6 +385,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setCylinderForm({ ...cylinderForm, setpoint4: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
           <Input>
@@ -374,6 +396,7 @@ export default function ScanReviewScreen() {
               onChangeText={(t) =>
                 setCylinderForm({ ...cylinderForm, setpoint5: t })
               }
+              style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
         </VStack>
@@ -383,7 +406,7 @@ export default function ScanReviewScreen() {
         className="gap-4 mt-6 items-center justify-between"
       >
         <Button variant="outline" action="secondary" onPress={onBack}>
-          <Text className="text-typography-50">
+          <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
             {t("cancel")}
           </Text>
         </Button>
@@ -423,7 +446,7 @@ export default function ScanReviewScreen() {
             onSave();
           }}
         >
-          <Text className="text-typography-50">
+          <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
             {t("create") || "Speichern"}
           </Text>
         </Button>
