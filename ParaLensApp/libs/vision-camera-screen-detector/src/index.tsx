@@ -79,10 +79,10 @@ export function performScan(
   ocr?: {
     boxes: Array<
       | { id: string; type: 'value'; text?: string; number?: number; confidence?: number }
-      | { 
-          id: string; 
-          type: 'checkbox'; 
-          checked: boolean; 
+      | {
+          id: string;
+          type: 'checkbox';
+          checked: boolean;
           confidence?: number;
           valueText?: string;
           valueNumber?: number;
@@ -130,10 +130,11 @@ export function performScan(
             ...(b.options
               ? {
                   options: {
-                    ...(b.options.orientation ? { orientation: b.options.orientation } : {}),
-                    ...(b.options.cells != null ? { cells: +b.options.cells } : {}),
-                    ...(b.options.checkboxThreshold != null
-                      ? { checkboxThreshold: +b.options.checkboxThreshold }
+                    ...(b.options.orientation
+                      ? { orientation: b.options.orientation }
+                      : {}),
+                    ...(b.options.cells != null
+                      ? { cells: +b.options.cells }
                       : {}),
                     ...(b.options.valuesRegion
                       ? {

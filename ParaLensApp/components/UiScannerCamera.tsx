@@ -30,8 +30,21 @@ const SCREEN_ASPECT_W = 3;
 const SCREEN_ASPECT_H = 4;
 const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 
+export interface FieldSummary {
+  value: string;
+  totalScans: number;
+  majorityRatio: number;
+}
+
+export interface CurrentScanSummary {
+  layout: TemplateLayout | null;
+  byFieldId: Record<string, FieldSummary>;
+  isComplete: boolean;
+}
+
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   currentLayout: TemplateLayout;
+  onScanSummaryChange?: (summary: CurrentScanSummary | null) => void;
 }
 
 interface FrameToViewTransform {
@@ -69,10 +82,42 @@ const toNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(num) ? num : fallback;
 };
 
+const REQUIRED_FIELDS_BY_LAYOUT: Partial<Record<TemplateLayout, string[]>> = {
+  [TemplateLayout.Injection]: ['spray_pessure_limit'], // main menu numeric
+  [TemplateLayout.InjectionSpeed_ScrollBar]: ['injection_speed_items'],
+  [TemplateLayout.Injection_SwitchType]: [
+    'transshipment_position',
+    'switch_over_time',
+    'switching_pressure',
+  ],
+  [TemplateLayout.HoldingPressure]: [
+    'holding_pressure_time',
+    'cooling_time',
+    'screw_diameter',
+  ],
+  [TemplateLayout.HoldingPressure_ScrollBar]: ['specific_back_pressure_items'],
+  [TemplateLayout.Dosing]: [
+    'dosing_stroke',
+    'dosing_delay_time',
+    'relieve_dosing',
+    'relieve_after_dosing',
+    'discharge_speed_before',
+    'discharge_speed_after',
+  ],
+  [TemplateLayout.Dosing_ScrollBar]: [
+    'dosing_speed_items',
+    'specific_back_pressure_items',
+  ],
+  [TemplateLayout.CylinderHeating]: ['cylinder_heating_items'],
+};
+
+const MAJORITY_THRESHOLD = 0.8;
+
 const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   currentLayout,
   style: cameraStyleProp,
   device,
+  onScanSummaryChange,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -267,44 +312,16 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
             }
           }
           
-          // Second pass: process scrollbar boxes now that we have all start values
+          // Second pass: process scrollbar boxes - just store raw array joined
           for (const b of scrollbarBoxes) {
-            // Handle scrollbar values - convert array of text blocks to key-value pairs
+            // Store raw scrollbar values as semicolon-separated string
+            // The history filtering will handle pairing and filtering start/end units
             const scrollbarValues = b.values;
             if (Array.isArray(scrollbarValues)) {
-              // Check if this is a scrollbar with a corresponding _start field
-              const hasStartValue = b.id.endsWith('_items');
-              const startValueFieldId = hasStartValue ? b.id.replace('_items', '_start') : null;
-              
-              // Get start value from map if it exists
-              const startValue = startValueFieldId ? map[startValueFieldId] : null;
-              
-              // Filter out start value from the beginning of the array
-              let filteredValues = [...scrollbarValues];
-              if (startValue && filteredValues.length > 0) {
-                const startValueTrimmed = startValue.trim();
-                // Remove first value if it matches start value
-                if (filteredValues[0]?.trim() === startValueTrimmed) {
-                  filteredValues = filteredValues.slice(1);
-                } else if (filteredValues.length > 1 && filteredValues[1]?.trim() === startValueTrimmed) {
-                  // Remove second value if it matches start value
-                  filteredValues = filteredValues.slice(2);
-                }
-              }
-              
-              // Group into key-value pairs: block[0]=key, block[1]=value, block[2]=key, etc.
-              const keyValueMap: Record<string, string> = {};
-              for (let i = 0; i < filteredValues.length; i += 2) {
-                const key = filteredValues[i]?.trim() || '';
-                const value = filteredValues[i + 1]?.trim() || '';
-                if (key) {
-                  keyValueMap[key] = value;
-                }
-              }
-              // Format as key:value pairs
-              const scrollbarValue = Object.entries(keyValueMap)
-                .map(([key, val]) => `${key}:${val}`)
-                .join(', ');
+              const scrollbarValue = scrollbarValues
+                .map(v => String(v || '').trim())
+                .filter(v => v !== '')
+                .join('; ');
               map[b.id] = scrollbarValue;
             }
           }
@@ -422,6 +439,50 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     if (!cameraFeedBox) return null;
     return mapBoxToViewStyle(cameraFeedBox);
   };
+
+  // Build a summary for the current layout and notify parent when it changes
+  useEffect(() => {
+    if (!onScanSummaryChange) return;
+
+    const requiredIds = REQUIRED_FIELDS_BY_LAYOUT[currentLayout] ?? [];
+    if (!requiredIds.length) {
+      onScanSummaryChange(null);
+      return;
+    }
+
+    const byFieldId: Record<string, FieldSummary> = {};
+    let allComplete = true;
+
+    requiredIds.forEach(fieldId => {
+      // Determine field type from the latest scan
+      const scanResults = ocrHistory.getFieldScanResults(fieldId);
+      const lastScan = scanResults[0];
+      const boxType = (lastScan?.boxes?.find(b => b.id === fieldId)?.type ??
+        'value') as 'value' | 'checkbox' | 'scrollbar';
+
+      const best = ocrHistory.getBestValue(fieldId, boxType);
+
+      if (!best.value || best.majorityRatio < MAJORITY_THRESHOLD) {
+        allComplete = false;
+      }
+
+      if (best.value) {
+        byFieldId[fieldId] = {
+          value: best.value,
+          totalScans: best.totalScans,
+          majorityRatio: best.majorityRatio,
+        };
+      }
+    });
+
+    const summary: CurrentScanSummary = {
+      layout: currentLayout,
+      byFieldId,
+      isComplete: allComplete,
+    };
+
+    onScanSummaryChange(summary);
+  }, [currentLayout, ocrHistory, onScanSummaryChange]);
 
   return (
     <CameraPermissionProvider>
@@ -665,22 +726,123 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       {/* No template-pixel boxes overlay anymore */}
 
       {ocrLayoutBoxes.map(box => {
-        // Use filtered value from history instead of raw OCR map
-        const filteredValue = ocrHistory.getFilteredValue(box.id);
-        const rawValue = ocrMap[box.id];
-        
-        // Show filtered value if available, otherwise show raw value
-        const displayValue = filteredValue || rawValue;
-        if (!displayValue) return null;
+        const fieldId = box.id;
 
-        const labelTop = box.y + box.height - 24;
+        // Determine box type from latest scan result
+        const scanResults = ocrHistory.getFieldScanResults(fieldId);
+        const lastScan = scanResults[0];
+        const boxType = lastScan?.boxes?.find(b => b.id === fieldId)?.type ?? 'value';
+
+        // Compute display value:
+        // - Scrollbar: majority-by-type first, then fallback to raw OCR map
+        // - Other types: general filtered value, then fallback to raw OCR map
+        let displayValue: string | null = null;
+        if (boxType === 'scrollbar') {
+          displayValue =
+            ocrHistory.getMajorityValueByType(fieldId, 'scrollbar') ??
+            ocrMap[fieldId] ??
+            null;
+        } else {
+          displayValue =
+            ocrHistory.getFilteredValue(fieldId) ??
+            ocrMap[fieldId] ??
+            null;
+        }
+
+        if (!displayValue || !displayValue.trim()) {
+          return null;
+        }
+
+        // Special rendering for scrollbar: show key on top, value on bottom, side by side
+        if (boxType === 'scrollbar') {
+          // Values are stored as "key:value; key:value; ..." with ";" as separator.
+          // IMPORTANT: We split on ";" so decimal commas stay intact.
+          const itemStrings = displayValue
+            .split(';')
+            .map(item => item.trim())
+            .filter(item => item.length > 0);
+
+          const pairs = itemStrings
+            .map(item => {
+              const [keyPart, ...rest] = item.split(':');
+              const key = (keyPart || '').trim();
+              const value = rest.join(':').trim(); // keep any ':' that might appear in value
+              return { key, value };
+            })
+            .filter(p => p.key || p.value);
+
+          if (pairs.length === 0) {
+            return null;
+          }
+
+          const startTop = box.y + box.height + 5;
+          const itemSpacing = 6;
+          let currentLeft = box.x;
+
+          return pairs.map((pair, idx) => {
+            const keyText = pair.key;
+            const valueText = pair.value;
+
+            // Rough width estimate based on longest line
+            const longest = Math.max(keyText.length, valueText.length);
+            const estimatedWidth = Math.max(60, longest * 7 + 16);
+            const left = currentLeft;
+            currentLeft += estimatedWidth + itemSpacing;
+
+            return (
+              <Box
+                key={`${fieldId}_pair_${idx}`}
+                style={{
+                  position: 'absolute',
+                  left,
+                  top: startTop,
+                  alignItems: 'center',
+                  zIndex: 200,
+                  flexDirection: 'column',
+                }}
+              >
+                <Box
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    borderRadius: 6,
+                    paddingVertical: 2,
+                    paddingHorizontal: 6,
+                    minWidth: 50,
+                    alignItems: 'center',
+                  }}
+                >
+                  {keyText ? (
+                    <GluestackText
+                      className="text-xs text-center text-cyan-400"
+                      numberOfLines={1}
+                    >
+                      {keyText}
+                    </GluestackText>
+                  ) : null}
+                  {valueText ? (
+                    <GluestackText
+                      className="text-sm text-center font-bold text-green-400"
+                      numberOfLines={1}
+                    >
+                      {valueText}
+                    </GluestackText>
+                  ) : null}
+                </Box>
+              </Box>
+            );
+          });
+        }
+
+        // Default rendering for value / checkbox: single label below box
+        const labelTop = box.y + box.height + 6;
+
         return (
           <Box
             key={box.id}
             style={{
               position: 'absolute',
               left: box.x,
-              top: labelTop + 30,
+              top: labelTop,
               alignItems: 'center',
               zIndex: 200,
             }}
@@ -692,22 +854,15 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 paddingVertical: 4,
                 paddingHorizontal: 8,
                 minWidth: 40,
-                maxWidth: Math.max(box.width * 1.5, 120), // Allow 50% more width or minimum 120px
+                maxWidth: Math.max(box.width * 1.5, 120),
               }}
             >
-              <GluestackText 
-                className={`text-sm text-center ${
-                  filteredValue ? 'text-green-400' : 'text-yellow-400'
-                }`}
+              <GluestackText
+                className="text-sm text-center text-green-400"
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
                 {displayValue}
-                {filteredValue && rawValue !== filteredValue && (
-                  <GluestackText className="text-xs text-gray-400">
-                    {' '}(filtered)
-                  </GluestackText>
-                )}
               </GluestackText>
             </Box>
           </Box>

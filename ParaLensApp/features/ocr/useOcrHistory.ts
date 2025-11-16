@@ -1,4 +1,42 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+
+// Valid unit tokens for scrollbar start/end boxes (module-level constants)
+const START_BOX_UNITS = ['v', 'p', 't'];
+const END_BOX_UNITS = ['cm', 'bar', 'm/s', 's'];
+
+// Module-level helper to validate scrollbar units
+function isValidScrollbarUnit(value: string, fieldId: string): boolean {
+  const normalized = value.toLowerCase().trim();
+  const isStartBox = fieldId.includes('_start');
+  const isEndBox = fieldId.includes('_end');
+
+  if (!isStartBox && !isEndBox) {
+    return true; // Not a scrollbar unit box, so it's valid
+  }
+
+  if (isStartBox) {
+    // Start box should contain one of START_BOX_UNITS
+    return START_BOX_UNITS.some(unit => normalized.includes(unit));
+  } else {
+    // End box should contain one of END_BOX_UNITS
+    return END_BOX_UNITS.some(unit => normalized.includes(unit));
+  }
+}
+
+// Helper: check if a token contains any letters (a–z)
+const LETTER_REGEX = /[a-zA-Z]/;
+function containsLetters(value: string): boolean {
+  return LETTER_REGEX.test(value);
+}
+
+// Helper: check if a token looks numeric-ish (digits with optional comma/dot)
+const NUMERIC_TOKEN_REGEX = /^[0-9.,]+$/;
+function isValidNumericToken(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (containsLetters(trimmed)) return false;
+  return NUMERIC_TOKEN_REGEX.test(trimmed);
+}
 
 export interface OcrBox {
   id: string;
@@ -23,6 +61,65 @@ export interface OcrScanResult {
   boxes: OcrBox[];
   screenDetected?: boolean;
   accuracy?: number;
+}
+
+// Internal helper type for scrollbar index pairs
+interface ScrollbarPair {
+  index: number;
+  key: string;
+  value: string;
+}
+
+// Convert a scrollbar box into index-based key/value pairs,
+// while trimming start/end units and invalid (non-numeric) tokens.
+function extractScrollbarPairsFromBox(box: OcrBox): ScrollbarPair[] {
+  const pairs: ScrollbarPair[] = [];
+
+  if (!Array.isArray(box.values)) {
+    return pairs;
+  }
+
+  let values = box.values
+    .map(v =>
+      typeof v === 'number' ? v.toFixed(2) : String(v ?? '').trim(),
+    )
+    .filter(v => v !== '');
+
+  if (!values.length) return pairs;
+
+  // Remove leading start unit (e.g. v, p, t) if present
+  if (values.length > 0) {
+    const firstValue = values[0].toLowerCase();
+    const isStartUnit = START_BOX_UNITS.some(unit => firstValue.includes(unit));
+    if (isStartUnit) {
+      values = values.slice(1);
+    }
+  }
+
+  // Remove trailing end unit (e.g. cm, bar, m/s, s) if present
+  if (values.length > 0) {
+    const lastValue = values[values.length - 1].toLowerCase();
+    const isEndUnit = END_BOX_UNITS.some(unit => lastValue.includes(unit));
+    if (isEndUnit) {
+      values = values.slice(0, -1);
+    }
+  }
+
+  // Group into pairs: [0,1] -> index 0, [2,3] -> index 1, etc.
+  for (let i = 0; i < values.length - 1; i += 2) {
+    const index = Math.floor(i / 2);
+    const key = values[i];
+    const value = values[i + 1];
+
+    // Only keep pairs where both key and value are numeric-ish
+    if (!isValidNumericToken(key) || !isValidNumericToken(value)) {
+      continue;
+    }
+
+    pairs.push({ index, key, value });
+  }
+
+  return pairs;
 }
 
 export interface OcrValue {
@@ -57,6 +154,14 @@ interface UseOcrHistoryReturn {
   hasComma: (value: string) => boolean;
   getMajorityValue: (fieldId: string) => string | null;
   getMajorityValueByType: (fieldId: string, type: 'value' | 'checkbox' | 'scrollbar') => string | null;
+  getBestValue: (
+    fieldId: string,
+    type: 'value' | 'checkbox' | 'scrollbar'
+  ) => {
+    value: string | null;
+    majorityRatio: number;
+    totalScans: number;
+  };
   
   // Statistics
   getFieldStats: (fieldId: string) => {
@@ -95,26 +200,6 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
   const isCheckboxValue = useCallback((value: string): boolean => {
     const normalized = value.toLowerCase().trim();
     return normalized === 'true' || normalized === 'false';
-  }, []);
-
-  // Check if a value is a valid scrollbar unit
-  const isValidScrollbarUnit = useCallback((value: string, fieldId: string): boolean => {
-    const normalized = value.toLowerCase().trim();
-    const isStartBox = fieldId.includes('_start');
-    const isEndBox = fieldId.includes('_end');
-    
-    if (!isStartBox && !isEndBox) {
-      return true; // Not a scrollbar unit box, so it's valid
-    }
-    
-    if (isStartBox) {
-      // Start box should contain: V, v, P, t
-      return normalized.includes('v') || normalized.includes('p') || normalized.includes('t');
-    } else {
-      // End box should contain: cm, bar, m/s, s
-      return normalized.includes('cm') || normalized.includes('bar') || 
-             normalized.includes('m/s') || normalized.includes('s');
-    }
   }, []);
 
   // Helper function to normalize values for comparison
@@ -176,7 +261,7 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
       
       return newHistory;
     });
-  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, isValidScrollbarUnit, normalizeValue]);
+  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, normalizeValue]);
 
   // Add full scan result with complete box information
   const addFullScanResult = useCallback((scanResult: OcrScanResult) => {
@@ -193,25 +278,12 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
         } else if (box.type === 'checkbox') {
           value = box.checked ? 'true' : 'false';
         } else if (box.type === 'scrollbar') {
-          // Handle scrollbar values - can be array or HashMap
+          // Store raw scrollbar values - getBestValue will handle pairing/filtering
           if (Array.isArray(box.values)) {
-            if (box.values.length > 0 && typeof box.values[0] === 'number') {
-              // Legacy: array of numbers
-              value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
-            } else {
-              // New: array of text blocks, convert to key-value pairs
-              const keyValueMap: Record<string, string> = {};
-              for (let i = 0; i < box.values.length; i += 2) {
-                const key = String(box.values[i] || '').trim();
-                const val = String(box.values[i + 1] || '').trim();
-                if (key) {
-                  keyValueMap[key] = val;
-                }
-              }
-              value = Object.entries(keyValueMap)
-                .map(([key, val]) => `${key}:${val}`)
-                .join(', ');
-            }
+            value = box.values
+              .map(v => typeof v === 'number' ? v.toFixed(2) : String(v || '').trim())
+              .filter(v => v !== '')
+              .join('; ');
           } else if (typeof box.values === 'object' && box.values !== null) {
             // HashMap of string -> string
             value = Object.entries(box.values)
@@ -281,7 +353,7 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
       
       return newHistory;
     });
-  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, isValidScrollbarUnit, normalizeValue]);
+  }, [maxHistoryPerField, commaRequired, hasComma, isCheckboxValue, normalizeValue]);
 
   // Get the majority value for a field
   const getMajorityValue = useCallback((fieldId: string): string | null => {
@@ -303,7 +375,7 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
     let maxCount = 0;
     let majorityValue: string | null = null;
     
-    Object.entries(valueCounts).forEach(([normalized, data]) => {
+    Object.entries(valueCounts).forEach(([, data]) => {
       if (data.count > maxCount && data.count >= minOccurrencesForMajority) {
         maxCount = data.count;
         majorityValue = data.originalValue;
@@ -313,84 +385,158 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
     return majorityValue;
   }, [history, minOccurrencesForMajority, normalizeValue]);
 
-  // Get the majority value for a field filtered by type
-  const getMajorityValueByType = useCallback((fieldId: string, type: 'value' | 'checkbox' | 'scrollbar'): string | null => {
-    const entry = history[fieldId];
-    if (!entry || entry.scanResults.length === 0) return null;
-    
-    // Get all boxes of the specified type for this field
-    const typeBoxes: OcrBox[] = [];
-    entry.scanResults.forEach(scanResult => {
-      const box = scanResult.boxes.find(b => b.id === fieldId && b.type === type);
-      if (box) {
-        typeBoxes.push(box);
-      }
-    });
-    
-    if (typeBoxes.length === 0) return null;
-    
-    // Count occurrences of each normalized value for this type
-    const valueCounts: Record<string, { count: number; originalValue: string }> = {};
-    
-    typeBoxes.forEach(box => {
-      let value: string | null = null;
-      if (box.type === 'value') {
-        value = (box.number != null ? String(box.number) : (box.text ?? '')) ?? '';
-      } else if (box.type === 'checkbox') {
-        value = box.checked ? 'true' : 'false';
-      } else if (box.type === 'scrollbar') {
-        // Handle scrollbar values - can be array or HashMap
-        if (Array.isArray(box.values)) {
-          if (box.values.length > 0 && typeof box.values[0] === 'number') {
-            // Legacy: array of numbers
-            value = box.values.map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ');
-          } else {
-            // New: array of text blocks, convert to key-value pairs
-            const keyValueMap: Record<string, string> = {};
-            for (let i = 0; i < box.values.length; i += 2) {
-              const key = String(box.values[i] || '').trim();
-              const val = String(box.values[i + 1] || '').trim();
-              if (key) {
-                keyValueMap[key] = val;
-              }
-            }
-            value = Object.entries(keyValueMap)
-              .map(([key, val]) => `${key}:${val}`)
-              .join(', ');
-          }
-        } else if (typeof box.values === 'object' && box.values !== null) {
-          // HashMap of string -> string
-          value = Object.entries(box.values)
-            .map(([key, val]) => `${key}:${val}`)
-            .join(', ');
-        } else if (box.positionPercent !== undefined) {
-          // Fallback to positionPercent
-          value = box.positionPercent.toFixed(2);
+  // Generic majority helper used by getBestValue
+  const computeMajority = useCallback(
+    (values: string[]): { bestValue: string | null; bestCount: number; total: number } => {
+      const counts: Record<string, { count: number; original: string }> = {};
+
+      values.forEach(v => {
+        const norm = normalizeValue(v);
+        if (!norm) return;
+        if (!counts[norm]) {
+          counts[norm] = { count: 0, original: v };
         }
+        counts[norm].count += 1;
+      });
+
+      let bestCount = 0;
+      let bestOriginal: string | null = null;
+      Object.values(counts).forEach(c => {
+        if (c.count > bestCount) {
+          bestCount = c.count;
+          bestOriginal = c.original;
+        }
+      });
+
+      return { bestValue: bestOriginal, bestCount, total: values.length };
+    },
+    [normalizeValue],
+  );
+
+  // Get the best value and its majority ratio for a specific field and type
+  const getBestValue = useCallback(
+    (
+      fieldId: string,
+      type: 'value' | 'checkbox' | 'scrollbar',
+    ): { value: string | null; majorityRatio: number; totalScans: number } => {
+      const entry = history[fieldId];
+      if (!entry || entry.scanResults.length === 0) {
+        return { value: null, majorityRatio: 0, totalScans: 0 };
       }
-      
-      if (!value || value.trim() === '') return;
-      
-      const normalized = normalizeValue(value);
-      if (!valueCounts[normalized]) {
-        valueCounts[normalized] = { count: 0, originalValue: value };
+
+      // Collect all boxes of the requested type
+      const typeBoxes: OcrBox[] = [];
+      entry.scanResults.forEach(scanResult => {
+        const box = scanResult.boxes.find(b => b.id === fieldId && b.type === type);
+        if (box) {
+          typeBoxes.push(box);
+        }
+      });
+
+      if (typeBoxes.length === 0) {
+        return { value: null, majorityRatio: 0, totalScans: 0 };
       }
-      valueCounts[normalized].count++;
-    });
-    
-    // Find the value with the highest count
-    let maxCount = 0;
-    let majorityValue: string | null = null;
-    
-    Object.entries(valueCounts).forEach(([normalized, data]) => {
-      if (data.count > maxCount && data.count >= minOccurrencesForMajority) {
-        maxCount = data.count;
-        majorityValue = data.originalValue;
+
+      // Scrollbar: compute majority per index using key:value pairs
+      if (type === 'scrollbar') {
+        const indexedValues: Record<number, string[]> = {};
+
+        typeBoxes.forEach(box => {
+          const pairs = extractScrollbarPairsFromBox(box);
+          pairs.forEach(pair => {
+            if (!indexedValues[pair.index]) {
+              indexedValues[pair.index] = [];
+            }
+            indexedValues[pair.index].push(`${pair.key}:${pair.value}`);
+          });
+        });
+
+        const indices = Object.keys(indexedValues);
+        if (!indices.length) {
+          return { value: null, majorityRatio: 0, totalScans: 0 };
+        }
+
+        const majorityValuesByIndex: Record<number, string> = {};
+        const ratios: number[] = [];
+        let totalPairs = 0;
+
+        indices.forEach(indexStr => {
+          const idx = parseInt(indexStr, 10);
+          const valuesAtIndex = indexedValues[idx];
+          const { bestValue, bestCount, total } = computeMajority(valuesAtIndex);
+          if (bestValue && total > 0) {
+            majorityValuesByIndex[idx] = bestValue;
+            ratios.push(bestCount / total);
+            totalPairs += total;
+          }
+        });
+
+        if (!Object.keys(majorityValuesByIndex).length) {
+          return { value: null, majorityRatio: 0, totalScans: 0 };
+        }
+
+        const sorted = Object.keys(majorityValuesByIndex)
+          .map(Number)
+          .sort((a, b) => a - b);
+        const combinedValue = sorted.map(i => majorityValuesByIndex[i]).join('; ');
+        const majorityRatio =
+          ratios.length > 0
+            ? ratios.reduce((sum, r) => sum + r, 0) / ratios.length
+            : 0;
+
+        return {
+          value: combinedValue,
+          majorityRatio,
+          totalScans: totalPairs,
+        };
       }
-    });
-    
-    return majorityValue;
-  }, [history, minOccurrencesForMajority, normalizeValue]);
+
+      // Value / checkbox: simple majority over extracted values
+      const rawValues: string[] = [];
+      typeBoxes.forEach(box => {
+        let v: string | null = null;
+        if (type === 'value') {
+          v =
+            box.number != null
+              ? String(box.number)
+              : (box.text ?? '');
+        } else if (type === 'checkbox') {
+          v = box.checked ? 'true' : 'false';
+        }
+
+        if (!v || !v.trim()) return;
+        if (type === 'value' && !isValidNumericToken(v)) return;
+        rawValues.push(v);
+      });
+
+      if (!rawValues.length) {
+        return { value: null, majorityRatio: 0, totalScans: 0 };
+      }
+
+      const { bestValue, bestCount, total } = computeMajority(rawValues);
+      if (!bestValue) {
+        return { value: null, majorityRatio: 0, totalScans: total };
+      }
+
+      const majorityRatio = total > 0 ? bestCount / total : 0;
+
+      return {
+        value: bestValue,
+        majorityRatio,
+        totalScans: total,
+      };
+    },
+    [history, computeMajority],
+  );
+
+  // Get the majority value for a field filtered by type (backed by getBestValue)
+  const getMajorityValueByType = useCallback(
+    (fieldId: string, type: 'value' | 'checkbox' | 'scrollbar'): string | null => {
+      const result = getBestValue(fieldId, type);
+      return result.value;
+    },
+    [getBestValue],
+  );
 
   // Get filtered value (majority value if available, otherwise most recent)
   const getFilteredValue = useCallback((fieldId: string): string | null => {
@@ -501,6 +647,7 @@ export const useOcrHistory = (options: UseOcrHistoryOptions = {}): UseOcrHistory
     hasComma,
     getMajorityValue,
     getMajorityValueByType,
+    getBestValue,
     getFieldStats,
     clearFieldHistory,
     clearAllHistory,

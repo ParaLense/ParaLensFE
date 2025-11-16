@@ -26,6 +26,7 @@ export default function ScanReviewScreen() {
     injectionMode?: InjectionMode;
     holdingMode?: HoldingPressureMode;
     dosingMode?: DosingMode;
+    ocrPrefill?: string;
   }>();
   const router = useRouter();
   const { selectedFullScanId, upsertSection } = useFullScan();
@@ -38,6 +39,15 @@ export default function ScanReviewScreen() {
   const holdingMode = params.holdingMode ?? null;
   const dosingMode = params.dosingMode ?? null;
 
+  const prefill = useMemo(() => {
+    if (!params.ocrPrefill) return null;
+    try {
+      return JSON.parse(params.ocrPrefill as string);
+    } catch {
+      return null;
+    }
+  }, [params.ocrPrefill]);
+
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
     if (selectedMenu) parts.push(selectedMenu);
@@ -48,45 +58,51 @@ export default function ScanReviewScreen() {
   }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
 
   const [injMainForm, setInjMainForm] = useState({
-    sprayPressureLimit: "",
-    increasedSpecificPointPrinter: "",
+    sprayPressureLimit:
+      prefill?.injection?.mainMenu?.sprayPressureLimit ?? "",
+    increasedSpecificPointPrinter:
+      prefill?.injection?.mainMenu?.increasedSpecificPointPrinter ?? "",
   });
   const [injSwitchForm, setInjSwitchForm] = useState({
-    transshipmentPosition: "",
-    switchOverTime: "",
-    switchingPressure: "",
+    transshipmentPosition:
+      prefill?.injection?.switchType?.transshipmentPosition ?? "",
+    switchOverTime: prefill?.injection?.switchType?.switchOverTime ?? "",
+    switchingPressure:
+      prefill?.injection?.switchType?.switchingPressure ?? "",
   });
-  const [injGraphicValues, setInjGraphicValues] = useState<IndexValuePair[]>([
-    { index: "1" },
-  ]);
+  const [injGraphicValues, setInjGraphicValues] = useState<IndexValuePair[]>(
+    prefill?.injection?.subMenuGraphic?.values ?? [{ index: "1" }],
+  );
   const [doseMainForm, setDoseMainForm] = useState({
-    dosingStroke: "",
-    dosingDelayTime: "",
-    relieveDosing: "",
-    relieveAfterDosing: "",
-    dischargeSpeedBeforeDosing: "",
-    dischargeSpeedAfterDosing: "",
+    dosingStroke: prefill?.dosing?.mainMenu?.dosingStroke ?? "",
+    dosingDelayTime: prefill?.dosing?.mainMenu?.dosingDelayTime ?? "",
+    relieveDosing: prefill?.dosing?.mainMenu?.relieveDosing ?? "",
+    relieveAfterDosing: prefill?.dosing?.mainMenu?.relieveAfterDosing ?? "",
+    dischargeSpeedBeforeDosing:
+      prefill?.dosing?.mainMenu?.dischargeSpeedBeforeDosing ?? "",
+    dischargeSpeedAfterDosing:
+      prefill?.dosing?.mainMenu?.dischargeSpeedAfterDosing ?? "",
   });
-  const [doseSpeedValues, setDoseSpeedValues] = useState<IndexValuePair[]>([
-    { index: "1" },
-  ]);
-  const [dosePressureValues, setDosePressureValues] = useState<IndexValuePair[]>([
-    { index: "1" },
-  ]);
+  const [doseSpeedValues, setDoseSpeedValues] = useState<IndexValuePair[]>(
+    prefill?.dosing?.subMenuGraphic?.dosingSpeedsValues ?? [{ index: "1" }],
+  );
+  const [dosePressureValues, setDosePressureValues] = useState<IndexValuePair[]>(
+    prefill?.dosing?.subMenuGraphic?.dosingPressuresValues ?? [{ index: "1" }],
+  );
   const [holdMainForm, setHoldMainForm] = useState({
-    holdingTime: "",
-    coolTime: "",
-    screwDiameter: "",
+    holdingTime: prefill?.holdingPressure?.mainMenu?.holdingTime ?? "",
+    coolTime: prefill?.holdingPressure?.mainMenu?.coolTime ?? "",
+    screwDiameter: prefill?.holdingPressure?.mainMenu?.screwDiameter ?? "",
   });
-  const [holdGraphicValues, setHoldGraphicValues] = useState<IndexValuePair[]>([
-    { index: "1" },
-  ]);
+  const [holdGraphicValues, setHoldGraphicValues] = useState<IndexValuePair[]>(
+    prefill?.holdingPressure?.subMenuGraphic?.values ?? [{ index: "1" }],
+  );
   const [cylinderForm, setCylinderForm] = useState({
-    setpoint1: "",
-    setpoint2: "",
-    setpoint3: "",
-    setpoint4: "",
-    setpoint5: "",
+    setpoint1: prefill?.cylinderHeating?.setpoint1 ?? "",
+    setpoint2: prefill?.cylinderHeating?.setpoint2 ?? "",
+    setpoint3: prefill?.cylinderHeating?.setpoint3 ?? "",
+    setpoint4: prefill?.cylinderHeating?.setpoint4 ?? "",
+    setpoint5: prefill?.cylinderHeating?.setpoint5 ?? "",
   });
 
   const onBack = () => router.back();

@@ -2,7 +2,8 @@ import React, { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Modal as RNModal } from "react-native";
 
-import UiScannerCamera from "@/components/UiScannerCamera";
+import UiScannerCamera, { CurrentScanSummary } from "@/components/UiScannerCamera";
+import { IndexValuePair } from "@/components/DynamicValueList";
 import { Box } from "@/components/ui/box";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
@@ -42,6 +43,7 @@ export default function CameraScreen() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [authorInput, setAuthorInput] = useState("");
+  const [scanSummary, setScanSummary] = useState<CurrentScanSummary | null>(null);
 
   const selectedLabel = useMemo(() => {
     if (!selectedFullScanId) {
@@ -98,7 +100,127 @@ export default function CameraScreen() {
     setDosingMode(null);
   };
 
+  const buildOcrPrefill = () => {
+    if (!scanSummary) return null;
+    const byId = scanSummary.byFieldId;
+    const getVal = (id: string): string =>
+      byId[id]?.value ?? "";
+
+    const mapCheckbox = (raw: string): string => {
+      const n = raw.toLowerCase().trim();
+      if (n === "true") return "1";
+      if (n === "false") return "0";
+      return raw;
+    };
+
+    const buildPairs = (value: string | undefined) => {
+      if (!value) return [{ index: "1" }];
+      const parts = value
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const rows: IndexValuePair[] = parts.map((item, idx) => {
+        const [kPart, ...rest] = item.split(":");
+        const k = (kPart || "").trim();
+        const v = rest.join(":").trim();
+        return { index: String(idx + 1), v: k, v2: v };
+      });
+      return rows.length ? rows : [{ index: "1" }];
+    };
+
+    // For holding-pressure scrollbar (t, p) we map to (t, p) instead of (v, v2)
+    const buildPairsTP = (value: string | undefined) => {
+      if (!value) return [{ index: "1" }];
+      const parts = value
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const rows: IndexValuePair[] = parts.map((item, idx) => {
+        const [kPart, ...rest] = item.split(":");
+        const k = (kPart || "").trim();
+        const v = rest.join(":").trim();
+        return { index: String(idx + 1), t: k, p: v };
+      });
+      return rows.length ? rows : [{ index: "1" }];
+    };
+
+    const payload: any = {};
+
+    if (selectedMenu === "injection") {
+      payload.injection = {};
+      if (injectionMode === "mainMenu") {
+        payload.injection.mainMenu = {
+          sprayPressureLimit: getVal("spray_pessure_limit"),
+          increasedSpecificPointPrinter: mapCheckbox(
+            getVal("increase_specific_point_printer_checkbox"),
+          ),
+        };
+      } else if (injectionMode === "subMenuGraphic") {
+        payload.injection.subMenuGraphic = {
+          values: buildPairs(getVal("injection_speed_items")),
+        };
+      } else if (injectionMode === "switchType") {
+        payload.injection.switchType = {
+          transshipmentPosition: getVal("transshipment_position"),
+          switchOverTime: getVal("switch_over_time"),
+          switchingPressure: getVal("switching_pressure"),
+        };
+      }
+    } else if (selectedMenu === "holdingPressure") {
+      payload.holdingPressure = {};
+      if (holdingMode === "mainMenu") {
+        payload.holdingPressure.mainMenu = {
+          holdingTime: getVal("holding_pressure_time"),
+          coolTime: getVal("cooling_time"),
+          screwDiameter: getVal("screw_diameter"),
+        };
+      } else if (holdingMode === "subMenuGraphic") {
+        payload.holdingPressure.subMenuGraphic = {
+          values: buildPairsTP(getVal("specific_back_pressure_items")),
+        };
+      }
+    } else if (selectedMenu === "dosing") {
+      payload.dosing = {};
+      if (dosingMode === "mainMenu") {
+        payload.dosing.mainMenu = {
+          dosingStroke: getVal("dosing_stroke"),
+          dosingDelayTime: getVal("dosing_delay_time"),
+          relieveDosing: getVal("relieve_dosing"),
+          relieveAfterDosing: getVal("relieve_after_dosing"),
+          dischargeSpeedBeforeDosing: getVal("discharge_speed_before"),
+          dischargeSpeedAfterDosing: getVal("discharge_speed_after"),
+        };
+      } else if (dosingMode === "subMenuGraphic") {
+        payload.dosing.subMenuGraphic = {
+          dosingSpeedsValues: buildPairs(getVal("dosing_speed_items")),
+          dosingPressuresValues: buildPairs(
+            getVal("specific_back_pressure_items"),
+          ),
+        };
+      }
+    } else if (selectedMenu === "cylinderHeating") {
+      const raw = getVal("cylinder_heating_items");
+      if (raw) {
+        const parts = raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        payload.cylinderHeating = {
+          setpoint1: parts[0] ?? "",
+          setpoint2: parts[1] ?? "",
+          setpoint3: parts[2] ?? "",
+          setpoint4: parts[3] ?? "",
+          setpoint5: parts[4] ?? "",
+        };
+      }
+    }
+
+    return payload;
+  };
+
   const goReview = () => {
+    console.log("goReview", scanSummary);
+    const ocrPrefill = buildOcrPrefill();
     router.push({
       pathname: "/scan-review",
       params: {
@@ -106,6 +228,7 @@ export default function CameraScreen() {
         injectionMode: injectionMode ?? "",
         holdingMode: holdingMode ?? "",
         dosingMode: dosingMode ?? "",
+        ocrPrefill: ocrPrefill ? JSON.stringify(ocrPrefill) : "",
       },
     });
   };
@@ -502,6 +625,7 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         isActive
         device={device}
+        onScanSummaryChange={setScanSummary}
       />
 
       <Box
@@ -526,11 +650,20 @@ export default function CameraScreen() {
       {(injectionMode || holdingMode || dosingMode ||
         selectedMenu === "cylinderHeating") && (
         <Box style={{ position: 'absolute', left: 0, right: 0, bottom: 32, alignItems: 'center' }}>
-          <HStack className="gap-4">
-            <Button variant="outline" action="secondary" onPress={goReview}>
-              <Text>{t("continue") ?? "Continue"}</Text>
-            </Button>
-          </HStack>
+          <VStack className="gap-2 items-center">
+            {scanSummary && (
+              <Text className="text-typography-50 text-xs">
+                {scanSummary.isComplete
+                  ? "Scan finished (≥ 80% majority)"
+                  : "Scan not stable yet"}
+              </Text>
+            )}
+            <HStack className="gap-4">
+              <Button variant="outline" action="secondary" onPress={goReview}>
+                <Text>{t("continue") ?? "Continue"}</Text>
+              </Button>
+            </HStack>
+          </VStack>
         </Box>
       )}
     </Box>
