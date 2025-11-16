@@ -10,8 +10,6 @@ import {
     StyleSheet,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-
-// Your Expo UI aliases
 import { Box } from "@/components/ui/box";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
@@ -20,14 +18,12 @@ import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
 import { Badge, BadgeText } from "@/components/ui/badge";
 import { Divider } from "@/components/ui/divider";
-
-// Contexts (Expo aliases)
 import { useFullScan } from "@/features/fullscan/fullscan-context";
 import { useI18n } from "@/features/settings/i18n";
 import { useSettings } from "@/features/settings/settings-context";
-
-// Optionally available API context (adjust path if needed)
+import NetInfo from '@react-native-community/netinfo';
 import { useApiContext } from "@/features/api/api-context";
+import {handleLocalExcelDownload} from "@/features/fullscan/excel-export";
 
 // --- Optional native modules (guarded) ---
 let FileViewer: any = null;
@@ -85,6 +81,14 @@ export default function HistoryScreen() {
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [lastDownloadedPath, setLastDownloadedPath] = useState<string | null>(null);
     const lastProgressUpdateRef = useRef<number>(0);
+
+    const [isConnected, setIsConnected] = useState(true);
+    React.useEffect(() => {
+        const unsubscribe = NetInfo.addEventListener(state => {
+            setIsConnected(state.isConnected ?? false);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const selected = useMemo(
         () => fullScans?.find?.((fs: any) => fs.id === selectedId) ?? null,
@@ -554,106 +558,34 @@ export default function HistoryScreen() {
                                 </HStack>
 
                                 {/* Action buttons */}
-                                <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
-                                    <Button
-                                        variant="outline"
-                                        action="secondary"
-                                        onPress={() => {
-                                            setSelectedId(item.id);
-                                            setIsDetailsOpen(true);
-                                        }}
-                                        style={{
-                                            borderColor: isDark ? '#475569' : '#cbd5e1',
-                                            backgroundColor: 'transparent',
-                                            flex: 1,
-                                            marginRight: 8,
-                                        }}
-                                    >
-                                        <HStack style={{ alignItems: "center", gap: 6 }}>
-                                            <Feather 
-                                                name="eye" 
-                                                size={14} 
-                                                color={isDark ? '#cbd5e1' : '#64748b'} 
-                                            />
-                                            <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                                {t("details") ?? "Details"}
-                                            </Text>
-                                        </HStack>
-                                    </Button>
-
-                                    {(uploadScan || updateScan) && (
+                                <HStack style={{ gap: 8, marginTop: 8 }}>
+                                    {isConnected ? (
                                         <>
-                                            {(uploadStatus === "not_uploaded" || uploadStatus === "error") && uploadScan && (
-                                                <Button
-                                                    variant="solid"
-                                                    action="primary"
-                                                    onPress={() => handleUpload(item.id)}
-                                                    disabled={isUploading}
-                                                    style={{
-                                                        backgroundColor: isDark ? '#3b82f6' : '#2563eb',
-                                                        flex: 1,
-                                                    }}
-                                                >
-                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                        {isUploading ? (
-                                                            <Feather name="loader" size={14} color="#ffffff" />
-                                                        ) : (
-                                                            <Feather name="upload" size={14} color="#ffffff" />
-                                                        )}
-                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
-                                                            {isUploading ? "Uploading..." : "Upload"}
-                                                        </Text>
-                                                    </HStack>
-                                                </Button>
+                                            <Button
+                                                disabled={isUploading}
+                                                onPress={() => handleUpload(item.id)}
+                                            >
+                                                Upload
+                                            </Button>
+
+                                            {uploadStatus === "needs_update" && (
+                                                <Button onPress={() => handleUpdate(item.id)}>Reupload</Button>
                                             )}
-                                            {uploadStatus === "needs_update" && updateScan && (
-                                                <Button
-                                                    variant="solid"
-                                                    action="secondary"
-                                                    onPress={() => handleUpdate(item.id)}
-                                                    disabled={isUploading}
-                                                    style={{
-                                                        backgroundColor: isDark ? '#f59e0b' : '#d97706',
-                                                        flex: 1,
-                                                    }}
-                                                >
-                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                        {isUploading ? (
-                                                            <Feather name="loader" size={14} color="#ffffff" />
-                                                        ) : (
-                                                            <Feather name="refresh-cw" size={14} color="#ffffff" />
-                                                        )}
-                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
-                                                            {isUploading ? "Updating..." : "Update"}
-                                                        </Text>
-                                                    </HStack>
-                                                </Button>
-                                            )}
-                                            {uploadStatus === "uploaded" && updateScan && (
-                                                <Button
-                                                    variant="outline"
-                                                    action="secondary"
-                                                    onPress={() => handleUpdate(item.id)}
-                                                    disabled={isUploading}
-                                                    style={{
-                                                        borderColor: isDark ? '#475569' : '#cbd5e1',
-                                                        backgroundColor: 'transparent',
-                                                        flex: 1,
-                                                    }}
-                                                >
-                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                        {isUploading ? (
-                                                            <Feather name="loader" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
-                                                        ) : (
-                                                            <Feather name="refresh-cw" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
-                                                        )}
-                                                        <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                                            {isUploading ? "Updating..." : "Re-upload"}
-                                                        </Text>
-                                                    </HStack>
-                                                </Button>
-                                            )}
+
+                                            <Button
+                                                onPress={() => handleDownloadExcel(item.id)}
+                                                variant="outline"
+                                            >
+                                                Excel
+                                            </Button>
                                         </>
+                                    ) : (
+                                        <Button
+                                            onPress={() => handleLocalExcelDownload(item.id, fullScans)}
+                                            variant="outline"
+                                        >
+                                            🚫📶 Excel
+                                        </Button>
                                     )}
                                 </HStack>
                             </VStack>
