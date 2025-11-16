@@ -1,9 +1,10 @@
 import ExcelJS from "exceljs";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { Buffer } from "buffer";
 import { Alert, Platform } from "react-native";
-import {writeAsStringAsync} from "expo-file-system";
+import RNFS from "react-native-fs";
+import { PermissionsAndroid } from "react-native";
 
 const merge = (ws: ExcelJS.Worksheet, range: string) => ws.mergeCells(range);
 const center = (c: ExcelJS.Cell) => {
@@ -108,10 +109,16 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         const dosingSpeedHeaderRow = 23;    // C23
         const dosingPressureHeaderRow = 24; // C24
 
-        const injCount = scan?.Injection?.SubMenuValues?.Values?.length ?? 0;
-        const hpCount = scan?.HoldingPressure?.SubMenusValues?.Values?.length ?? 0;
-        const dosingSpeedCount = scan?.Dosing?.DosingSpeedsValues?.Values?.length ?? 0;
-        const dosingPressureCount = scan?.Dosing?.DosingPressuresValues?.Values?.length ?? 0;
+        // Handle both camelCase (local) and PascalCase (server) property names
+        const injection = scan?.injection || scan?.Injection;
+        const holdingPressure = scan?.holdingPressure || scan?.HoldingPressure;
+        const dosing = scan?.dosing || scan?.Dosing;
+        const cylinderHeating = scan?.cylinderHeating || scan?.CylinderHeating;
+
+        const injCount = injection?.subMenuValues?.values?.length || injection?.SubMenuValues?.Values?.length || 0;
+        const hpCount = holdingPressure?.subMenusValues?.values?.length || holdingPressure?.SubMenusValues?.Values?.length || 0;
+        const dosingSpeedCount = dosing?.dosingSpeedsValues?.values?.length || dosing?.DosingSpeedsValues?.Values?.length || 0;
+        const dosingPressureCount = dosing?.dosingPressuresValues?.values?.length || dosing?.DosingPressuresValues?.Values?.length || 0;
 
         // Insert rows under headers to push the sections down like the backend
         insertEmptyRows(ws, injHeaderRow + 1, injCount);
@@ -137,79 +144,89 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         // ========================
         // Populate scalar values (column F)
         // ========================
-        if (scan?.Injection?.MainMenu) {
-            ws.getRow(2).getCell(valuesStartCol).value = scan.Injection.MainMenu.SprayPressureLimit ?? null; // F2
-            ws.getRow(3).getCell(valuesStartCol).value = scan.Injection.MainMenu.IncreasedSpecificPointPrinter ?? null; // F3
+        const injMainMenu = injection?.mainMenu || injection?.MainMenu;
+        const injSwitchType = injection?.switchType || injection?.SwitchType;
+        const hpMainMenu = holdingPressure?.mainMenu || holdingPressure?.MainMenu;
+        const dosingMainMenu = dosing?.mainMenu || dosing?.MainMenu;
+        const cylMainMenu = cylinderHeating?.mainMenu || cylinderHeating?.MainMenu;
+
+        if (injMainMenu) {
+            ws.getRow(2).getCell(valuesStartCol).value = injMainMenu.sprayPressureLimit ?? injMainMenu.SprayPressureLimit ?? null; // F2
+            ws.getRow(3).getCell(valuesStartCol).value = injMainMenu.increasedSpecificPointPrinter ?? injMainMenu.IncreasedSpecificPointPrinter ?? null; // F3
         }
 
-        if (scan?.Injection?.SwitchType) {
-            ws.getRow(injWayRow).getCell(valuesStartCol).value = scan.Injection.SwitchType.TransshipmentPosition ?? null;
-            ws.getRow(injTimeRow).getCell(valuesStartCol).value = scan.Injection.SwitchType.SwitchOverTime ?? null;
-            ws.getRow(injHydRow).getCell(valuesStartCol).value = scan.Injection.SwitchType.SwitchingPressure ?? null;
+        if (injSwitchType) {
+            ws.getRow(injWayRow).getCell(valuesStartCol).value = injSwitchType.transshipmentPosition ?? injSwitchType.TransshipmentPosition ?? null;
+            ws.getRow(injTimeRow).getCell(valuesStartCol).value = injSwitchType.switchOverTime ?? injSwitchType.SwitchOverTime ?? null;
+            ws.getRow(injHydRow).getCell(valuesStartCol).value = injSwitchType.switchingPressure ?? injSwitchType.SwitchingPressure ?? null;
         }
 
-        if (scan?.HoldingPressure?.MainMenu) {
-            ws.getRow(hpMainStartRow + 0).getCell(valuesStartCol).value = scan.HoldingPressure.MainMenu.HoldingTime ?? null;
-            ws.getRow(hpMainStartRow + 1).getCell(valuesStartCol).value = scan.HoldingPressure.MainMenu.CoolTime ?? null;
-            ws.getRow(hpMainStartRow + 2).getCell(valuesStartCol).value = scan.HoldingPressure.MainMenu.ScrewDiameter ?? null;
+        if (hpMainMenu) {
+            ws.getRow(hpMainStartRow + 0).getCell(valuesStartCol).value = hpMainMenu.holdingTime ?? hpMainMenu.HoldingTime ?? null;
+            ws.getRow(hpMainStartRow + 1).getCell(valuesStartCol).value = hpMainMenu.coolTime ?? hpMainMenu.CoolTime ?? null;
+            ws.getRow(hpMainStartRow + 2).getCell(valuesStartCol).value = hpMainMenu.screwDiameter ?? hpMainMenu.ScrewDiameter ?? null;
         }
 
-        if (scan?.Dosing?.MainMenu) {
-            ws.getRow(dosingMainStartRow + 0).getCell(valuesStartCol).value = scan.Dosing.MainMenu.DosingStroke ?? null;
-            ws.getRow(dosingMainStartRow + 1).getCell(valuesStartCol).value = scan.Dosing.MainMenu.DosingDelayTime ?? null;
-            ws.getRow(dosingMainStartRow + 2).getCell(valuesStartCol).value = scan.Dosing.MainMenu.RelieveDosing ?? null;
-            ws.getRow(dosingMainStartRow + 3).getCell(valuesStartCol).value = scan.Dosing.MainMenu.RelieveAfterDosing ?? null;
-            ws.getRow(dosingMainStartRow + 4).getCell(valuesStartCol).value = scan.Dosing.MainMenu.DischargeSpeedBeforeDosing ?? null;
-            ws.getRow(dosingMainStartRow + 5).getCell(valuesStartCol).value = scan.Dosing.MainMenu.DischargeSpeedAfterDosing ?? null;
+        if (dosingMainMenu) {
+            ws.getRow(dosingMainStartRow + 0).getCell(valuesStartCol).value = dosingMainMenu.dosingStroke ?? dosingMainMenu.DosingStroke ?? null;
+            ws.getRow(dosingMainStartRow + 1).getCell(valuesStartCol).value = dosingMainMenu.dosingDelayTime ?? dosingMainMenu.DosingDelayTime ?? null;
+            ws.getRow(dosingMainStartRow + 2).getCell(valuesStartCol).value = dosingMainMenu.relieveDosing ?? dosingMainMenu.RelieveDosing ?? null;
+            ws.getRow(dosingMainStartRow + 3).getCell(valuesStartCol).value = dosingMainMenu.relieveAfterDosing ?? dosingMainMenu.RelieveAfterDosing ?? null;
+            ws.getRow(dosingMainStartRow + 4).getCell(valuesStartCol).value = dosingMainMenu.dischargeSpeedBeforeDosing ?? dosingMainMenu.DischargeSpeedBeforeDosing ?? null;
+            ws.getRow(dosingMainStartRow + 5).getCell(valuesStartCol).value = dosingMainMenu.dischargeSpeedAfterDosing ?? dosingMainMenu.DischargeSpeedAfterDosing ?? null;
         }
 
-        if (scan?.CylinderHeating?.MainMenu) {
-            ws.getRow(cylStartRow + 0).getCell(valuesStartCol).value = scan.CylinderHeating.MainMenu.Setpoint1 ?? null;
-            ws.getRow(cylStartRow + 1).getCell(valuesStartCol).value = scan.CylinderHeating.MainMenu.Setpoint2 ?? null;
-            ws.getRow(cylStartRow + 2).getCell(valuesStartCol).value = scan.CylinderHeating.MainMenu.Setpoint3 ?? null;
-            ws.getRow(cylStartRow + 3).getCell(valuesStartCol).value = scan.CylinderHeating.MainMenu.Setpoint4 ?? null;
-            ws.getRow(cylStartRow + 4).getCell(valuesStartCol).value = scan.CylinderHeating.MainMenu.Setpoint5 ?? null;
+        if (cylMainMenu) {
+            ws.getRow(cylStartRow + 0).getCell(valuesStartCol).value = cylMainMenu.setpoint1 ?? cylMainMenu.Setpoint1 ?? null;
+            ws.getRow(cylStartRow + 1).getCell(valuesStartCol).value = cylMainMenu.setpoint2 ?? cylMainMenu.Setpoint2 ?? null;
+            ws.getRow(cylStartRow + 2).getCell(valuesStartCol).value = cylMainMenu.setpoint3 ?? cylMainMenu.Setpoint3 ?? null;
+            ws.getRow(cylStartRow + 3).getCell(valuesStartCol).value = cylMainMenu.setpoint4 ?? cylMainMenu.Setpoint4 ?? null;
+            ws.getRow(cylStartRow + 4).getCell(valuesStartCol).value = cylMainMenu.setpoint5 ?? cylMainMenu.Setpoint5 ?? null;
         }
 
         // ========================
         // Populate lists (columns D/E) with ordering by Index
         // ========================
         if (injCount > 0) {
+            const injValues = injection?.subMenuValues?.values || injection?.SubMenuValues?.Values || [];
             let r = injListStartRow;
-            [...scan.Injection.SubMenuValues.Values].sort((a: any, b: any) => a.Index - b.Index)
+            [...injValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
                 .forEach((v: any) => {
-                    ws.getRow(r).getCell(4).value = v.V ?? null;   // D
-                    ws.getRow(r).getCell(5).value = v.V2 ?? null;  // E
+                    ws.getRow(r).getCell(4).value = v.v ?? v.V ?? null;   // D
+                    ws.getRow(r).getCell(5).value = v.v2 ?? v.V2 ?? null;  // E
                     r++;
                 });
         }
 
         if (hpCount > 0) {
+            const hpValues = holdingPressure?.subMenusValues?.values || holdingPressure?.SubMenusValues?.Values || [];
             let r = hpListStartRow;
-            [...scan.HoldingPressure.SubMenusValues.Values].sort((a: any, b: any) => a.Index - b.Index)
+            [...hpValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
                 .forEach((v: any) => {
-                    ws.getRow(r).getCell(4).value = v.T ?? null;   // D
-                    ws.getRow(r).getCell(5).value = v.P ?? null;   // E
+                    ws.getRow(r).getCell(4).value = v.t ?? v.T ?? null;   // D
+                    ws.getRow(r).getCell(5).value = v.p ?? v.P ?? null;   // E
                     r++;
                 });
         }
 
         if (dosingSpeedCount > 0) {
+            const dosingSpeedValues = dosing?.dosingSpeedsValues?.values || dosing?.DosingSpeedsValues?.Values || [];
             let r = dosingSpeedListStartRow;
-            [...scan.Dosing.DosingSpeedsValues.Values].sort((a: any, b: any) => a.Index - b.Index)
+            [...dosingSpeedValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
                 .forEach((v: any) => {
-                    ws.getRow(r).getCell(4).value = v.V ?? null;   // D
-                    ws.getRow(r).getCell(5).value = v.V2 ?? null;  // E
+                    ws.getRow(r).getCell(4).value = v.v ?? v.V ?? null;   // D
+                    ws.getRow(r).getCell(5).value = v.v2 ?? v.V2 ?? null;  // E
                     r++;
                 });
         }
 
         if (dosingPressureCount > 0) {
+            const dosingPressureValues = dosing?.dosingPressuresValues?.values || dosing?.DosingPressuresValues?.Values || [];
             let r = dosingPressureListStartRow;
-            [...scan.Dosing.DosingPressuresValues.Values].sort((a: any, b: any) => a.Index - b.Index)
+            [...dosingPressureValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
                 .forEach((v: any) => {
-                    ws.getRow(r).getCell(4).value = v.V ?? null;   // D
-                    ws.getRow(r).getCell(5).value = v.P ?? null;   // E
+                    ws.getRow(r).getCell(4).value = v.v ?? v.V ?? null;   // D
+                    ws.getRow(r).getCell(5).value = v.p ?? v.P ?? null;   // E
                     r++;
                 });
         }
@@ -233,25 +250,129 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
 
         const fileName = `ParaLens_Export_${scanId}.xlsx`;
 
-        const FS = FileSystem as unknown as {
-            documentDirectory?: string | null;
-            cacheDirectory?: string | null;
-            writeAsStringAsync: typeof FileSystem.writeAsStringAsync;
-        };
-
-        const baseDir = FS.documentDirectory ?? FS.cacheDirectory!;
-        const fileUri = baseDir + fileName;
-
+        // Generate Excel buffer
         const buf = await wb.xlsx.writeBuffer();
-        const base64 = Buffer.from(buf).toString("base64");
-
-        await writeAsStringAsync(fileUri, base64, { encoding: "base64" as any });
-
-        if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fileUri, { mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        } else {
-            Alert.alert("Excel exported!", `Saved to:\n${fileUri}`);
+        const uint8Array = new Uint8Array(buf);
+        
+        // Convert Uint8Array to base64 string (chunked for large files to avoid stack overflow)
+        let binaryString = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode.apply(null, Array.from(chunk));
         }
+        
+        // Use btoa if available (browser/Expo), otherwise use a polyfill
+        let base64String: string;
+        if (typeof btoa !== 'undefined') {
+            base64String = btoa(binaryString);
+        } else {
+            // Fallback: use Buffer if available (Node.js environment)
+            const { Buffer } = require('buffer');
+            base64String = Buffer.from(uint8Array).toString('base64');
+        }
+
+        // Use cache directory for temporary file storage (accessible for sharing)
+        // Access cache directory from legacy API for compatibility
+        const cacheDir = FileSystem.cacheDirectory;
+        if (!cacheDir) {
+            Alert.alert("Export failed", "Cache directory is not available");
+            return;
+        }
+
+        const fileUri = cacheDir + fileName;
+        const file = new File(fileUri);
+
+        // Write the file as base64-encoded string
+        await file.write(base64String, { encoding: 'base64' });
+
+        // Ask user what they want to do with the file
+        Alert.alert(
+            "Excel File Ready",
+            "What would you like to do with the file?",
+            [
+                {
+                    text: "Share",
+                    onPress: async () => {
+                        try {
+                            if (await Sharing.isAvailableAsync()) {
+                                await Sharing.shareAsync(fileUri, {
+                                    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    UTI: "com.microsoft.excel.xlsx",
+                                });
+                            } else {
+                                Alert.alert("Share Unavailable", "Sharing is not available on this device.");
+                            }
+                        } catch (shareError: any) {
+                            Alert.alert(
+                                "Share failed",
+                                shareError?.message || "Could not share the file."
+                            );
+                        }
+                    },
+                },
+                {
+                    text: "Save to Downloads",
+                    onPress: async () => {
+                        try {
+                            if (Platform.OS === 'android') {
+                                // Request storage permission for Android
+                                const hasPermission = await PermissionsAndroid.request(
+                                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                                    {
+                                        title: 'Storage Permission',
+                                        message: 'This app needs access to storage to save the file.',
+                                        buttonNeutral: 'Ask Me Later',
+                                        buttonNegative: 'Cancel',
+                                        buttonPositive: 'OK',
+                                    }
+                                );
+
+                                if (hasPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+                                    Alert.alert("Permission Denied", "Storage permission is required to save the file.");
+                                    return;
+                                }
+
+                                // Save to Downloads directory on Android
+                                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+                                await RNFS.copyFile(fileUri, downloadPath);
+                                Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
+                            } else {
+                                // For iOS, use document directory and share to Files app
+                                const documentDir = FileSystem.documentDirectory;
+                                if (documentDir) {
+                                    const documentPath = documentDir + fileName;
+                                    const documentFile = new File(documentPath);
+                                    await documentFile.write(base64String, { encoding: 'base64' });
+                                    
+                                    // Share to Files app
+                                    if (await Sharing.isAvailableAsync()) {
+                                        await Sharing.shareAsync(documentPath, {
+                                            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                            UTI: "com.microsoft.excel.xlsx",
+                                        });
+                                    } else {
+                                        Alert.alert("File Saved", `Excel file saved to:\n${documentPath}`);
+                                    }
+                                } else {
+                                    Alert.alert("Error", "Could not access document directory.");
+                                }
+                            }
+                        } catch (saveError: any) {
+                            Alert.alert(
+                                "Save failed",
+                                saveError?.message || "Could not save the file to downloads."
+                            );
+                        }
+                    },
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
+            ],
+            { cancelable: true }
+        );
     } catch (e: any) {
         Alert.alert("Export failed", e?.message ?? String(e));
     }

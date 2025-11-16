@@ -10,6 +10,8 @@ import {
     StyleSheet,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
+
+// Your Expo UI aliases
 import { Box } from "@/components/ui/box";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
@@ -18,12 +20,15 @@ import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
 import { Badge, BadgeText } from "@/components/ui/badge";
 import { Divider } from "@/components/ui/divider";
+
+// Contexts (Expo aliases)
 import { useFullScan } from "@/features/fullscan/fullscan-context";
 import { useI18n } from "@/features/settings/i18n";
 import { useSettings } from "@/features/settings/settings-context";
-import NetInfo from '@react-native-community/netinfo';
+
+// Optionally available API context (adjust path if needed)
 import { useApiContext } from "@/features/api/api-context";
-import {handleLocalExcelDownload} from "@/features/fullscan/excel-export";
+import { handleLocalExcelDownload } from "@/features/fullscan/excel-export";
 
 // --- Optional native modules (guarded) ---
 let FileViewer: any = null;
@@ -81,14 +86,6 @@ export default function HistoryScreen() {
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [lastDownloadedPath, setLastDownloadedPath] = useState<string | null>(null);
     const lastProgressUpdateRef = useRef<number>(0);
-
-    const [isConnected, setIsConnected] = useState(true);
-    React.useEffect(() => {
-        const unsubscribe = NetInfo.addEventListener(state => {
-            setIsConnected(state.isConnected ?? false);
-        });
-        return () => unsubscribe();
-    }, []);
 
     const selected = useMemo(
         () => fullScans?.find?.((fs: any) => fs.id === selectedId) ?? null,
@@ -230,7 +227,7 @@ export default function HistoryScreen() {
         }
     };
 
-    const handleDownloadExcel = async (scanId: number) => {
+    const handleDownloadExcelFromServer = async (scanId: number) => {
         if (!selected) return;
 
         const status: UploadStatus = getUploadStatus?.(scanId) ?? "unknown";
@@ -318,10 +315,39 @@ export default function HistoryScreen() {
         }
     };
 
+    const handleDownloadExcelFromLocal = async (scanId: number) => {
+        if (!selected) return;
+        await handleLocalExcelDownload(scanId, fullScans ?? []);
+    };
+
+    const handleDownloadExcel = async (scanId: number) => {
+        if (!selected) return;
+
+        Alert.alert(
+            "Download Excel",
+            "Choose download source:",
+            [
+                {
+                    text: "Server",
+                    onPress: () => handleDownloadExcelFromServer(scanId),
+                },
+                {
+                    text: "Local",
+                    onPress: () => handleDownloadExcelFromLocal(scanId),
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
+            ],
+            { cancelable: true }
+        );
+    };
+
     return (
         <Box
-            style={{ 
-                flex: 1, 
+            style={{
+                flex: 1,
                 backgroundColor: isDark ? '#0f172a' : '#f8fafc'
             }}
         >
@@ -347,9 +373,9 @@ export default function HistoryScreen() {
                     </VStack>
 
                     {(ConnectivityTest?.testConnection || excelService?.ping) && (
-                        <Button 
-                            variant="outline" 
-                            action="secondary" 
+                        <Button
+                            variant="outline"
+                            action="secondary"
                             onPress={doConnectivityTest}
                             style={{
                                 borderColor: isDark ? '#475569' : '#cbd5e1',
@@ -357,10 +383,10 @@ export default function HistoryScreen() {
                             }}
                         >
                             <HStack style={{ alignItems: "center", gap: 6 }}>
-                                <Feather 
-                                    name="wifi" 
-                                    size={16} 
-                                    color={isDark ? '#cbd5e1' : '#64748b'} 
+                                <Feather
+                                    name="wifi"
+                                    size={16}
+                                    color={isDark ? '#cbd5e1' : '#64748b'}
                                 />
                                 <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
                                     Test
@@ -377,12 +403,12 @@ export default function HistoryScreen() {
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={() => (
-                    <VStack 
-                        style={{ 
-                            alignItems: "center", 
-                            justifyContent: "center", 
+                    <VStack
+                        style={{
+                            alignItems: "center",
+                            justifyContent: "center",
                             paddingVertical: 60,
-                            paddingHorizontal: 20 
+                            paddingHorizontal: 20
                         }}
                     >
                         <Box
@@ -396,10 +422,10 @@ export default function HistoryScreen() {
                                 marginBottom: 20,
                             }}
                         >
-                            <Feather 
-                                name="inbox" 
-                                size={40} 
-                                color={isDark ? '#475569' : '#94a3b8'} 
+                            <Feather
+                                name="inbox"
+                                size={40}
+                                color={isDark ? '#475569' : '#94a3b8'}
                             />
                         </Box>
                         <Text className={`text-lg font-semibold mb-2 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
@@ -444,21 +470,21 @@ export default function HistoryScreen() {
                                 <HStack style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                                     <VStack style={{ flex: 1 }} className="gap-1">
                                         <HStack style={{ alignItems: "center", gap: 8 }}>
-                                            <Feather 
-                                                name="user" 
-                                                size={16} 
-                                                color={isDark ? '#cbd5e1' : '#64748b'} 
+                                            <Feather
+                                                name="user"
+                                                size={16}
+                                                color={isDark ? '#cbd5e1' : '#64748b'}
                                             />
                                             <Text className={`font-semibold ${isDark ? "text-typography-50" : "text-typography-900"}`}>
                                                 {item.author || t("unknown") || "Unbekannt"}
                                             </Text>
                                         </HStack>
-                                        
+
                                         <HStack style={{ alignItems: "center", gap: 6 }}>
-                                            <Feather 
-                                                name="clock" 
-                                                size={14} 
-                                                color={isDark ? '#94a3b8' : '#94a3b8'} 
+                                            <Feather
+                                                name="clock"
+                                                size={14}
+                                                color={isDark ? '#94a3b8' : '#94a3b8'}
                                             />
                                             <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
                                                 {new Date(item.date).toLocaleString()}
@@ -467,10 +493,10 @@ export default function HistoryScreen() {
 
                                         {!!item.serverId && (
                                             <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                <Feather 
-                                                    name="server" 
-                                                    size={14} 
-                                                    color={isDark ? '#94a3b8' : '#94a3b8'} 
+                                                <Feather
+                                                    name="server"
+                                                    size={14}
+                                                    color={isDark ? '#94a3b8' : '#94a3b8'}
                                                 />
                                                 <Text className={`text-xs ${isDark ? "text-typography-500" : "text-typography-500"}`}>
                                                     ID: {item.serverId}
@@ -479,8 +505,8 @@ export default function HistoryScreen() {
                                         )}
                                     </VStack>
 
-                                    <Badge 
-                                        action={statusConfig.badgeAction} 
+                                    <Badge
+                                        action={statusConfig.badgeAction}
                                         variant="solid"
                                         style={{
                                             backgroundColor: statusConfig.bgColor,
@@ -488,13 +514,13 @@ export default function HistoryScreen() {
                                         }}
                                     >
                                         <HStack style={{ alignItems: "center", gap: 4 }}>
-                                            <Feather 
-                                                name={statusConfig.icon} 
-                                                size={12} 
+                                            <Feather
+                                                name={statusConfig.icon}
+                                                size={12}
                                                 color={statusConfig.color}
                                             />
-                                            <BadgeText 
-                                                style={{ 
+                                            <BadgeText
+                                                style={{
                                                     color: statusConfig.color,
                                                     fontSize: 11,
                                                 }}
@@ -539,12 +565,12 @@ export default function HistoryScreen() {
                                                     gap: 6,
                                                 }}
                                             >
-                                                <Feather 
-                                                    name={icon as any} 
-                                                    size={12} 
+                                                <Feather
+                                                    name={icon as any}
+                                                    size={12}
                                                     color={textColor}
                                                 />
-                                                <Text style={{ 
+                                                <Text style={{
                                                     color: textColor,
                                                     fontSize: 11,
                                                     fontWeight: '500',
@@ -558,34 +584,106 @@ export default function HistoryScreen() {
                                 </HStack>
 
                                 {/* Action buttons */}
-                                <HStack style={{ gap: 8, marginTop: 8 }}>
-                                    {isConnected ? (
+                                <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
+                                    <Button
+                                        variant="outline"
+                                        action="secondary"
+                                        onPress={() => {
+                                            setSelectedId(item.id);
+                                            setIsDetailsOpen(true);
+                                        }}
+                                        style={{
+                                            borderColor: isDark ? '#475569' : '#cbd5e1',
+                                            backgroundColor: 'transparent',
+                                            flex: 1,
+                                            marginRight: 8,
+                                        }}
+                                    >
+                                        <HStack style={{ alignItems: "center", gap: 6 }}>
+                                            <Feather
+                                                name="eye"
+                                                size={14}
+                                                color={isDark ? '#cbd5e1' : '#64748b'}
+                                            />
+                                            <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
+                                                {t("details") ?? "Details"}
+                                            </Text>
+                                        </HStack>
+                                    </Button>
+
+                                    {(uploadScan || updateScan) && (
                                         <>
-                                            <Button
-                                                disabled={isUploading}
-                                                onPress={() => handleUpload(item.id)}
-                                            >
-                                                Upload
-                                            </Button>
-
-                                            {uploadStatus === "needs_update" && (
-                                                <Button onPress={() => handleUpdate(item.id)}>Reupload</Button>
+                                            {(uploadStatus === "not_uploaded" || uploadStatus === "error") && uploadScan && (
+                                                <Button
+                                                    variant="solid"
+                                                    action="primary"
+                                                    onPress={() => handleUpload(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        backgroundColor: isDark ? '#3b82f6' : '#2563eb',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color="#ffffff" />
+                                                        ) : (
+                                                            <Feather name="upload" size={14} color="#ffffff" />
+                                                        )}
+                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
+                                                            {isUploading ? "Uploading..." : "Upload"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
                                             )}
-
-                                            <Button
-                                                onPress={() => handleDownloadExcel(item.id)}
-                                                variant="outline"
-                                            >
-                                                Excel
-                                            </Button>
+                                            {uploadStatus === "needs_update" && updateScan && (
+                                                <Button
+                                                    variant="solid"
+                                                    action="secondary"
+                                                    onPress={() => handleUpdate(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        backgroundColor: isDark ? '#f59e0b' : '#d97706',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color="#ffffff" />
+                                                        ) : (
+                                                            <Feather name="refresh-cw" size={14} color="#ffffff" />
+                                                        )}
+                                                        <Text style={{ color: '#ffffff', fontWeight: '600' }}>
+                                                            {isUploading ? "Updating..." : "Update"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
+                                            )}
+                                            {uploadStatus === "uploaded" && updateScan && (
+                                                <Button
+                                                    variant="outline"
+                                                    action="secondary"
+                                                    onPress={() => handleUpdate(item.id)}
+                                                    disabled={isUploading}
+                                                    style={{
+                                                        borderColor: isDark ? '#475569' : '#cbd5e1',
+                                                        backgroundColor: 'transparent',
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <HStack style={{ alignItems: "center", gap: 6 }}>
+                                                        {isUploading ? (
+                                                            <Feather name="loader" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
+                                                        ) : (
+                                                            <Feather name="refresh-cw" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
+                                                        )}
+                                                        <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
+                                                            {isUploading ? "Updating..." : "Re-upload"}
+                                                        </Text>
+                                                    </HStack>
+                                                </Button>
+                                            )}
                                         </>
-                                    ) : (
-                                        <Button
-                                            onPress={() => handleLocalExcelDownload(item.id, fullScans)}
-                                            variant="outline"
-                                        >
-                                            🚫📶 Excel
-                                        </Button>
                                     )}
                                 </HStack>
                             </VStack>
@@ -656,10 +754,10 @@ export default function HistoryScreen() {
                                         justifyContent: "center",
                                     }}
                                 >
-                                    <Feather 
-                                        name="x" 
-                                        size={18} 
-                                        color={isDark ? "#cbd5e1" : "#64748b"} 
+                                    <Feather
+                                        name="x"
+                                        size={18}
+                                        color={isDark ? "#cbd5e1" : "#64748b"}
                                     />
                                 </Pressable>
                             </HStack>
@@ -688,10 +786,10 @@ export default function HistoryScreen() {
                                         <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
                                             <VStack style={{ flex: 1 }} className="gap-1">
                                                 <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                    <Feather 
-                                                        name="user" 
-                                                        size={14} 
-                                                        color={isDark ? "#94a3b8" : "#64748b"} 
+                                                    <Feather
+                                                        name="user"
+                                                        size={14}
+                                                        color={isDark ? "#94a3b8" : "#64748b"}
                                                     />
                                                     <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
                                                         {t("author") ?? "Autor"}
@@ -703,10 +801,10 @@ export default function HistoryScreen() {
                                             </VStack>
                                             <VStack style={{ alignItems: "flex-end" }} className="gap-1">
                                                 <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                    <Feather 
-                                                        name="clock" 
-                                                        size={14} 
-                                                        color={isDark ? "#94a3b8" : "#64748b"} 
+                                                    <Feather
+                                                        name="clock"
+                                                        size={14}
+                                                        color={isDark ? "#94a3b8" : "#64748b"}
                                                     />
                                                     <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
                                                         {t("date") ?? "Datum"}
@@ -719,10 +817,10 @@ export default function HistoryScreen() {
                                         </HStack>
                                         {!!selected.serverId && (
                                             <HStack style={{ alignItems: "center", gap: 6 }}>
-                                                <Feather 
-                                                    name="server" 
-                                                    size={14} 
-                                                    color={isDark ? "#94a3b8" : "#64748b"} 
+                                                <Feather
+                                                    name="server"
+                                                    size={14}
+                                                    color={isDark ? "#94a3b8" : "#64748b"}
                                                 />
                                                 <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
                                                     Server ID: {selected.serverId}
@@ -829,18 +927,14 @@ export default function HistoryScreen() {
                                     onPress={() => selected && handleDownloadExcel(selected.id)}
                                     disabled={
                                         isDownloading ||
-                                        !selected ||
-                                        (getUploadStatus?.(selected.id) ?? "unknown") !== "uploaded" ||
-                                        !excelService?.downloadExcel
+                                        !selected
                                     }
-                                    style={{ 
+                                    style={{
                                         backgroundColor: isDark ? '#3b82f6' : '#2563eb',
                                         flex: 1,
                                         opacity: (
                                             isDownloading ||
-                                            !selected ||
-                                            (getUploadStatus?.(selected.id) ?? "unknown") !== "uploaded" ||
-                                            !excelService?.downloadExcel
+                                            !selected
                                         ) ? 0.5 : 1,
                                     }}
                                 >
@@ -851,9 +945,9 @@ export default function HistoryScreen() {
                                         </Text>
                                     </HStack>
                                 </Button>
-                                <Button 
-                                    variant="outline" 
-                                    action="secondary" 
+                                <Button
+                                    variant="outline"
+                                    action="secondary"
                                     onPress={() => setIsDetailsOpen(false)}
                                     style={{
                                         borderColor: isDark ? '#475569' : '#cbd5e1',
@@ -913,10 +1007,10 @@ function SectionDetails({
                     Data structure not recognized
                 </Text>
                 {data && typeof data === 'object' && (
-                    <DataBlock 
-                        title="Raw Data" 
-                        entries={Object.entries(data)} 
-                        isDark={isDark} 
+                    <DataBlock
+                        title="Raw Data"
+                        entries={Object.entries(data)}
+                        isDark={isDark}
                     />
                 )}
             </VStack>
@@ -993,7 +1087,7 @@ function SectionDetails({
         }
 
         const entries = Object.entries(data).filter(([_, value]) => value != null);
-        
+
         if (entries.length === 0) {
             return (
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
@@ -1090,8 +1184,8 @@ function ArrayBlock({
                 className="gap-2"
             >
                 {/* Header Row */}
-                <HStack 
-                    style={{ 
+                <HStack
+                    style={{
                         justifyContent: "space-between",
                         paddingBottom: 8,
                         borderBottomWidth: 1,
@@ -1099,8 +1193,8 @@ function ArrayBlock({
                     }}
                 >
                     {columns.map((col) => (
-                        <Text 
-                            key={col} 
+                        <Text
+                            key={col}
                             className={`text-xs font-semibold uppercase ${isDark ? "text-typography-400" : "text-typography-500"}`}
                             style={{ flex: 1 }}
                         >
@@ -1110,16 +1204,16 @@ function ArrayBlock({
                 </HStack>
                 {/* Data Rows */}
                 {entries.map((row, idx) => (
-                    <HStack 
-                        key={idx} 
-                        style={{ 
+                    <HStack
+                        key={idx}
+                        style={{
                             justifyContent: "space-between",
                             paddingVertical: 4,
                         }}
                     >
                         {columns.map((col) => (
-                            <Text 
-                                key={col} 
+                            <Text
+                                key={col}
                                 className={`text-sm ${isDark ? "text-typography-200" : "text-typography-700"}`}
                                 style={{ flex: 1 }}
                             >
