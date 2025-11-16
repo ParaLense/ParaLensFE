@@ -12,7 +12,7 @@ import {VStack} from "@/components/ui/vstack";
 import {Text} from "@/components/ui/text";
 import {Input, InputField} from "@/components/ui/input";
 import { Heading } from "@/components/ui/heading";
-import {Button} from "@/components/ui/button";
+import {Button, ButtonText} from "@/components/ui/button";
 import {HStack} from "@/components/ui/hstack";
 
 type ScanMenu = "injection" | "dosing" | "holdingPressure" | "cylinderHeating";
@@ -406,9 +406,9 @@ export default function ScanReviewScreen() {
         className="gap-4 mt-6 items-center justify-between"
       >
         <Button variant="outline" action="secondary" onPress={onBack}>
-          <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
+          <ButtonText>
             {t("cancel")}
-          </Text>
+          </ButtonText>
         </Button>
         <Button
           action="primary"
@@ -446,9 +446,9 @@ export default function ScanReviewScreen() {
             onSave();
           }}
         >
-          <Text className={isDark ? "text-typography-50" : "text-typography-900"}>
+          <ButtonText className={isDark ? "text-typography-900" : undefined}>
             {t("create") || "Speichern"}
-          </Text>
+          </ButtonText>
         </Button>
       </HStack>
     </ScrollView>

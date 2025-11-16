@@ -4,7 +4,7 @@ import { FlatList, Pressable, Modal as RNModal } from "react-native";
 
 import UiScannerCamera from "@/components/UiScannerCamera";
 import { Box } from "@/components/ui/box";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonText } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
 import { HStack } from "@/components/ui/hstack";
 import { Input, InputField } from "@/components/ui/input";
@@ -349,7 +349,9 @@ export default function CameraScreen() {
                     setAuthorInput("");
                   }}
                 >
-                  <Text>{t("cancel") ?? "Abbrechen"}</Text>
+                  <ButtonText>
+                    {t("cancel") ?? "Abbrechen"}
+                  </ButtonText>
                 </Button>
                 <Button
                   onPress={() => {
@@ -359,7 +361,9 @@ export default function CameraScreen() {
                     setAuthorInput("");
                   }}
                 >
-                  <Text className="text-typography-0">{t("create") ?? "Erstellen"}</Text>
+                  <ButtonText className={isDark ? "text-typography-900" : undefined}>
+                    {t("create") ?? "Erstellen"}
+                  </ButtonText>
                 </Button>
               </HStack>
             </Pressable>
