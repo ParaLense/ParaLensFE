@@ -26,7 +26,7 @@ export type OcrTemplateBox = {
     orientation?: 'horizontal' | 'vertical';
     cells?: number;
     valuesRegion?: { x: number; y: number; width: number; height: number };
-    checkboxThreshold?: number;
+    blackRatioMin?: number;
     readValue?: boolean;
     valueBoxId?: string;
   };
