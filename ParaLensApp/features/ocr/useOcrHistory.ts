@@ -178,7 +178,7 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
     // 3. Partial/Base match logic
     // If the expected unit is complex (e.g. "cm^3/s") and we found the base (e.g. "cm"),
     // we consider it a match.
-    // if its /s and we found /s then we remove it
+    // if it's /s and we found /s then we remove it
     let simplifiedForComparison = simplified;
     if (kwClean.endsWith('/s') && simplified.endsWith('/s')){
       simplifiedForComparison = simplified.slice(0, -2);
