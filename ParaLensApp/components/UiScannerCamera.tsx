@@ -161,7 +161,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     []
   );
 
-  // TODO: load OCR template for currentLayout (percent over warped image)
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
   const frameDimensions = useMemo(() => {

@@ -43,10 +43,10 @@ const buildRowsFromScrollbar = (scrollbar: ParsedScrollbarValue | undefined): In
     const key = seg?.key?.[0];
     const val = seg?.value?.[0];
     if (typeof key === "number" && Number.isFinite(key)) {
-      row.v = key.toFixed(2);
+      row.v = key.toFixed(4);
     }
     if (typeof val === "number" && Number.isFinite(val)) {
-      row.v2 = val.toFixed(2);
+      row.v2 = val.toFixed(4);
     }
     return row;
   });
