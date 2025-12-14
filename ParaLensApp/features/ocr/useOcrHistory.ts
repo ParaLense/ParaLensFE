@@ -587,8 +587,6 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
   const maxHistoryPerField = config?.maxHistoryPerField ?? DEFAULT_MAX_HISTORY_PER_FIELD;
   const minOccurrencesForMajority = config?.minOccurrencesForMajority ?? DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY;
   const commaRequired = !!config?.commaRequired;
-  const template = config?.template;
-
   // Add a full OCR scan result (with boxes) and update field aggregations
   const addFullScanResult = useCallback(
     (scanResult: OcrScanResult) => {
