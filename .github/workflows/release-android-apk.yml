@@ -36,14 +36,7 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Debug paths (sanity check)
-        run: |
-          pwd
-          ls -la
-          ls -la android || true
-
-      # Ensures android/app exists on CI even if android/ is not committed
-      - name: Generate android/ (prebuild)
+      - name: Prebuild Android (ensure android/app exists)
         run: npx expo prebuild --platform android --no-install
 
       - name: Ensure android/app exists
@@ -54,9 +47,12 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
           ls -lah android/app/release.jks
 
-      - name: Provide signing values to Gradle
+      - name: Provide signing values to Gradle (safe newline)
         run: |
-          cat >> android/gradle.properties << 'EOF'
+          # Ensure gradle.properties ends with a newline before appending
+          printf "\n" >> android/gradle.properties
+
+          cat >> android/gradle.properties << EOF
           MYAPP_UPLOAD_STORE_FILE=release.jks
           MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
