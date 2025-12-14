@@ -36,10 +36,18 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      # If your repo already contains ParaLensApp/android, keep this OFF.
-      # If android/ is NOT committed, uncomment the next step.
-      # - name: Generate android/ (prebuild)
-      #   run: npx expo prebuild --platform android --no-install
+      - name: Debug paths (sanity check)
+        run: |
+          pwd
+          ls -la
+          ls -la android || true
+
+      # Ensures android/app exists on CI even if android/ is not committed
+      - name: Generate android/ (prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Ensure android/app exists
+        run: mkdir -p android/app
 
       - name: Decode keystore into android/app
         run: |
@@ -58,7 +66,7 @@ jobs:
       - name: Build Release APK
         run: |
           cd android
-          ./gradlew :app:assembleRelease --no-daemon
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Copy APK to workspace
         run: |
