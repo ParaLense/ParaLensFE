@@ -161,7 +161,7 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
 
   // Remove characters that are usually noise, but keep relevant ones
   // We keep letters, numbers, %, /, ^, ³, ²
-  let simplified = cleaned.replace(/[^a-z0-9%/\^³²]/g, '');
+  const simplified = cleaned.replace(/[^a-z0-9%/\^³²]/g, '');
   
   if (!simplified) return null;
 
