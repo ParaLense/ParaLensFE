@@ -28,18 +28,18 @@
   },
   {
     "id": "relieve_dosing",
-    "x": 8.15,
+    "x": 31.41,
     "y": 60.51,
-    "width": 39.02,
+    "width": 15.76,
     "height": 2.59,
     "label": "Relieve Dosing",
     "type": "value"
   },
   {
     "id": "relieve_after_dosing",
-    "x": 47.8,
+    "x": 71.66,
     "y": 60.41,
-    "width": 37.42,
+    "width": 13.56,
     "height": 2.71,
     "label": "Relieve After Dosing",
     "type": "value"

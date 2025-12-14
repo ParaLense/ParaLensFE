@@ -294,3 +294,6 @@ Die Screen Detection verwendet eine robuste Pipeline mit:
 
 
 
+
+
+

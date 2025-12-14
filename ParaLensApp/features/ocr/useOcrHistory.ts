@@ -10,13 +10,26 @@ export type OcrFieldType = 'scrollbar' | 'value' | 'checkbox';
 // Each index (0, 1, 2, ...) represents one key/value-pair of the scrollbar.
 // We keep *all* numeric candidates that passed the filter in arrays so that
 // we can later apply majority voting.
-export type ParsedScrollbarValue = Record<
-  number, // index: 0, 1, 2, ...
+//
+// Additionally, we store detected units once per scrollbar:
+// - keyUnit:   unit for the "key"/start values (e.g. "bar")
+// - valueUnit: unit for the "value"/end values  (e.g. "s")
+//
+// We model this as an index signature for numeric indices plus two
+// optional properties. Callers that iterate over keys MUST always filter
+// to numeric indices (which we already do via Number.isFinite).
+type ParsedScrollbarSegments = Record<
+  number,
   {
-    key: number[];   // all filtered "key"/start values (e.g. 0.00, 0.00, ...)
-    value: number[]; // all filtered "value"/end values  (e.g. 8.00, 8.01, ...)
+    key: number[];   // all filtered "key"/start values (e.g. 0.0000, 0.0000, ...)
+    value: number[]; // all filtered "value"/end values  (e.g. 8.0000, 8.0001, ...)
   }
 >;
+
+export type ParsedScrollbarValue = ParsedScrollbarSegments & {
+  keyUnit?: string | null;
+  valueUnit?: string | null;
+};
 
 export type OcrFieldResult = {
   box_id: string;
@@ -73,6 +86,7 @@ const END_KEYWORDS = ['cm', 'bar', 'm/s', 's'];
 const NUMERIC_TOKEN_REGEX = /^[+-]?\d+(?:[.,]\d+)?$/;
 
 const DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY = 15;
+const SCROLLBAR_DECIMALS = 4;
 
 export const isValidNumericToken = (token: string, commaRequired = false): boolean => {
   if (!token) return false;
@@ -98,8 +112,8 @@ export const pickMajorityValue = (values: number[], minOccurrences = DEFAULT_MIN
   const counts = new Map<string, { value: number; count: number }>();
   for (const v of values) {
     if (typeof v !== 'number' || !Number.isFinite(v)) continue;
-    // Use fixed precision so 0.00 and 0.0 are treated as same value
-    const key = v.toFixed(2);
+    // Use fixed precision so 0.0000 and 0.0 are treated as same value
+    const key = v.toFixed(SCROLLBAR_DECIMALS);
     const existing = counts.get(key);
     if (existing) {
       existing.count += 1;
@@ -121,7 +135,7 @@ export const pickMajorityValue = (values: number[], minOccurrences = DEFAULT_MIN
 
 // Fuzzy detection of units / start-keywords like "v", "cm", "bar", "m/s", "s".
 // Handles common OCR mistakes such as "cms" -> "cm", "ms" -> "m/s".
-export const detectMatchingEinheit = (raw: string, keywords: string[]): string | null => {
+export const detectMatchingUnit = (raw: string, keywords: string[]): string | null => {
   if (!raw) return null;
   const cleaned = raw.toLowerCase().replace(/[^a-z/]/g, '');
   if (!cleaned) return null;
@@ -147,6 +161,91 @@ export const detectMatchingEinheit = (raw: string, keywords: string[]): string |
   }
 
   return null;
+};
+
+// ---------------------------------------------------------------------------
+// Scrollbar-specific helpers (units, token normalisation)
+// ---------------------------------------------------------------------------
+
+type ScrollbarUnits = {
+  keyUnit?: string | null;
+  valueUnit?: string | null;
+};
+
+/**
+ * Normalise raw scrollbar tokens:
+ * - Split values on ';' so "123,3;322,4 bar;76 s" becomes individual tokens
+ * - For the last two tokens, if they contain " <unit>" at the end
+ *   (e.g. "322,4 bar", "76 s"), split the unit off, detect it via
+ *   detectMatchingUnit + END_KEYWORDS and remember:
+ *      - first of the last two -> keyUnit
+ *      - second of the last two -> valueUnit
+ * - Return cleaned tokens (numeric parts only) plus detected units.
+ */
+const normalizeScrollbarTokensAndUnits = (
+  rawTokens: string[]
+): { tokens: string[] } & ScrollbarUnits => {
+  if (!rawTokens || rawTokens.length === 0) {
+    return { tokens: [] };
+  }
+
+  // First expand any ";" separated values into individual tokens.
+  const expanded: string[] = [];
+  for (const raw of rawTokens) {
+    const str = String(raw);
+    const parts = str
+      .split(/[;]+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (parts.length > 0) {
+      expanded.push(...parts);
+    }
+  }
+
+  if (expanded.length === 0) {
+    return { tokens: [] };
+  }
+
+  const tokens = [...expanded];
+  let keyUnit: string | null | undefined;
+  let valueUnit: string | null | undefined;
+
+  // Determine indices of the last two "values"
+  const indexCandidates: number[] = [];
+  if (tokens.length >= 2) {
+    indexCandidates.push(tokens.length - 2, tokens.length - 1);
+  } else {
+    indexCandidates.push(tokens.length - 1);
+  }
+
+  indexCandidates.forEach((idx, pos) => {
+    if (idx < 0 || idx >= tokens.length) return;
+    const token = tokens[idx];
+    if (!token) return;
+
+    // Look for "<number> <unit>" pattern using the last space
+    const lastSpace = token.lastIndexOf(' ');
+    if (lastSpace <= 0 || lastSpace >= token.length - 1) return;
+
+    const numericPart = token.slice(0, lastSpace).trim();
+    const unitPart = token.slice(lastSpace + 1).trim();
+    if (!numericPart || !unitPart) return;
+
+    const detected = detectMatchingUnit(unitPart, END_KEYWORDS);
+    if (!detected) return;
+
+    // Store unit depending on whether this is the first or second from the end
+    if (pos === 0 && keyUnit == null) {
+      keyUnit = detected;
+    } else if (pos === 1 && valueUnit == null) {
+      valueUnit = detected;
+    }
+
+    // Replace token with numeric part only so downstream numeric parsing works
+    tokens[idx] = numericPart;
+  });
+
+  return { tokens, keyUnit, valueUnit };
 };
 
 // ---------------------------------------------------------------------------
@@ -181,13 +280,31 @@ const mergeParsedScrollbar = (
   incoming: ParsedScrollbarValue
 ): ParsedScrollbarValue => {
   const result: ParsedScrollbarValue = existing ? { ...existing } : {};
+
+  // Merge numeric segments (skip non-numeric properties like keyUnit/valueUnit)
   for (const [indexKey, segment] of Object.entries(incoming)) {
     const idx = Number(indexKey);
-    const current = result[idx] ?? { key: [], value: [] };
-    if (Array.isArray(segment.key)) current.key.push(...segment.key);
-    if (Array.isArray(segment.value)) current.value.push(...segment.value);
+    if (!Number.isFinite(idx)) continue;
+    const current = (result[idx] ?? { key: [], value: [] }) as {
+      key: number[];
+      value: number[];
+    };
+    if (Array.isArray((segment as any).key)) current.key.push(...(segment as any).key);
+    if (Array.isArray((segment as any).value)) current.value.push(...(segment as any).value);
     result[idx] = current;
   }
+
+  // Merge units at the "overarching" scrollbar level – all values belong to them.
+  const incomingKeyUnit = (incoming as ParsedScrollbarValue).keyUnit;
+  const incomingValueUnit = (incoming as ParsedScrollbarValue).valueUnit;
+
+  if (incomingKeyUnit) {
+    result.keyUnit = incomingKeyUnit;
+  }
+  if (incomingValueUnit) {
+    result.valueUnit = incomingValueUnit;
+  }
+
   return result;
 };
 
@@ -220,6 +337,9 @@ const computeBestScrollbar = (
   const bestParsed: ParsedScrollbarValue = {};
   const parts: string[] = [];
 
+  const keyUnit = agg.keyUnit ?? null;
+  const valueUnit = agg.valueUnit ?? null;
+
   for (const idx of indices) {
     const segment = agg[idx];
     if (!segment) continue;
@@ -231,7 +351,14 @@ const computeBestScrollbar = (
       key: [bestKey],
       value: [bestValue],
     };
-    parts.push(`${idx}: (${bestKey.toFixed(2)},${bestValue.toFixed(2)})`);
+    // Format with four decimal places and append units (once per side)
+    const keySuffix = keyUnit ? ` ${keyUnit}` : '';
+    const valueSuffix = valueUnit ? ` ${valueUnit}` : '';
+    parts.push(
+      `${idx}: (${bestKey.toFixed(SCROLLBAR_DECIMALS)}${keySuffix},${bestValue.toFixed(
+        SCROLLBAR_DECIMALS
+      )}${valueSuffix})`
+    );
   }
 
   if (parts.length === 0) return null;
@@ -266,10 +393,14 @@ const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): ParsedScro
 
   if (rawTokens.length === 0) return null;
 
+  // First normalise tokens and extract possible units from the last two values.
+  const { tokens: normalisedTokens, keyUnit, valueUnit } = normalizeScrollbarTokensAndUnits(rawTokens);
+  if (normalisedTokens.length === 0) return null;
+
   // Remove potential unit/start tokens at the beginning (START_KEYWORDS)
-  const tokens = [...rawTokens];
+  const tokens = [...normalisedTokens];
   for (let i = 0; i < Math.min(2, tokens.length); i++) {
-    const unit = detectMatchingEinheit(tokens[i], START_KEYWORDS);
+    const unit = detectMatchingUnit(tokens[i], START_KEYWORDS);
     if (unit) {
       tokens.splice(i, 1);
       i -= 1;
@@ -281,7 +412,7 @@ const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): ParsedScro
   // Remove potential unit tokens at the end (END_KEYWORDS)
   for (let removed = 0; removed < 2 && tokens.length > 0; removed++) {
     const lastIdx = tokens.length - 1;
-    const unit = detectMatchingEinheit(tokens[lastIdx], END_KEYWORDS);
+    const unit = detectMatchingUnit(tokens[lastIdx], END_KEYWORDS);
     if (unit) {
       tokens.splice(lastIdx, 1);
     } else {
@@ -328,7 +459,18 @@ const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): ParsedScro
     }
   }
 
-  return Object.keys(parsed).length > 0 ? parsed : null;
+  if (Object.keys(parsed).length === 0) return null;
+
+  // Store detected units once at the scrollbar level so that all segments
+  // in this field can re-use them.
+  if (keyUnit) {
+    parsed.keyUnit = keyUnit;
+  }
+  if (valueUnit) {
+    parsed.valueUnit = valueUnit;
+  }
+
+  return parsed;
 };
 
 // Parse a simple numeric value box
