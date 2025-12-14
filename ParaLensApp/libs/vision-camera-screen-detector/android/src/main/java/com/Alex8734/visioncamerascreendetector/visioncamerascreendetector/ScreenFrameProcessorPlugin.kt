@@ -2,6 +2,7 @@ package com.alex8734.visioncamerascreendetector.visioncamerascreendetector
 
 import android.media.Image
 import android.util.Log
+import com.alex8734.visioncamerascreendetector.BuildConfig
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
@@ -21,7 +22,7 @@ class ScreenDetectorFrameProcessorPlugin(
   options: Map<String, Any>?
 ) : FrameProcessorPlugin() {
   private val pluginOptions = options
-  
+
   companion object {
     private var detectionCounter = 0
     private var totalFrameCounter = 0
@@ -64,7 +65,7 @@ class ScreenDetectorFrameProcessorPlugin(
       // Convert image to grayscale
       val gray = ImageProcessing.yPlaneToGrayMat(mediaImage)
       val rotate90CW = Utils.getBool(arguments, "rotate90CW", Utils.getBool(pluginOptions, "rotate90CW", false))
-      
+
       val img = if (rotate90CW) {
         val rotated = Mat()
         Core.rotate(gray, rotated, Core.ROTATE_90_CLOCKWISE)
@@ -75,8 +76,10 @@ class ScreenDetectorFrameProcessorPlugin(
       val frameW = img.width()
       val frameH = img.height()
 
-      DebugHttpStreamer.updateMatGray("gray", gray, 60)
-      DebugHttpStreamer.updateMatGray("rotated", img, 60)
+      if (BuildConfig.DEBUG) {
+        DebugHttpStreamer.updateMatGray("gray", gray, 60)
+        DebugHttpStreamer.updateMatGray("rotated", img, 60)
+      }
 
       // Resolve ROIs in pixels, enforce min aspect
       val roiOuterPx = Utils.enforceMinAspect(Utils.normRectToPx(roiOuterArg, frameW, frameH), frameW, frameH, minAspect)
@@ -84,17 +87,17 @@ class ScreenDetectorFrameProcessorPlugin(
 
       // Preprocess image for better edge detection
       val normalized = ImageProcessing.preprocessImage(img)
-      
+
       // Create edge maps for screen and detail detection
       val (screenEdges, detailEdges) = ImageProcessing.createEdgeMaps(normalized)
-      
+
       // Update debug streams less frequently to avoid overload
-      if (totalFrameCounter % 3 == 0) {
+      if (BuildConfig.DEBUG && totalFrameCounter % 3 == 0) {
         DebugHttpStreamer.updateMatGray("normalized", normalized, 60)
         DebugHttpStreamer.updateMatGray("screenEdges", screenEdges, 60)
         DebugHttpStreamer.updateMatGray("detailEdges", detailEdges, 60)
       }
-      
+
       // Find screen contours
       val screenContours = ArrayList<org.opencv.core.MatOfPoint>()
       val screenHierarchy = Mat()
@@ -102,9 +105,9 @@ class ScreenDetectorFrameProcessorPlugin(
 
       // Find screen contour rectangles for debug visualization
       val screenContourRects = ImageProcessing.findContourRects(screenEdges)
-      
+
       // Debug: Draw detected screen contours (less frequent updates)
-      if (totalFrameCounter % 5 == 0) {
+      if (BuildConfig.DEBUG && totalFrameCounter % 5 == 0) {
         val debugScreenRects = ImageProcessing.drawDebugRects(img, screenContourRects, Scalar(0.0, 255.0, 0.0), 3)
         DebugHttpStreamer.updateMatColor("screenContourRects", debugScreenRects, 60)
       }
@@ -113,12 +116,12 @@ class ScreenDetectorFrameProcessorPlugin(
       val (bestRect, bestQuad, bestScore) = ScreenDetection.findBestScreenCandidate(
         screenContours, roiInnerPx, roiOuterPx, frameW, frameH
       )
-      
+
       // Find detail contours for template matching
       val contourRects = ImageProcessing.findContourRects(detailEdges)
 
       // Debug: Draw detected detail contours (less frequent updates)
-      if (totalFrameCounter % 5 == 0) {
+      if (BuildConfig.DEBUG && totalFrameCounter % 5 == 0) {
         val debugDetailRects = ImageProcessing.drawDebugRects(img, contourRects, Scalar(255.0, 0.0, 0.0), 2)
         DebugHttpStreamer.updateMatColor("detailContourRects", debugDetailRects, 60)
       }
@@ -129,20 +132,22 @@ class ScreenDetectorFrameProcessorPlugin(
       if (bestQuad != null) {
         H = ScreenDetection.buildScreenHomography(bestQuad, templateTargetW, templateTargetH)
       }
-      
+
       // Create warped image early for template matching
       var warped: Mat? = null
       if (H != null && !H.empty()) {
         warped = Mat(outputH, outputW, org.opencv.core.CvType.CV_8UC1)
         Imgproc.warpPerspective(img, warped, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
-        DebugHttpStreamer.updateMatGray("warped", warped, 80)
+        if (BuildConfig.DEBUG) {
+          DebugHttpStreamer.updateMatGray("warped", warped, 80)
+        }
       }
-      
+
       // Match template boxes using improved warped image method
       var accuracy = 0.0
       val matchedArr = ArrayList<Any?>()
       val templatePixelRectsArr = ArrayList<HashMap<String, Any?>>()
-      
+
       if (warped != null && templateBoxes != null && templateBoxes.isNotEmpty()) {
         // Use new improved method: match in warped image with padding
         val (acc, matched, pixelRects) = ScreenDetection.matchTemplateBoxesInWarped(
@@ -153,34 +158,34 @@ class ScreenDetectorFrameProcessorPlugin(
         accuracy = acc
         templatePixelRectsArr.addAll(pixelRects)
         matchedArr.addAll(matched)
-        
+
         // Debug: Draw matched boxes on camera feed (less frequent updates)
-        if (totalFrameCounter % 7 == 0 && H != null && !H.empty()) {
+        if (BuildConfig.DEBUG && totalFrameCounter % 7 == 0 && H != null && !H.empty()) {
           // Draw matched boxes on camera feed with IDs and scores
           val matchedBoxesDebug = ImageProcessing.drawMatchedBoxesOnCameraFeed(
             img, matchedArr, templateBoxes, outputW, outputH, H
           )
           DebugHttpStreamer.updateMatColor("matchedBoxes", matchedBoxesDebug, 85)
-          
+
           // Log summary of matched boxes
           val matchedCount = matchedArr.count { it != null }
           val totalCount = templateBoxes.size
           Log.d("ScreenDetector", "Matched boxes visualization: $matchedCount/$totalCount boxes detected (accuracy: ${String.format("%.2f", accuracy * 100)}%)")
-          
+
           // Debug: Template boxes projected on camera feed
           val debugTemplateBoxes = ImageProcessing.drawDebugTemplateBoxes(img, templateBoxes, H, templateTargetW, templateTargetH, Scalar(0.0, 0.0, 255.0), 2)
           DebugHttpStreamer.updateMatColor("templateBoxes", debugTemplateBoxes, 80)
-          
+
           // Debug: Combined visualization with all elements
           val combinedDebug = ImageProcessing.createCombinedDebugVisualization(img, screenEdges, detailEdges, screenContourRects, contourRects, templateBoxes, H, templateTargetW, templateTargetH)
           DebugHttpStreamer.updateMatColor("combinedDebug", combinedDebug, 80)
         }
       }
-      
+
       val detected = (H != null && !H.empty()) && (
         if (templateBoxes != null && templateBoxes.isNotEmpty()) accuracy >= accuracyThreshold else true
       )
-      
+
       // Update counters
       totalFrameCounter++
       if (detected) detectionCounter++
@@ -202,24 +207,24 @@ class ScreenDetectorFrameProcessorPlugin(
           Imgproc.warpPerspective(img, temp, H.inv(), Size(outputW.toDouble(), outputH.toDouble()))
           temp
         } else null
-        
+
         if (ocrWarped != null && H != null && !H.empty()) {
           // Debug: Draw OCR template boxes on camera feed (less frequent updates)
-          if (totalFrameCounter % 10 == 0) {
+          if (BuildConfig.DEBUG && totalFrameCounter % 10 == 0) {
             // Draw on camera feed (with perspective projection)
             val ocrDebugCameraFeed = ImageProcessing.drawOcrTemplateBoxesOnCameraFeed(
               img, ocrBoxes, outputW, outputH, H
             )
             DebugHttpStreamer.updateMatColor("ocrTemplateBoxes", ocrDebugCameraFeed, 60)
-            
+
             // Also draw on warped image for comparison
             val ocrDebugWarped = ImageProcessing.drawOcrTemplateBoxes(ocrWarped, ocrBoxes, outputW, outputH)
             DebugHttpStreamer.updateMatColor("ocrTemplateBoxesWarped", ocrDebugWarped, 60)
           }
-          
+
           val ocrResults = OcrProcessor.processOcrBoxes(ocrWarped, ocrBoxes, outputW, outputH)
           data["ocr"] = hashMapOf("boxes" to ocrResults)
-          
+
           // Clean up if we created a separate warped image for OCR
           if (ocrWarped != warped) {
             ocrWarped.release()
@@ -237,22 +242,24 @@ class ScreenDetectorFrameProcessorPlugin(
       )
 
       // Create debug overlay with matched boxes projected on camera feed
-      try {
-        val overlayColor = ImageProcessing.createOverlayImage(
-          img, detected, detectionCounter, totalFrameCounter,
-          roiOuterPx, roiInnerPx, bestQuad, templateBoxes, H, matchedArr
-        )
-        
-        // Overlay matched boxes if available
-        if (H != null && !H.empty() && templateBoxes != null && matchedArr.isNotEmpty()) {
-          val matchedOverlay = ImageProcessing.drawMatchedBoxesOnCameraFeed(
-            overlayColor, matchedArr, templateBoxes, outputW, outputH, H
+      if (BuildConfig.DEBUG) {
+        try {
+          val overlayColor = ImageProcessing.createOverlayImage(
+            img, detected, detectionCounter, totalFrameCounter,
+            roiOuterPx, roiInnerPx, bestQuad, templateBoxes, H, matchedArr
           )
-          DebugHttpStreamer.updateMatColor("overlay", matchedOverlay, 90)
-        } else {
-          DebugHttpStreamer.updateMatColor("overlay", overlayColor, 90)
-        }
-      } catch (_: Throwable) {}
+
+          // Overlay matched boxes if available
+          if (H != null && !H.empty() && templateBoxes != null && matchedArr.isNotEmpty()) {
+            val matchedOverlay = ImageProcessing.drawMatchedBoxesOnCameraFeed(
+              overlayColor, matchedArr, templateBoxes, outputW, outputH, H
+            )
+            DebugHttpStreamer.updateMatColor("overlay", matchedOverlay, 90)
+          } else {
+            DebugHttpStreamer.updateMatColor("overlay", overlayColor, 90)
+          }
+        } catch (_: Throwable) {}
+      }
 
       data["screen"] = screenData
       return data

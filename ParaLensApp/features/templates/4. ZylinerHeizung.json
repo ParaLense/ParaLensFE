@@ -6,6 +6,7 @@
     "width": 57.1,
     "height": 3.51,
     "label": "Cylinder Heating Items",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["°C", "°F"]
   }
 ]

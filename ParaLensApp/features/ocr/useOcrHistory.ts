@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { OcrTemplateBox } from '../templates/ocr-template';
 
 // ---------------------------------------------------------------------------
 // Shared OCR types for field-level aggregation
@@ -22,7 +23,7 @@ type ParsedScrollbarSegments = Record<
   number,
   {
     key: number[];   // all filtered "key"/start values (e.g. 0.0000, 0.0000, ...)
-    value: number[]; // all filtered "value"/end values  (e.g. 8.0000, 8.0001, ...)
+    value: number[]; // all filtered "value"/end values  (e.g. 8.0001, 8.0001, ...)
   }
 >;
 
@@ -37,6 +38,7 @@ export type OcrFieldResult = {
   // For scrollbars we return the structured ParsedScrollbarValue,
   // for value/checkbox a simple string representation.
   value: string | ParsedScrollbarValue;
+  unit?: string;
 };
 
 // Shape of a single OCR box as emitted by the screen detector.
@@ -46,6 +48,8 @@ export type OcrBox = {
   type: OcrFieldType;
   text?: string;
   number?: number;
+  expectedUnits?: string[];
+  sameUnitAs?: string;
   // checkbox specific
   checked?: boolean;
   valueText?: string;
@@ -133,29 +137,76 @@ export const pickMajorityValue = (values: number[], minOccurrences = DEFAULT_MIN
   return best.value;
 };
 
-// Fuzzy detection of units / start-keywords like "v", "cm", "bar", "m/s", "s".
-// Handles common OCR mistakes such as "cms" -> "cm", "ms" -> "m/s".
+// Fuzzy detection of units. Handles common OCR mistakes.
 export const detectMatchingUnit = (raw: string, keywords: string[]): string | null => {
-  if (!raw) return null;
-  const cleaned = raw.toLowerCase().replace(/[^a-z/]/g, '');
-  if (!cleaned) return null;
+  if (!raw || !keywords || keywords.length === 0) return null;
+  
+  // Pre-process raw string to handle common OCR substitutions
+  let cleaned = raw.toLowerCase().trim();
+  
+  // Common OCR fixes
+  cleaned = cleaned.replace('cn', 'cm'); // cn -> cm
+  cleaned = cleaned.replace('°', '%');   // ° -> % (often confused in OCR if % is expected)
+  
+  // Fix common /s misinterpretations at the end of units
+  // e.g. "cm^3s", "cm^3is", "cm^3ls" -> "cm^3/s"
+  if (cleaned.endsWith('s') && !cleaned.endsWith('/s')) {
+      // Check for patterns like "is", "ls", "1s" at the end which are likely "/s"
+      if (cleaned.endsWith('is')) cleaned = cleaned.slice(0, -2) + '/s';
+      else if (cleaned.endsWith('ls')) cleaned = cleaned.slice(0, -2) + '/s';
+      else if (cleaned.endsWith('1s')) cleaned = cleaned.slice(0, -2) + '/s';
+      // If it ends with just "s" but preceded by a number/power (e.g. "cm^3s"), assume it means "/s"
+      else if (cleaned.match(/[\d³²]s$/)) cleaned = cleaned.slice(0, -1) + '/s';
+  }
+
+  // Remove characters that are usually noise, but keep relevant ones
+  // We keep letters, numbers, %, /, ^, ³, ²
+  const simplified = cleaned.replace(/[^a-z0-9%/\^³²]/g, '');
+  
+  if (!simplified) return null;
 
   for (const kw of keywords) {
-    const kwClean = kw.toLowerCase().replace(/[^a-z/]/g, '');
-    if (!kwClean) continue;
+    const kwClean = kw.toLowerCase();
+    
+    // 1. Exact match (after basic cleaning)
+    if (cleaned === kwClean) return kw;
+    
+    // 2. Simplified match (ignoring special chars)
+    const kwSimplified = kwClean.replace(/[^a-z0-9%/\^³²]/g, '');
+    if (simplified === kwSimplified) return kw;
 
-    // Normalise by removing slashes for comparison
-    const cleanedNoSlash = cleaned.replace(/\//g, '');
-    const kwNoSlash = kwClean.replace(/\//g, '');
+    // 3. Partial/Base match logic
+    // If the expected unit is complex (e.g. "cm^3/s") and we found the base (e.g. "cm"),
+    // we consider it a match.
+    // if it's /s and we found /s then we remove it
+    
+    if (kwClean.endsWith('/s') && simplified.endsWith('/s')){
+      const simplifiedForComparison = simplified.slice(0, -2);
+    }
 
-    // Exact or substring match (e.g. "cms" contains "cm", "ms" == "ms")
-    if (
-      cleanedNoSlash === kwNoSlash ||
-      cleanedNoSlash.startsWith(kwNoSlash) ||
-      cleanedNoSlash.endsWith(kwNoSlash) ||
-      cleanedNoSlash.includes(kwNoSlash)
-    ) {
-      // Return the canonical keyword (e.g. always "m/s" instead of "ms")
+    // Check for "cm" matching "cm^3/s" or "cm³"
+    if (kwClean.startsWith('cm') && simplifiedForComparison === 'cm') return kw;
+    
+    // Check for "in" matching "in^3/s" or "in³"
+    if (kwClean.startsWith('in') && simplifiedForComparison === 'in') return kw;
+    
+    // Check for "mm" matching "mm/s"
+    if (kwClean.startsWith('mm') && simplifiedForComparison === 'mm') return kw;
+    
+    // Check for "%" matching
+    if (kwClean === '%' && (simplified === '%' || simplified === 'o' || simplified === '0')) return kw;
+
+    // 4. Permutations for other common OCR errors
+    const permutations = [
+      kwSimplified.replace('/', ''),
+      kwSimplified.replace('^', ''),
+      kwSimplified.replace('³', '3'),
+      kwSimplified.replace('²', '2'),
+      // Add permutation for missing slash in per-second units
+      kwSimplified.replace('/s', 's'),
+    ];
+
+    if (permutations.some(p => simplified.includes(p))) {
       return kw;
     }
   }
@@ -262,15 +313,17 @@ type FieldAggregation = {
   id: string;
   totalScans: number;
   uniqueValues: number;
-  rawValues: string[];
+  rawValues: { value: string; unit?: string }[];
   typeBreakdown: FieldTypeBreakdown;
   scrollbar?: ParsedScrollbarValue;
+  sameUnitAs?: string;
 };
 
 export type UseOcrHistoryConfig = {
   maxHistoryPerField?: number;
   minOccurrencesForMajority?: number;
   commaRequired?: boolean;
+  template?: OcrTemplateBox[];
 };
 
 const DEFAULT_MAX_HISTORY_PER_FIELD = 30;
@@ -308,21 +361,26 @@ const mergeParsedScrollbar = (
   return result;
 };
 
-const computeMajorityString = (values: string[], minOccurrences: number): string | null => {
+const computeMajorityString = (values: { value: string; unit?: string }[], minOccurrences: number): { value: string; unit?: string } | null => {
   if (!values || values.length === 0) return null;
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { value: string; unit?: string; count: number }>();
   for (const v of values) {
-    const key = String(v);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const key = `${v.value}|${v.unit || ''}`;
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      counts.set(key, { ...v, count: 1 });
+    }
   }
-  let best: { value: string; count: number } | null = null;
-  for (const [value, count] of counts.entries()) {
-    if (!best || count > best.count) {
-      best = { value, count };
+  let best: { value: string; unit?: string; count: number } | null = null;
+  for (const entry of counts.values()) {
+    if (!best || entry.count > best.count) {
+      best = entry;
     }
   }
   if (!best || best.count < minOccurrences) return null;
-  return best.value;
+  return { value: best.value, unit: best.unit };
 };
 
 const computeBestScrollbar = (
@@ -474,23 +532,47 @@ const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): ParsedScro
 };
 
 // Parse a simple numeric value box
-const parseValueFromScan = (box: OcrBox, commaRequired: boolean): string | null => {
+const parseValueFromScan = (box: OcrBox, commaRequired: boolean): { value: string; unit?: string } | null => {
   if (!box || box.type !== 'value') return null;
   const raw =
     (typeof box.number === 'number' ? String(box.number) : undefined) ??
     (typeof box.text === 'string' && box.text.trim().length > 0 ? box.text.trim() : undefined);
   if (!raw) return null;
-  if (!isValidNumericToken(raw, commaRequired)) return null;
-  const num = normalizeNumber(raw);
+
+  // If sameUnitAs is set, we ignore unit detection for this box and just try to parse the number.
+  // We also split by space to handle cases where OCR might have picked up a unit or text anyway.
+  // We also relax the comma requirement because these values might be less strictly formatted.
+  if (box.sameUnitAs) {
+    const parts = raw.split(' ');
+    const numericPart = parts[0];
+    if (!isValidNumericToken(numericPart, false)) return null; // Relaxed comma check
+    const num = normalizeNumber(numericPart);
+    return num != null ? { value: num.toString() } : null;
+  }
+
+  const parts = raw.split(' ');
+  const numericPart = parts[0];
+  const unitPart = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
+
+  if (!isValidNumericToken(numericPart, commaRequired)) return null;
+  const num = normalizeNumber(numericPart);
   if (num == null) return null;
-  return num.toString();
+
+  const unit = unitPart ? detectMatchingUnit(unitPart, box.expectedUnits || []) : undefined;
+
+  // STRICT MODE: If expectedUnits are defined, we MUST find a matching unit.
+  if (box.expectedUnits && box.expectedUnits.length > 0 && !unit) {
+    return null;
+  }
+
+  return { value: num.toString(), unit };
 };
 
 // Parse checkbox state into a stable string value
-const parseCheckboxFromScan = (box: OcrBox): string | null => {
+const parseCheckboxFromScan = (box: OcrBox): { value: string; unit?: string } | null => {
   if (!box || box.type !== 'checkbox') return null;
   if (typeof box.checked !== 'boolean') return null;
-  return box.checked ? 'checked' : 'unchecked';
+  return { value: box.checked ? 'checked' : 'unchecked' };
 };
 
 // ---------------------------------------------------------------------------
@@ -505,7 +587,6 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
   const maxHistoryPerField = config?.maxHistoryPerField ?? DEFAULT_MAX_HISTORY_PER_FIELD;
   const minOccurrencesForMajority = config?.minOccurrencesForMajority ?? DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY;
   const commaRequired = !!config?.commaRequired;
-
   // Add a full OCR scan result (with boxes) and update field aggregations
   const addFullScanResult = useCallback(
     (scanResult: OcrScanResult) => {
@@ -527,7 +608,13 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
               uniqueValues: 0,
               rawValues: [],
               typeBreakdown: { value: 0, checkbox: 0, scrollbar: 0 },
+              sameUnitAs: box.sameUnitAs,
             };
+          } else {
+            // Ensure sameUnitAs is updated if present in the new box
+            if (box.sameUnitAs) {
+              agg.sameUnitAs = box.sameUnitAs;
+            }
           }
 
           agg.totalScans += 1;
@@ -536,22 +623,35 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
           }
 
           if (type === 'value') {
-            const valueStr = parseValueFromScan(box, commaRequired);
-            if (valueStr != null) {
-              agg.rawValues = [valueStr, ...agg.rawValues];
+            const parsed = parseValueFromScan(box, commaRequired);
+            if (parsed != null) {
+              
+              // If this field has sameUnitAs, try to grab the unit from the source field immediately
+              // so it's stored with the value. This is a "best effort" for direct storage.
+              if (box.sameUnitAs && !parsed.unit) {
+                const sourceAgg = next[box.sameUnitAs]; // Look in current state (next is copy of prev)
+                if (sourceAgg && sourceAgg.rawValues.length > 0) {
+                   const sourceBest = computeMajorityString(sourceAgg.rawValues, minOccurrencesForMajority);
+                   if (sourceBest?.unit) {
+                     parsed.unit = sourceBest.unit;
+                   }
+                }
+              }
+
+              agg.rawValues = [parsed, ...agg.rawValues];
               if (agg.rawValues.length > maxHistoryPerField) {
                 agg.rawValues = agg.rawValues.slice(0, maxHistoryPerField);
               }
-              agg.uniqueValues = new Set(agg.rawValues).size;
+              agg.uniqueValues = new Set(agg.rawValues.map(v => `${v.value}|${v.unit || ''}`)).size;
             }
           } else if (type === 'checkbox') {
-            const valueStr = parseCheckboxFromScan(box);
-            if (valueStr != null) {
-              agg.rawValues = [valueStr, ...agg.rawValues];
+            const parsed = parseCheckboxFromScan(box);
+            if (parsed != null) {
+              agg.rawValues = [parsed, ...agg.rawValues];
               if (agg.rawValues.length > maxHistoryPerField) {
                 agg.rawValues = agg.rawValues.slice(0, maxHistoryPerField);
               }
-              agg.uniqueValues = new Set(agg.rawValues).size;
+              agg.uniqueValues = new Set(agg.rawValues.map(v => v.value)).size;
             }
           } else if (type === 'scrollbar') {
             const parsedScrollbar = parseScrollbarFromScan(box, commaRequired);
@@ -568,7 +668,7 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
 
       return scanResult;
     },
-    [commaRequired, maxHistoryPerField]
+    [commaRequired, maxHistoryPerField, minOccurrencesForMajority]
   );
 
   // Convenience alias that matches the wording from the plan
@@ -610,8 +710,22 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
       }
 
       if (!agg.rawValues || agg.rawValues.length === 0) return undefined;
-      const bestString = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
-      return bestString ?? undefined;
+      const best = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
+      if (!best) return undefined;
+
+      let unit = best.unit;
+      if (agg.sameUnitAs) {
+        const sourceAgg = fieldAggregations[agg.sameUnitAs];
+        if (sourceAgg && sourceAgg.rawValues.length > 0) {
+          const sourceBest = computeMajorityString(sourceAgg.rawValues, minOccurrencesForMajority);
+          // Prefer source unit if available, otherwise keep existing (if any)
+          if (sourceBest?.unit) {
+            unit = sourceBest.unit;
+          }
+        }
+      }
+
+      return unit ? `${best.value} ${unit}` : best.value;
     },
     [fieldAggregations, minOccurrencesForMajority]
   );
@@ -619,8 +733,12 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
   const getBestFields = useCallback(
     (): OcrFieldResult[] => {
       const results: OcrFieldResult[] = [];
+      const fieldIds = Object.keys(fieldAggregations);
 
-      for (const [fieldId, agg] of Object.entries(fieldAggregations)) {
+      for (const fieldId of fieldIds) {
+        const agg = fieldAggregations[fieldId];
+        if (!agg) continue;
+
         // Scrollbar fields: return structured ParsedScrollbarValue
         if (agg.scrollbar) {
           const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
@@ -635,8 +753,8 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
         }
 
         if (!agg.rawValues || agg.rawValues.length === 0) continue;
-        const bestString = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
-        if (!bestString) continue;
+        const best = computeMajorityString(agg.rawValues, minOccurrencesForMajority);
+        if (!best) continue;
 
         const tb = agg.typeBreakdown;
         let dominantType: OcrFieldType = 'value';
@@ -648,10 +766,22 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
           dominantType = 'value';
         }
 
+        let unit = best.unit;
+        if (agg.sameUnitAs) {
+          const sourceAgg = fieldAggregations[agg.sameUnitAs];
+          if (sourceAgg && sourceAgg.rawValues.length > 0) {
+            const sourceBest = computeMajorityString(sourceAgg.rawValues, minOccurrencesForMajority);
+            if (sourceBest?.unit) {
+              unit = sourceBest.unit;
+            }
+          }
+        }
+
         results.push({
           box_id: fieldId,
           type: dominantType,
-          value: bestString,
+          value: best.value,
+          unit: unit,
         });
       }
 

@@ -15,6 +15,8 @@ interface TemplateBox{
     readValue?: boolean;
     valueBoxId?: string;
   };
+  sameUnitAs?: string;
+  expectedUnits?: string[];
 }
 
 enum TemplateLayout {

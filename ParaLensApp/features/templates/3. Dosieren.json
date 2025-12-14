@@ -1,21 +1,13 @@
 [
   {
-    "id": "dosing_profile_modal",
-    "x": 22.45,
-    "y": 18.06,
-    "width": 54.7,
-    "height": 15.57,
-    "label": "Dosing Profile Modal",
-    "type": "value"
-  },
-  {
     "id": "dosing_stroke",
     "x": 71.27,
     "y": 36.66,
     "width": 14.24,
     "height": 2.82,
     "label": "Dosing Stroke",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["cm^3", "in^3"]
   },
   {
     "id": "dosing_delay_time",
@@ -24,16 +16,18 @@
     "width": 10.68,
     "height": 2.59,
     "label": "Dosing Delay Time",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["s"]
   },
   {
     "id": "relieve_dosing",
     "x": 31.41,
     "y": 60.51,
-    "width": 15.76,
-    "height": 2.59,
+    "width": 12.13,
+    "height": 2.33,
     "label": "Relieve Dosing",
-    "type": "value"
+    "type": "value",
+    "sameUnitAs": "relieve_after_dosing"
   },
   {
     "id": "relieve_after_dosing",
@@ -42,24 +36,27 @@
     "width": 13.56,
     "height": 2.71,
     "label": "Relieve After Dosing",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["cm^3", "in^3"]
   },
   {
     "id": "discharge_speed_before",
     "x": 72.44,
     "y": 65.67,
-    "width": 11.06,
+    "width": 15.03,
     "height": 3.1,
     "label": "Discharge Speed Before",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["cm^3/s", "in^3/s", "%"]
   },
   {
     "id": "discharge_speed_after",
     "x": 72.42,
     "y": 68.8,
-    "width": 11.06,
+    "width": 15.26,
     "height": 3.28,
     "label": "Discharge Speed After",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": ["cm^3/s", "in^3/s", "%"]
   }
 ]
