@@ -35,6 +35,10 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
+      - name: Increase memory limits
+        run: |
+          echo "GRADLE_OPTS=-Xmx6g" >> $GITHUB_ENV
+          echo "JAVA_OPTS=-Xmx6g" >> $GITHUB_ENV
 
       - name: Prebuild Android (ensure android/app exists)
         run: npx expo prebuild --platform android --no-install
