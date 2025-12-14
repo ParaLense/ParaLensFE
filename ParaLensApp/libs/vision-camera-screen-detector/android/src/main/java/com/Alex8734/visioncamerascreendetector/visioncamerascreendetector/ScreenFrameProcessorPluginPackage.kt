@@ -5,13 +5,16 @@ import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.uimanager.ViewManager
 import android.util.Log
+import com.alex8734.visioncamerascreendetector.BuildConfig
 import org.opencv.android.OpenCVLoader
 
 class ScreenDetectorFrameProcessorPluginPackage : ReactPackage {
 
   init {
       // Neu: Debug-HTTP-Server Port aus Optionen lesen (0 = aus)
-    DebugHttpStreamer.start(8082)
+    if (BuildConfig.DEBUG) {
+      DebugHttpStreamer.start(8082)
+    }
     try {
       val ok = OpenCVLoader.initDebug()
       Log.d("ScreenDetector", "OpenCV initDebug: $ok")

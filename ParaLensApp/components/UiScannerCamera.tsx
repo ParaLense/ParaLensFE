@@ -115,11 +115,14 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     [onOcrUpdate]
   );
 
+  const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
+
   // OCR History Hook for filtering and storing recognized values
   const ocrHistory = useOcrHistory({
     maxHistoryPerField: 30,
     minOccurrencesForMajority: 3,
     commaRequired: true, // Keep comma requirement for numeric value fields
+    template: ocrTemplate,
   });
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -147,7 +150,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
     onOcrUpdateJS({ bestFields, ocrMap });
-  }, [ocrHistory, ocrMap, onOcrUpdate, onOcrUpdateJS]);
+  }, [ocrHistory.fieldAggregations, ocrMap, onOcrUpdate, onOcrUpdateJS]);
 
   const screenTemplate = useMemo(
     () =>
@@ -160,8 +163,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       })),
     []
   );
-
-  const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
   const frameDimensions = useMemo(() => {
     const frameW = toNumber(screenResult?.width, 0);
@@ -311,10 +312,20 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           if (Object.keys(map).length > 0) {
             setOcrMapJS(map);
 
+            // Enrich boxes with template data (sameUnitAs, expectedUnits)
+            const enrichedBoxes = scan.ocr.boxes.map((box: any) => {
+              const templateBox = ocrTemplate.find(t => t.id === box.id);
+              return {
+                ...box,
+                sameUnitAs: templateBox?.sameUnitAs,
+                expectedUnits: templateBox?.expectedUnits,
+              };
+            });
+
             // Add full scan result (with complete box information) to OCR history
             const fullScanResult = {
               timestamp: Date.now(),
-              boxes: scan.ocr.boxes,
+              boxes: enrichedBoxes,
               screenDetected: true, // We know screen was detected if we're here
               accuracy: 0.5, // Default accuracy since we don't have direct access
             };
@@ -325,7 +336,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     } catch (error) {
       console.error(`Frame Processor Error: ${error}`);
     }
-  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addScanResultJS, viewHeight, viewWidth]);
+  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, ocrTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addScanResultJS, viewHeight, viewWidth]);
 
   // Helper function to apply homography transformation to a point
   const applyHomography = (h: number[][], point: { x: number; y: number }): { x: number; y: number } => {
