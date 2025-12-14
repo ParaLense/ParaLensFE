@@ -178,20 +178,20 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
     // 3. Partial/Base match logic
     // If the expected unit is complex (e.g. "cm^3/s") and we found the base (e.g. "cm"),
     // we consider it a match.
-    // If the expected unit ends with "/s" and the simplified string also ends with "/s", remove "/s" from the simplified string.
-    // This allows matching the base unit (e.g., "cm" in "cm^3/s") in subsequent checks.
+    // if it's /s and we found /s then we remove it
+    
     if (kwClean.endsWith('/s') && simplified.endsWith('/s')){
-      simplified = simplified.slice(0, -2);
+      const simplifiedForComparison = simplified.slice(0, -2);
     }
 
     // Check for "cm" matching "cm^3/s" or "cm³"
-    if (kwClean.startsWith('cm') && simplified === 'cm') return kw;
+    if (kwClean.startsWith('cm') && simplifiedForComparison === 'cm') return kw;
     
     // Check for "in" matching "in^3/s" or "in³"
-    if (kwClean.startsWith('in') && simplified === 'in') return kw;
+    if (kwClean.startsWith('in') && simplifiedForComparison === 'in') return kw;
     
     // Check for "mm" matching "mm/s"
-    if (kwClean.startsWith('mm') && simplified === 'mm') return kw;
+    if (kwClean.startsWith('mm') && simplifiedForComparison === 'mm') return kw;
     
     // Check for "%" matching
     if (kwClean === '%' && (simplified === '%' || simplified === 'o' || simplified === '0')) return kw;
