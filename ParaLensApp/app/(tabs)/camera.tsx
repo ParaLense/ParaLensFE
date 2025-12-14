@@ -212,15 +212,21 @@ export default function CameraScreen() {
               key={menu}
               action="primary"
               variant="solid"
+              disabled={!selectedFullScanId}
               onPress={() => {
                 setSelectedMenu(menu);
                 if (menu === "injection") setInjectionMode(null);
                 if (menu === "holdingPressure") setHoldingMode(null);
                 if (menu === "dosing") setDosingMode(null);
               }}
-              style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
+              style={{ 
+                backgroundColor: !selectedFullScanId ? (isDark ? '#404040' : '#a3a3a3') : (isDark ? '#ffffff' : '#000000')
+              }}
             >
-              <Text style={{ color: isDark ? '#000000' : '#ffffff', textTransform: 'capitalize' }}>{menu}</Text>
+              <Text style={{ 
+                color: !selectedFullScanId ? (isDark ? '#a3a3a3' : '#6b7280') : (isDark ? '#000000' : '#ffffff'), 
+                textTransform: 'capitalize' 
+              }}>{menu}</Text>
             </Button>
           ))}
         </VStack>
@@ -562,4 +568,3 @@ export default function CameraScreen() {
     </Box>
   );
 }
-
