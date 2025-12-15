@@ -1111,7 +1111,7 @@ function SectionDetails({
                             {label}
                         </Text>
                         <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
-                            {String(value)}
+                            {typeof value === 'object' && value !== null && 'value' in value ? `${value.value} ${value.unit || ''}`.trim() : String(value)}
                         </Text>
                     </HStack>
                 ))}
@@ -1150,7 +1150,7 @@ function DataBlock({
                             {label}
                         </Text>
                         <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
-                            {String(value)}
+                            {typeof value === 'object' && value !== null && 'value' in value ? `${value.value} ${value.unit || ''}`.trim() : String(value)}
                         </Text>
                     </HStack>
                 ))}

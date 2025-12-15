@@ -7,7 +7,7 @@
     "height": 2.82,
     "label": "Dosing Stroke",
     "type": "value",
-    "expectedUnits": ["cm^3", "in^3"]
+    "expectedUnits": ["cm^3", "in^3","mm","in"]
   },
   {
     "id": "dosing_delay_time",
@@ -37,7 +37,7 @@
     "height": 2.71,
     "label": "Relieve After Dosing",
     "type": "value",
-    "expectedUnits": ["cm^3", "in^3"]
+    "expectedUnits": ["cm^3", "in^3","mm","in"]
   },
   {
     "id": "discharge_speed_before",
