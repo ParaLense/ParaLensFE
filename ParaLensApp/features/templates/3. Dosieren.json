@@ -21,9 +21,9 @@
   },
   {
     "id": "relieve_dosing",
-    "x": 31.41,
+    "x": 34.9,
     "y": 60.51,
-    "width": 12.13,
+    "width": 8.64,
     "height": 2.33,
     "label": "Relieve Dosing",
     "type": "value",

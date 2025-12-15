@@ -153,6 +153,7 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
   if (cleaned === 'ins' || cleaned === "in's") cleaned = 'in^3/s'; // Specific fix for "ins" -> "in^3/s"
   else if (cleaned.endsWith("'s")) cleaned = cleaned.slice(0, -2) + '/s';
   else if (cleaned.endsWith('is')) cleaned = cleaned.slice(0, -2) + '/s';
+  else if (cleaned.endsWith("is")) cleaned = cleaned.slice(0, -3) + '/s';
   else if (cleaned.endsWith('ls')) cleaned = cleaned.slice(0, -2) + '/s';
   else if (cleaned.endsWith('s') && !cleaned.endsWith('/s')) {
       // If it ends with just "s" but preceded by a number/power (e.g. "cm^3s"), assume it means "/s"
@@ -178,15 +179,9 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
     // 3. Partial/Base match logic
     // If the expected unit is complex (e.g. "cm^3/s") and we found the base (e.g. "cm"),
     // we consider it a match.
-    
+
     // Check for "cm" matching "cm^3/s" or "cm³"
-    if (kwClean.startsWith('cm') && simplified === 'cm') return kw;
-    
-    // Check for "in" matching "in^3/s" or "in³"
-    if (kwClean.startsWith('in') && simplified === 'in') return kw;
-    
-    // Check for "mm" matching "mm/s"
-    if (kwClean.startsWith('mm') && simplified === 'mm') return kw;
+    if(kwClean.replace('^3','') === simplified.replace("'","")) return kw;
     
     // Check for "%" matching
     if (kwClean === '%' && (simplified === '%' || simplified === 'o' || simplified === '0')) return kw;
