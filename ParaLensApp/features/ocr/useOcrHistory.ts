@@ -148,18 +148,18 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
   cleaned = cleaned.replace('cn', 'cm'); // cn -> cm
   cleaned = cleaned.replace('°', '%');   // ° -> % (often confused in OCR if % is expected)
   
-  // Fix common /s misinterpretations at the end of units
-  // e.g. "cm^3s", "cm^3is", "cm^3ls" -> "cm^3/s"
-  if (cleaned.endsWith('s') && !cleaned.endsWith('/s')) {
-      // Check for patterns like "is", "ls", "1s" at the end which are likely "/s"
-      if (cleaned.endsWith('is')) cleaned = cleaned.slice(0, -2) + '/s';
-      else if (cleaned.endsWith('ls')) cleaned = cleaned.slice(0, -2) + '/s';
-      else if (cleaned.endsWith('1s')) cleaned = cleaned.slice(0, -2) + '/s';
+  // Aggressively fix common /s misinterpretations
+  // e.g. "in^3s", "in^3's", "in^3is", "in^3ls" -> "in^3/s"
+  if (cleaned === 'ins' || cleaned === "in's") cleaned = 'in^3/s'; // Specific fix for "ins" -> "in^3/s"
+  else if (cleaned.endsWith("'s")) cleaned = cleaned.slice(0, -2) + '/s';
+  else if (cleaned.endsWith('is')) cleaned = cleaned.slice(0, -2) + '/s';
+  else if (cleaned.endsWith('ls')) cleaned = cleaned.slice(0, -2) + '/s';
+  else if (cleaned.endsWith('s') && !cleaned.endsWith('/s')) {
       // If it ends with just "s" but preceded by a number/power (e.g. "cm^3s"), assume it means "/s"
-      else if (cleaned.match(/[\d³²]s$/)) cleaned = cleaned.slice(0, -1) + '/s';
+      if (cleaned.match(/[\d³²]s$/)) cleaned = cleaned.slice(0, -1) + '/s';
   }
 
-  // Remove characters that are usually noise, but keep relevant ones
+  // Remove characters that are usually noise, but keep relevant onesr
   // We keep letters, numbers, %, /, ^, ³, ²
   const simplified = cleaned.replace(/[^a-z0-9%/\^³²]/g, '');
   
@@ -178,20 +178,15 @@ export const detectMatchingUnit = (raw: string, keywords: string[]): string | nu
     // 3. Partial/Base match logic
     // If the expected unit is complex (e.g. "cm^3/s") and we found the base (e.g. "cm"),
     // we consider it a match.
-    // if it's /s and we found /s then we remove it
-    let simplifiedForComparison = simplified;
-    if (kwClean.endsWith('/s') && simplified.endsWith('/s')){
-      simplifiedForComparison = simplified.slice(0, -2);
-    }
-
+    
     // Check for "cm" matching "cm^3/s" or "cm³"
-    if (kwClean.startsWith('cm') && simplifiedForComparison === 'cm') return kw;
+    if (kwClean.startsWith('cm') && simplified === 'cm') return kw;
     
     // Check for "in" matching "in^3/s" or "in³"
-    if (kwClean.startsWith('in') && simplifiedForComparison === 'in') return kw;
+    if (kwClean.startsWith('in') && simplified === 'in') return kw;
     
     // Check for "mm" matching "mm/s"
-    if (kwClean.startsWith('mm') && simplifiedForComparison === 'mm') return kw;
+    if (kwClean.startsWith('mm') && simplified === 'mm') return kw;
     
     // Check for "%" matching
     if (kwClean === '%' && (simplified === '%' || simplified === 'o' || simplified === '0')) return kw;
@@ -587,6 +582,8 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
   const maxHistoryPerField = config?.maxHistoryPerField ?? DEFAULT_MAX_HISTORY_PER_FIELD;
   const minOccurrencesForMajority = config?.minOccurrencesForMajority ?? DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY;
   const commaRequired = !!config?.commaRequired;
+  const template = config?.template;
+
   // Add a full OCR scan result (with boxes) and update field aggregations
   const addFullScanResult = useCallback(
     (scanResult: OcrScanResult) => {

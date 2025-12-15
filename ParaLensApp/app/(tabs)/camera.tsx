@@ -534,6 +534,7 @@ export default function CameraScreen() {
         isActive
         device={device}
         onOcrUpdate={(payload) => setOcrSnapshot(payload)}
+        onScanComplete={goReview}
       />
 
       <Box

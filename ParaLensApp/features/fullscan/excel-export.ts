@@ -41,7 +41,7 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         const rows: (string | number | null)[][] = [];
         
         // Initialize all rows with empty arrays
-        const maxRowCount = 29 + injCount + hpCount + dosingSpeedCount + dosingPressureCount + 5;
+        const maxRowCount = 30 + injCount + hpCount + dosingSpeedCount + dosingPressureCount + 5; // Increased for new row
         for (let i = 0; i <= maxRowCount; i++) {
             rows[i] = [];
         }
@@ -50,9 +50,21 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         const setCell = (row: number, col: number, value: string | number | null) => {
             rows[row - 1][col - 1] = value;
         };
+        
+        const setCellValueAndUnit = (row: number, col: number, data: { value: any, unit?: string } | any) => {
+            if (typeof data === 'object' && data !== null && 'value' in data) {
+                setCell(row, col, data.value);
+                if (data.unit) {
+                    setCell(row, col - 2, data.unit); // Place unit in column D (Unit 1) - assuming value is in F (col 6)
+                }
+            } else {
+                setCell(row, col, data);
+            }
+        };
 
         // Row indices (1-based Excel rows)
         const valuesStartCol = 6; // F column
+        const unitCol = 4; // D column
 
         const injHeaderRow = 5;             // C5: Actual Value (List)
         const hpHeaderRow = 14;             // C14: Actual Value (List)
@@ -64,6 +76,7 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         const injWayRow = 6 + injCount;
         const injTimeRow = 7 + injCount;
         const injHydRow = 8 + injCount;
+        const injActiveModeRow = 9 + injCount; // New row for active mode
 
         const hpListStartRow = hpHeaderRow + 1 + injCount;
         const hpMainStartRow = 10 + injCount;
@@ -84,31 +97,33 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         // ========================
         
         // Injection section
-        const injEndRow = 8 + injCount;
+        const injEndRow = 9 + injCount; // Adjusted for new row
         setCell(2, 1, "Injection"); // A2
         setCell(2, 2, "Mainpage"); // B2
-        setCell(2, 3, "Injection Pressure"); setCell(2, 4, "bar");
+        setCell(2, 3, "Injection Pressure");
         setCell(3, 2, null); // B3 (merged)
-        setCell(3, 3, "IsIncreasedSpecificPressure"); setCell(3, 4, "bool");
+        setCell(3, 3, "IsIncreasedSpecificPressure");
 
         setCell(4, 2, "Undermenu"); // B4
-        setCell(4, 3, "Injection Speed"); setCell(4, 4, "cm^3/s"); setCell(4, 5, "cm^3");
+        setCell(4, 3, "Injection Speed"); 
+        setCell(4, 4, "v"); setCell(4, 5, "v2"); 
         setCell(5, 3, "Actual Value (List)"); // C5
 
         setCell(6, 2, "Switch Over"); // B6
-        setCell(injWayRow, 3, "Way"); setCell(injWayRow, 4, "mm");
-        setCell(injTimeRow, 3, "Time"); setCell(injTimeRow, 4, "s");
-        setCell(injHydRow, 3, "Hydraulic Pressure"); setCell(injHydRow, 4, "bar");
+        setCell(injWayRow, 3, "Way");
+        setCell(injTimeRow, 3, "Time");
+        setCell(injHydRow, 3, "Hydraulic Pressure");
+        setCell(injActiveModeRow, 3, "Active Switch Over Mode"); // New label
 
         // Holding Pressure section
         const hpEndRow = 14 + injCount + hpCount;
         setCell(hpMainStartRow, 1, "Holding Pressure"); // A10
         setCell(hpMainStartRow, 2, "Mainpage"); // B10
-        setCell(hpMainStartRow, 3, "ReprintTime"); setCell(hpMainStartRow, 4, "s");
+        setCell(hpMainStartRow, 3, "ReprintTime");
         setCell(hpMainStartRow + 1, 2, null); // B11 (merged)
-        setCell(hpMainStartRow + 1, 3, "CoolTime"); setCell(hpMainStartRow + 1, 4, "s");
+        setCell(hpMainStartRow + 1, 3, "CoolTime");
         setCell(hpMainStartRow + 2, 2, null); // B12 (merged)
-        setCell(hpMainStartRow + 2, 3, "ScrewDiameter"); setCell(hpMainStartRow + 2, 4, "mm");
+        setCell(hpMainStartRow + 2, 3, "ScrewDiameter");
 
         setCell(hpUndermenuStartRow, 2, "Undermenu"); // B13
         setCell(hpUndermenuStartRow, 3, "Holding Pressure"); setCell(hpUndermenuStartRow, 4, "t"); setCell(hpUndermenuStartRow, 5, "p");
@@ -120,41 +135,41 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
         
         setCell(dosingMainStartRow, 1, "Dosing"); // A16
         setCell(dosingMainStartRow, 2, "Mainpage"); // B16
-        setCell(dosingMainStartRow, 3, "DosingStroke"); setCell(dosingMainStartRow, 4, "mm");
+        setCell(dosingMainStartRow, 3, "DosingStroke");
         setCell(dosingMainStartRow + 1, 2, null); // B17 (merged)
-        setCell(dosingMainStartRow + 1, 3, "DosingDelayTime"); setCell(dosingMainStartRow + 1, 4, "s");
+        setCell(dosingMainStartRow + 1, 3, "DosingDelayTime");
         setCell(dosingMainStartRow + 2, 2, null); // B18 (merged)
-        setCell(dosingMainStartRow + 2, 3, "RelieveDosing"); setCell(dosingMainStartRow + 2, 4, "bar");
+        setCell(dosingMainStartRow + 2, 3, "RelieveDosing");
         setCell(dosingMainStartRow + 3, 2, null); // B19 (merged)
-        setCell(dosingMainStartRow + 3, 3, "RelieveAfterDosing"); setCell(dosingMainStartRow + 3, 4, "bar");
+        setCell(dosingMainStartRow + 3, 3, "RelieveAfterDosing");
         setCell(dosingMainStartRow + 4, 2, null); // B20 (merged)
-        setCell(dosingMainStartRow + 4, 3, "DischargeSpeedBeforeDosing"); setCell(dosingMainStartRow + 4, 4, "cm^3/s");
+        setCell(dosingMainStartRow + 4, 3, "DischargeSpeedBeforeDosing");
         setCell(dosingMainStartRow + 5, 2, null); // B21 (merged)
-        setCell(dosingMainStartRow + 5, 3, "DischargeSpeedAfterDosing"); setCell(dosingMainStartRow + 5, 4, "cm^3/s");
+        setCell(dosingMainStartRow + 5, 3, "DischargeSpeedAfterDosing");
 
         // Dosing Speed section
         setCell(dosingUndermenuStartRow, 2, "Undermenu"); // B22
-        setCell(dosingUndermenuStartRow, 3, "DosingSpeed"); setCell(dosingUndermenuStartRow, 4, "V"); setCell(dosingUndermenuStartRow, 5, "v");
+        setCell(dosingUndermenuStartRow, 3, "DosingSpeed"); setCell(dosingUndermenuStartRow, 4, "v"); setCell(dosingUndermenuStartRow, 5, "v2");
         setCell(dosingSpeedHeaderRow + injCount + hpCount, 3, "Actual Value (List)"); // C23
         
         // Dosing Pressure section
-        setCell(dosingPressureHeaderRowAdjusted, 3, "DosingPressure"); setCell(dosingPressureHeaderRowAdjusted, 4, "V"); setCell(dosingPressureHeaderRowAdjusted, 5, "p");
+        setCell(dosingPressureHeaderRowAdjusted, 3, "DosingPressure"); setCell(dosingPressureHeaderRowAdjusted, 4, "v"); setCell(dosingPressureHeaderRowAdjusted, 5, "p");
 
         // Cylinder Heating section
         setCell(cylStartRow, 1, "Cylinder Heating"); // A29
         setCell(cylStartRow, 2, "Mainpage"); // B29
-        setCell(cylStartRow, 3, "Sollwert1"); setCell(cylStartRow, 4, "°C");
+        setCell(cylStartRow, 3, "Sollwert1");
         setCell(cylStartRow + 1, 2, null); // B30 (merged)
-        setCell(cylStartRow + 1, 3, "Sollwert2"); setCell(cylStartRow + 1, 4, "°C");
+        setCell(cylStartRow + 1, 3, "Sollwert2");
         setCell(cylStartRow + 2, 2, null); // B31 (merged)
-        setCell(cylStartRow + 2, 3, "Sollwert3"); setCell(cylStartRow + 2, 4, "°C");
+        setCell(cylStartRow + 2, 3, "Sollwert3");
         setCell(cylStartRow + 3, 2, null); // B32 (merged)
-        setCell(cylStartRow + 3, 3, "Sollwert4"); setCell(cylStartRow + 3, 4, "°C");
+        setCell(cylStartRow + 3, 3, "Sollwert4");
         setCell(cylStartRow + 4, 2, null); // B33 (merged)
-        setCell(cylStartRow + 4, 3, "Sollwert5"); setCell(cylStartRow + 4, 4, "°C");
+        setCell(cylStartRow + 4, 3, "Sollwert5");
 
         // ========================
-        // Populate scalar values (column F)
+        // Populate scalar values (column F) and dynamic units (column D)
         // ========================
         const injMainMenu = injection?.mainMenu || injection?.MainMenu;
         const injSwitchType = injection?.switchType || injection?.SwitchType;
@@ -164,29 +179,40 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
             (cylinderHeating && (cylinderHeating.setpoint1 !== undefined || cylinderHeating.Setpoint1 !== undefined) ? cylinderHeating : null);
 
         if (injMainMenu) {
-            setCell(2, valuesStartCol, injMainMenu.sprayPressureLimit ?? injMainMenu.SprayPressureLimit ?? null); // F2
-            setCell(3, valuesStartCol, injMainMenu.increasedSpecificPointPrinter ?? injMainMenu.IncreasedSpecificPointPrinter ?? null); // F3
+            setCellValueAndUnit(2, valuesStartCol, injMainMenu.sprayPressureLimit ?? injMainMenu.SprayPressureLimit ?? null); // F2
+            setCellValueAndUnit(3, valuesStartCol, injMainMenu.increasedSpecificPointPrinter ?? injMainMenu.IncreasedSpecificPointPrinter ?? null); // F3
         }
 
         if (injSwitchType) {
-            setCell(injWayRow, valuesStartCol, injSwitchType.transshipmentPosition ?? injSwitchType.TransshipmentPosition ?? null);
-            setCell(injTimeRow, valuesStartCol, injSwitchType.switchOverTime ?? injSwitchType.SwitchOverTime ?? null);
-            setCell(injHydRow, valuesStartCol, injSwitchType.switchingPressure ?? injSwitchType.SwitchingPressure ?? null);
+            setCellValueAndUnit(injWayRow, valuesStartCol, injSwitchType.transshipmentPosition ?? injSwitchType.TransshipmentPosition ?? null);
+            setCellValueAndUnit(injTimeRow, valuesStartCol, injSwitchType.switchOverTime ?? injSwitchType.SwitchOverTime ?? null);
+            setCellValueAndUnit(injHydRow, valuesStartCol, injSwitchType.switchingPressure ?? injSwitchType.SwitchingPressure ?? null);
+            
+            // Determine and set active switch over mode
+            let activeMode = "";
+            if (injSwitchType.switch_over_way?.value === "1" || injSwitchType.switch_over_way?.value === true) {
+                activeMode = "Way";
+            } else if (injSwitchType.switch_over_time?.value === "1" || injSwitchType.switch_over_time?.value === true) {
+                activeMode = "Time";
+            } else if (injSwitchType.switch_over_hydraulic?.value === "1" || injSwitchType.switch_over_hydraulic?.value === true) {
+                activeMode = "Hydraulic Pressure";
+            }
+            setCell(injActiveModeRow, valuesStartCol, activeMode);
         }
 
         if (hpMainMenu) {
-            setCell(hpMainStartRow + 0, valuesStartCol, hpMainMenu.holdingTime ?? hpMainMenu.HoldingTime ?? null);
-            setCell(hpMainStartRow + 1, valuesStartCol, hpMainMenu.coolTime ?? hpMainMenu.CoolTime ?? null);
-            setCell(hpMainStartRow + 2, valuesStartCol, hpMainMenu.screwDiameter ?? hpMainMenu.ScrewDiameter ?? null);
+            setCellValueAndUnit(hpMainStartRow + 0, valuesStartCol, hpMainMenu.holdingTime ?? hpMainMenu.HoldingTime ?? null);
+            setCellValueAndUnit(hpMainStartRow + 1, valuesStartCol, hpMainMenu.coolTime ?? hpMainMenu.CoolTime ?? null);
+            setCellValueAndUnit(hpMainStartRow + 2, valuesStartCol, hpMainMenu.screwDiameter ?? hpMainMenu.ScrewDiameter ?? null);
         }
 
         if (dosingMainMenu) {
-            setCell(dosingMainStartRow + 0, valuesStartCol, dosingMainMenu.dosingStroke ?? dosingMainMenu.DosingStroke ?? null);
-            setCell(dosingMainStartRow + 1, valuesStartCol, dosingMainMenu.dosingDelayTime ?? dosingMainMenu.DosingDelayTime ?? null);
-            setCell(dosingMainStartRow + 2, valuesStartCol, dosingMainMenu.relieveDosing ?? dosingMainMenu.RelieveDosing ?? null);
-            setCell(dosingMainStartRow + 3, valuesStartCol, dosingMainMenu.relieveAfterDosing ?? dosingMainMenu.RelieveAfterDosing ?? null);
-            setCell(dosingMainStartRow + 4, valuesStartCol, dosingMainMenu.dischargeSpeedBeforeDosing ?? dosingMainMenu.DischargeSpeedBeforeDosing ?? null);
-            setCell(dosingMainStartRow + 5, valuesStartCol, dosingMainMenu.dischargeSpeedAfterDosing ?? dosingMainMenu.DischargeSpeedAfterDosing ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 0, valuesStartCol, dosingMainMenu.dosingStroke ?? dosingMainMenu.DosingStroke ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 1, valuesStartCol, dosingMainMenu.dosingDelayTime ?? dosingMainMenu.DosingDelayTime ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 2, valuesStartCol, dosingMainMenu.relieveDosing ?? dosingMainMenu.RelieveDosing ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 3, valuesStartCol, dosingMainMenu.relieveAfterDosing ?? dosingMainMenu.RelieveAfterDosing ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 4, valuesStartCol, dosingMainMenu.dischargeSpeedBeforeDosing ?? dosingMainMenu.DischargeSpeedBeforeDosing ?? null);
+            setCellValueAndUnit(dosingMainStartRow + 5, valuesStartCol, dosingMainMenu.dischargeSpeedAfterDosing ?? dosingMainMenu.DischargeSpeedAfterDosing ?? null);
         }
 
         if (cylMainMenu) {
@@ -196,11 +222,11 @@ export const handleLocalExcelDownload = async (scanId: number, fullScans: any[])
                 return obj[camelKey] !== undefined ? obj[camelKey] : (obj[pascalKey] !== undefined ? obj[pascalKey] : null);
             };
             
-            setCell(cylStartRow + 0, valuesStartCol, getSetpoint(cylMainMenu, 1));
-            setCell(cylStartRow + 1, valuesStartCol, getSetpoint(cylMainMenu, 2));
-            setCell(cylStartRow + 2, valuesStartCol, getSetpoint(cylMainMenu, 3));
-            setCell(cylStartRow + 3, valuesStartCol, getSetpoint(cylMainMenu, 4));
-            setCell(cylStartRow + 4, valuesStartCol, getSetpoint(cylMainMenu, 5));
+            setCellValueAndUnit(cylStartRow + 0, valuesStartCol, getSetpoint(cylMainMenu, 1));
+            setCellValueAndUnit(cylStartRow + 1, valuesStartCol, getSetpoint(cylMainMenu, 2));
+            setCellValueAndUnit(cylStartRow + 2, valuesStartCol, getSetpoint(cylMainMenu, 3));
+            setCellValueAndUnit(cylStartRow + 3, valuesStartCol, getSetpoint(cylMainMenu, 4));
+            setCellValueAndUnit(cylStartRow + 4, valuesStartCol, getSetpoint(cylMainMenu, 5));
         }
 
         // ========================

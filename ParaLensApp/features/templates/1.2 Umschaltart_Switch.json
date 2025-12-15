@@ -20,7 +20,10 @@
     "width": 13.75,
     "height": 2.76,
     "label": "Transshipment Position",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": [
+      "cm^3","in^3","mm","in"
+    ]
   },
   {
     "id": "switch_over_time_checkbox",
@@ -43,7 +46,10 @@
     "width": 10.93,
     "height": 2.93,
     "label": "Switch Over Time",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": [
+      "s"
+    ]
   },
   {
     "id": "switching_pressure_checkbox",
@@ -66,6 +72,9 @@
     "width": 12.53,
     "height": 2.82,
     "label": "Switching Pressure",
-    "type": "value"
+    "type": "value",
+    "expectedUnits": [
+      "bar","psi"
+    ]
   }
 ]

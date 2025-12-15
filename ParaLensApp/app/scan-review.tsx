@@ -98,24 +98,27 @@ export default function ScanReviewScreen() {
   }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
 
   const [injMainForm, setInjMainForm] = useState({
-    sprayPressureLimit: "",
-    increasedSpecificPointPrinter: "",
+    sprayPressureLimit: { value: "", unit: "" },
+    increasedSpecificPointPrinter: { value: "", unit: "" },
   });
   const [injSwitchForm, setInjSwitchForm] = useState({
-    transshipmentPosition: "",
-    switchOverTime: "",
-    switchingPressure: "",
+    transshipmentPosition: { value: "", unit: "" },
+    switchOverTime: { value: "", unit: "" },
+    switchingPressure: { value: "", unit: "" },
+    switch_over_way: { value: "0" },
+    switch_over_time: { value: "0" },
+    switch_over_hydraulic: { value: "0" },
   });
   const [injGraphicValues, setInjGraphicValues] = useState<IndexValuePair[]>([
     { index: "1" },
   ]);
   const [doseMainForm, setDoseMainForm] = useState({
-    dosingStroke: "",
-    dosingDelayTime: "",
-    relieveDosing: "",
-    relieveAfterDosing: "",
-    dischargeSpeedBeforeDosing: "",
-    dischargeSpeedAfterDosing: "",
+    dosingStroke: { value: "", unit: "" },
+    dosingDelayTime: { value: "", unit: "" },
+    relieveDosing: { value: "", unit: "" },
+    relieveAfterDosing: { value: "", unit: "" },
+    dischargeSpeedBeforeDosing: { value: "", unit: "" },
+    dischargeSpeedAfterDosing: { value: "", unit: "" },
   });
   const [doseSpeedValues, setDoseSpeedValues] = useState<IndexValuePair[]>([
     { index: "1" },
@@ -124,19 +127,19 @@ export default function ScanReviewScreen() {
     { index: "1" },
   ]);
   const [holdMainForm, setHoldMainForm] = useState({
-    holdingTime: "",
-    coolTime: "",
-    screwDiameter: "",
+    holdingTime: { value: "", unit: "" },
+    coolTime: { value: "", unit: "" },
+    screwDiameter: { value: "", unit: "" },
   });
   const [holdGraphicValues, setHoldGraphicValues] = useState<IndexValuePair[]>([
     { index: "1" },
   ]);
   const [cylinderForm, setCylinderForm] = useState({
-    setpoint1: "",
-    setpoint2: "",
-    setpoint3: "",
-    setpoint4: "",
-    setpoint5: "",
+    setpoint1: { value: "", unit: "" },
+    setpoint2: { value: "", unit: "" },
+    setpoint3: { value: "", unit: "" },
+    setpoint4: { value: "", unit: "" },
+    setpoint5: { value: "", unit: "" },
   });
 
   // Parse OCR data once on mount (if provided via navigation)
@@ -163,10 +166,13 @@ export default function ScanReviewScreen() {
   const findField = (boxId: string): OcrFieldResult | undefined =>
     ocrSnapshot?.bestFields?.find((f) => f.box_id === boxId);
 
-  const getFieldValueString = (boxId: string): string | undefined => {
+  const findFieldWithUnit = (boxId: string): { value: string, unit?: string } | undefined => {
     const f = findField(boxId);
     if (!f) return undefined;
-    return typeof f.value === "string" ? f.value : undefined;
+    if (typeof f.value === "string") {
+      return { value: f.value, unit: f.unit };
+    }
+    return undefined;
   };
 
   const getScrollbarValue = (boxId: string): ParsedScrollbarValue | undefined => {
@@ -182,15 +188,15 @@ export default function ScanReviewScreen() {
     // Injection · Main Menu
     if (selectedMenu === "injection" && injectionMode === "mainMenu") {
       setInjMainForm((prev) => {
-        const spray = getFieldValueString("spray_pessure_limit");
-        const incCheckbox = getFieldValueString("increase_specific_point_printer_checkbox");
+        const spray = findFieldWithUnit("spray_pessure_limit");
+        const incCheckbox = findFieldWithUnit("increase_specific_point_printer_checkbox");
         return {
           sprayPressureLimit: spray ?? prev.sprayPressureLimit,
           increasedSpecificPointPrinter:
-            incCheckbox === "checked"
-              ? "1"
-              : incCheckbox === "unchecked"
-              ? "0"
+            incCheckbox?.value === "checked"
+              ? { value: "1" }
+              : incCheckbox?.value === "unchecked"
+              ? { value: "0" }
               : prev.increasedSpecificPointPrinter,
         };
       });
@@ -205,13 +211,24 @@ export default function ScanReviewScreen() {
     // Injection · Switch Type
     if (selectedMenu === "injection" && injectionMode === "switchType") {
       setInjSwitchForm((prev) => {
-        const transshipment = getFieldValueString("transshipment_position");
-        const switchTime = getFieldValueString("switch_over_time");
-        const switchingPressure = getFieldValueString("switching_pressure");
+        const transshipment = findFieldWithUnit("transshipment_position");
+        const switchTime = findFieldWithUnit("switch_over_time");
+        const switchingPressure = findFieldWithUnit("switching_pressure");
+        const switchWay = findFieldWithUnit("transshipment_position_checkbox");
+        const switchTimeCb = findFieldWithUnit("switch_over_time_checkbox");
+        const switchHydraulic = findFieldWithUnit("switching_pressure_checkbox");
+        
+        const isWayActive = switchWay?.value === "checked";
+        const isTimeActive = switchTimeCb?.value === "checked";
+        const isHydraulicActive = switchHydraulic?.value === "checked";
+
         return {
           transshipmentPosition: transshipment ?? prev.transshipmentPosition,
           switchOverTime: switchTime ?? prev.switchOverTime,
           switchingPressure: switchingPressure ?? prev.switchingPressure,
+          switch_over_way: { value: isWayActive ? "1" : "0" },
+          switch_over_time: { value: isTimeActive ? "1" : "0" },
+          switch_over_hydraulic: { value: isHydraulicActive ? "1" : "0" },
         };
       });
     }
@@ -219,9 +236,9 @@ export default function ScanReviewScreen() {
     // Holding Pressure · Main Menu
     if (selectedMenu === "holdingPressure" && holdingMode === "mainMenu") {
       setHoldMainForm((prev) => {
-        const holdingTime = getFieldValueString("holding_pressure_time");
-        const coolTime = getFieldValueString("cooling_time");
-        const screwDiameter = getFieldValueString("screw_diameter");
+        const holdingTime = findFieldWithUnit("holding_pressure_time");
+        const coolTime = findFieldWithUnit("cooling_time");
+        const screwDiameter = findFieldWithUnit("screw_diameter");
         return {
           holdingTime: holdingTime ?? prev.holdingTime,
           coolTime: coolTime ?? prev.coolTime,
@@ -245,12 +262,12 @@ export default function ScanReviewScreen() {
     // Dosing · Main Menu
     if (selectedMenu === "dosing" && dosingMode === "mainMenu") {
       setDoseMainForm((prev) => {
-        const dosingStroke = getFieldValueString("dosing_stroke");
-        const dosingDelayTime = getFieldValueString("dosing_delay_time");
-        const relieveDosing = getFieldValueString("relieve_dosing");
-        const relieveAfterDosing = getFieldValueString("relieve_after_dosing");
-        const dischargeBefore = getFieldValueString("discharge_speed_before");
-        const dischargeAfter = getFieldValueString("discharge_speed_after");
+        const dosingStroke = findFieldWithUnit("dosing_stroke");
+        const dosingDelayTime = findFieldWithUnit("dosing_delay_time");
+        const relieveDosing = findFieldWithUnit("relieve_dosing");
+        const relieveAfterDosing = findFieldWithUnit("relieve_after_dosing");
+        const dischargeBefore = findFieldWithUnit("discharge_speed_before");
+        const dischargeAfter = findFieldWithUnit("discharge_speed_after");
         return {
           dosingStroke: dosingStroke ?? prev.dosingStroke,
           dosingDelayTime: dosingDelayTime ?? prev.dosingDelayTime,
@@ -277,14 +294,15 @@ export default function ScanReviewScreen() {
     if (selectedMenu === "cylinderHeating") {
       const raw =
         ocrSnapshot.ocrMap["cylinder_heating_items"] ??
-        getFieldValueString("cylinder_heating_items");
+        findFieldWithUnit("cylinder_heating_items")?.value;
       const nums = extractNumberStrings(raw, 5);
+      const unit = findFieldWithUnit("cylinder_heating_items")?.unit;
       setCylinderForm((prev) => ({
-        setpoint1: nums[0] ?? prev.setpoint1,
-        setpoint2: nums[1] ?? prev.setpoint2,
-        setpoint3: nums[2] ?? prev.setpoint3,
-        setpoint4: nums[3] ?? prev.setpoint4,
-        setpoint5: nums[4] ?? prev.setpoint5,
+        setpoint1: nums[0] ? { value: nums[0], unit } : prev.setpoint1,
+        setpoint2: nums[1] ? { value: nums[1], unit } : prev.setpoint2,
+        setpoint3: nums[2] ? { value: nums[2], unit } : prev.setpoint3,
+        setpoint4: nums[3] ? { value: nums[3], unit } : prev.setpoint4,
+        setpoint5: nums[4] ? { value: nums[4], unit } : prev.setpoint5,
       }));
     }
 
@@ -296,7 +314,7 @@ export default function ScanReviewScreen() {
     injectionMode,
     holdingMode,
     dosingMode,
-    getFieldValueString,
+    findFieldWithUnit,
     getScrollbarValue,
   ]);
 
@@ -321,9 +339,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Spray Pressure Limit"
-              value={injMainForm.sprayPressureLimit}
+              value={injMainForm.sprayPressureLimit.value}
               onChangeText={(t) =>
-                setInjMainForm({ ...injMainForm, sprayPressureLimit: t })
+                setInjMainForm({ ...injMainForm, sprayPressureLimit: { ...injMainForm.sprayPressureLimit, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -332,11 +350,11 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Increased Specific Point Printer"
-              value={injMainForm.increasedSpecificPointPrinter}
+              value={injMainForm.increasedSpecificPointPrinter.value}
               onChangeText={(t) =>
                 setInjMainForm({
                   ...injMainForm,
-                  increasedSpecificPointPrinter: t,
+                  increasedSpecificPointPrinter: { ...injMainForm.increasedSpecificPointPrinter, value: t },
                 })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
@@ -365,9 +383,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Transshipment Position"
-              value={injSwitchForm.transshipmentPosition}
+              value={injSwitchForm.transshipmentPosition.value}
               onChangeText={(t) =>
-                setInjSwitchForm({ ...injSwitchForm, transshipmentPosition: t })
+                setInjSwitchForm({ ...injSwitchForm, transshipmentPosition: { ...injSwitchForm.transshipmentPosition, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -376,9 +394,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Switch Over Time"
-              value={injSwitchForm.switchOverTime}
+              value={injSwitchForm.switchOverTime.value}
               onChangeText={(t) =>
-                setInjSwitchForm({ ...injSwitchForm, switchOverTime: t })
+                setInjSwitchForm({ ...injSwitchForm, switchOverTime: { ...injSwitchForm.switchOverTime, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -387,13 +405,60 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Switching Pressure"
-              value={injSwitchForm.switchingPressure}
+              value={injSwitchForm.switchingPressure.value}
               onChangeText={(t) =>
-                setInjSwitchForm({ ...injSwitchForm, switchingPressure: t })
+                setInjSwitchForm({ ...injSwitchForm, switchingPressure: { ...injSwitchForm.switchingPressure, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
           </Input>
+          
+          <VStack className="gap-2 mt-2">
+            <Heading size="sm" className={isDark ? "text-typography-50" : "text-typography-900"}>
+              Active Switch Over Mode
+            </Heading>
+            <HStack className="gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={injSwitchForm.switch_over_way.value === "1" ? "solid" : "outline"}
+                action={injSwitchForm.switch_over_way.value === "1" ? "primary" : "secondary"}
+                onPress={() => setInjSwitchForm(prev => ({
+                  ...prev,
+                  switch_over_way: { value: "1" },
+                  switch_over_time: { value: "0" },
+                  switch_over_hydraulic: { value: "0" }
+                }))}
+              >
+                <ButtonText>Way</ButtonText>
+              </Button>
+              <Button
+                size="sm"
+                variant={injSwitchForm.switch_over_time.value === "1" ? "solid" : "outline"}
+                action={injSwitchForm.switch_over_time.value === "1" ? "primary" : "secondary"}
+                onPress={() => setInjSwitchForm(prev => ({
+                  ...prev,
+                  switch_over_way: { value: "0" },
+                  switch_over_time: { value: "1" },
+                  switch_over_hydraulic: { value: "0" }
+                }))}
+              >
+                <ButtonText>Time</ButtonText>
+              </Button>
+              <Button
+                size="sm"
+                variant={injSwitchForm.switch_over_hydraulic.value === "1" ? "solid" : "outline"}
+                action={injSwitchForm.switch_over_hydraulic.value === "1" ? "primary" : "secondary"}
+                onPress={() => setInjSwitchForm(prev => ({
+                  ...prev,
+                  switch_over_way: { value: "0" },
+                  switch_over_time: { value: "0" },
+                  switch_over_hydraulic: { value: "1" }
+                }))}
+              >
+                <ButtonText>Hydraulic</ButtonText>
+              </Button>
+            </HStack>
+          </VStack>
         </VStack>
       )}
 
@@ -403,9 +468,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Holding Time"
-              value={holdMainForm.holdingTime}
+              value={holdMainForm.holdingTime.value}
               onChangeText={(t) =>
-                setHoldMainForm({ ...holdMainForm, holdingTime: t })
+                setHoldMainForm({ ...holdMainForm, holdingTime: { ...holdMainForm.holdingTime, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -414,9 +479,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Cool Time"
-              value={holdMainForm.coolTime}
+              value={holdMainForm.coolTime.value}
               onChangeText={(t) =>
-                setHoldMainForm({ ...holdMainForm, coolTime: t })
+                setHoldMainForm({ ...holdMainForm, coolTime: { ...holdMainForm.coolTime, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -425,9 +490,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Screw Diameter"
-              value={holdMainForm.screwDiameter}
+              value={holdMainForm.screwDiameter.value}
               onChangeText={(t) =>
-                setHoldMainForm({ ...holdMainForm, screwDiameter: t })
+                setHoldMainForm({ ...holdMainForm, screwDiameter: { ...holdMainForm.screwDiameter, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -455,9 +520,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Dosing Stroke"
-              value={doseMainForm.dosingStroke}
+              value={doseMainForm.dosingStroke.value}
               onChangeText={(t) =>
-                setDoseMainForm({ ...doseMainForm, dosingStroke: t })
+                setDoseMainForm({ ...doseMainForm, dosingStroke: { ...doseMainForm.dosingStroke, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -466,9 +531,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Dosing Delay Time"
-              value={doseMainForm.dosingDelayTime}
+              value={doseMainForm.dosingDelayTime.value}
               onChangeText={(t) =>
-                setDoseMainForm({ ...doseMainForm, dosingDelayTime: t })
+                setDoseMainForm({ ...doseMainForm, dosingDelayTime: { ...doseMainForm.dosingDelayTime, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -477,9 +542,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Relieve Dosing"
-              value={doseMainForm.relieveDosing}
+              value={doseMainForm.relieveDosing.value}
               onChangeText={(t) =>
-                setDoseMainForm({ ...doseMainForm, relieveDosing: t })
+                setDoseMainForm({ ...doseMainForm, relieveDosing: { ...doseMainForm.relieveDosing, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -488,9 +553,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Relieve After Dosing"
-              value={doseMainForm.relieveAfterDosing}
+              value={doseMainForm.relieveAfterDosing.value}
               onChangeText={(t) =>
-                setDoseMainForm({ ...doseMainForm, relieveAfterDosing: t })
+                setDoseMainForm({ ...doseMainForm, relieveAfterDosing: { ...doseMainForm.relieveAfterDosing, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -499,11 +564,11 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Discharge Speed Before"
-              value={doseMainForm.dischargeSpeedBeforeDosing}
+              value={doseMainForm.dischargeSpeedBeforeDosing.value}
               onChangeText={(t) =>
                 setDoseMainForm({
                   ...doseMainForm,
-                  dischargeSpeedBeforeDosing: t,
+                  dischargeSpeedBeforeDosing: { ...doseMainForm.dischargeSpeedBeforeDosing, value: t },
                 })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
@@ -513,11 +578,11 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Discharge Speed After"
-              value={doseMainForm.dischargeSpeedAfterDosing}
+              value={doseMainForm.dischargeSpeedAfterDosing.value}
               onChangeText={(t) =>
                 setDoseMainForm({
                   ...doseMainForm,
-                  dischargeSpeedAfterDosing: t,
+                  dischargeSpeedAfterDosing: { ...doseMainForm.dischargeSpeedAfterDosing, value: t },
                 })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
@@ -559,9 +624,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Setpoint 1"
-              value={cylinderForm.setpoint1}
+              value={cylinderForm.setpoint1.value}
               onChangeText={(t) =>
-                setCylinderForm({ ...cylinderForm, setpoint1: t })
+                setCylinderForm({ ...cylinderForm, setpoint1: { ...cylinderForm.setpoint1, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -570,9 +635,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Setpoint 2"
-              value={cylinderForm.setpoint2}
+              value={cylinderForm.setpoint2.value}
               onChangeText={(t) =>
-                setCylinderForm({ ...cylinderForm, setpoint2: t })
+                setCylinderForm({ ...cylinderForm, setpoint2: { ...cylinderForm.setpoint2, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -581,9 +646,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Setpoint 3"
-              value={cylinderForm.setpoint3}
+              value={cylinderForm.setpoint3.value}
               onChangeText={(t) =>
-                setCylinderForm({ ...cylinderForm, setpoint3: t })
+                setCylinderForm({ ...cylinderForm, setpoint3: { ...cylinderForm.setpoint3, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -592,9 +657,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Setpoint 4"
-              value={cylinderForm.setpoint4}
+              value={cylinderForm.setpoint4.value}
               onChangeText={(t) =>
-                setCylinderForm({ ...cylinderForm, setpoint4: t })
+                setCylinderForm({ ...cylinderForm, setpoint4: { ...cylinderForm.setpoint4, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -603,9 +668,9 @@ export default function ScanReviewScreen() {
             <InputField
               keyboardType="numeric"
               placeholder="Setpoint 5"
-              value={cylinderForm.setpoint5}
+              value={cylinderForm.setpoint5.value}
               onChangeText={(t) =>
-                setCylinderForm({ ...cylinderForm, setpoint5: t })
+                setCylinderForm({ ...cylinderForm, setpoint5: { ...cylinderForm.setpoint5, value: t } })
               }
               style={{ color: isDark ? '#ffffff' : '#000000' }}
             />
@@ -665,5 +730,3 @@ export default function ScanReviewScreen() {
     </ScrollView>
   );
 }
-
-
