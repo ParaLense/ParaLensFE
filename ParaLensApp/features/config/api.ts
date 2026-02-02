@@ -2,7 +2,7 @@ export const API_CONFIG = {
     // For physical device, use your computer's IP address
     // For Android emulator, use 'http://10.0.2.2:5200'
     // For iOS simulator, 'http://localhost:5200' works fine
-    BASE_URL: 'http://localhost:5200', // Replace with your computer's IP address
+    BASE_URL: 'http://192.168.31.153:5200', // Replace with your computer's IP address
     TIMEOUT: 10000,
     HEADERS: {
         'Content-Type': 'application/json',

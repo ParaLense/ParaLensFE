@@ -45,9 +45,24 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const upsertSection = useCallback((fullScanId: number, section: ScanMenu, payload: any) => {
         setFullScans(prev => prev.map(fs => {
             if (fs.id !== fullScanId) return fs;
-            const existingSection: any = (fs as any)[section] || {};
-            const merged = { ...existingSection, ...payload };
-            const updatedScan = { ...fs, [section]: merged, lastModified: new Date().toISOString() } as FullScanDto;
+            
+            // The payload is now expected to be structured, e.g., { mainMenu: { sprayPressureLimit: { value: '123', unit: 'bar' } } }
+            // We need to merge this deeply.
+            const existingSectionData = (fs as any)[section] || {};
+            
+            // A simple deep merge for one level of nesting (like 'mainMenu' or 'switchType')
+            const mergedPayload = Object.keys(payload).reduce((acc, key) => {
+                if (typeof payload[key] === 'object' && payload[key] !== null && !Array.isArray(payload[key])) {
+                    acc[key] = { ...(existingSectionData[key] || {}), ...payload[key] };
+                } else {
+                    acc[key] = payload[key];
+                }
+                return acc;
+            }, {} as any);
+
+            const mergedSection = { ...existingSectionData, ...mergedPayload };
+
+            const updatedScan = { ...fs, [section]: mergedSection, lastModified: new Date().toISOString() } as FullScanDto;
 
             // If this scan was previously uploaded, mark it as needing update
             if (updatedScan.uploadStatus === 'uploaded') {
@@ -182,5 +197,3 @@ export function useFullScan() {
     if (!ctx) throw new Error('useFullScan must be used within FullScanProvider');
     return ctx;
 }
-
-

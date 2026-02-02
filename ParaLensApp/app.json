@@ -34,6 +34,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./expo-plugins/withCustomGradleProps",
       "expo-router",
       [
         "expo-build-properties",
@@ -42,10 +43,7 @@
             "minSdkVersion": 26,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "kotlinVersion": "2.0.21",
-            "extraGradleProperties": {
-              "reactNativeArchitectures": "arm64-v8a"
-            }
+            "kotlinVersion": "2.0.21"
           },
           "ios": {
             "deploymentTarget": "15.1"
@@ -72,9 +70,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d5ab8482-0990-42f7-a6a0-2178b265f8be"
+        "projectId": "f39f4fd6-8750-43d3-856f-fb69f535391a"
       }
-    },
-    "owner": "error404x_x"
+    }
   }
 }

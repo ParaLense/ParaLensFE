@@ -20,6 +20,7 @@ import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-temp
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
 import { useOcrHistory } from '@/features/ocr';
+import type { OcrFieldResult } from '@/features/ocr/useOcrHistory';
 import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
 
@@ -30,21 +31,16 @@ const SCREEN_ASPECT_W = 3;
 const SCREEN_ASPECT_H = 4;
 const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 
-export interface FieldSummary {
-  value: string;
-  totalScans: number;
-  majorityRatio: number;
-}
-
-export interface CurrentScanSummary {
-  layout: TemplateLayout | null;
-  byFieldId: Record<string, FieldSummary>;
-  isComplete: boolean;
-}
-
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   currentLayout: TemplateLayout;
-  onScanSummaryChange?: (summary: CurrentScanSummary | null) => void;
+  /**
+   * Optional callback to expose the current best OCR field values and raw map
+   * to parent components (e.g. CameraScreen for scan-review prefill).
+   */
+  onOcrUpdate?: (payload: {
+    bestFields: OcrFieldResult[];
+    ocrMap: Record<string, string>;
+  }) => void;
 }
 
 interface FrameToViewTransform {
@@ -82,42 +78,11 @@ const toNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(num) ? num : fallback;
 };
 
-const REQUIRED_FIELDS_BY_LAYOUT: Partial<Record<TemplateLayout, string[]>> = {
-  [TemplateLayout.Injection]: ['spray_pessure_limit'], // main menu numeric
-  [TemplateLayout.InjectionSpeed_ScrollBar]: ['injection_speed_items'],
-  [TemplateLayout.Injection_SwitchType]: [
-    'transshipment_position',
-    'switch_over_time',
-    'switching_pressure',
-  ],
-  [TemplateLayout.HoldingPressure]: [
-    'holding_pressure_time',
-    'cooling_time',
-    'screw_diameter',
-  ],
-  [TemplateLayout.HoldingPressure_ScrollBar]: ['specific_back_pressure_items'],
-  [TemplateLayout.Dosing]: [
-    'dosing_stroke',
-    'dosing_delay_time',
-    'relieve_dosing',
-    'relieve_after_dosing',
-    'discharge_speed_before',
-    'discharge_speed_after',
-  ],
-  [TemplateLayout.Dosing_ScrollBar]: [
-    'dosing_speed_items',
-    'specific_back_pressure_items',
-  ],
-  [TemplateLayout.CylinderHeating]: ['cylinder_heating_items'],
-};
-
-const MAJORITY_THRESHOLD = 0.8;
-
 const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   currentLayout,
   style: cameraStyleProp,
   device,
-  onScanSummaryChange,
+  onOcrUpdate,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -141,12 +106,23 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const setOcrMapJS = useRunOnJS(setOcrMap, []);
   const setScreenResultJS = useRunOnJS(setScreenResult, []);
   const setBase64ImageJS = useRunOnJS(setBase64Image, []);
+  const onOcrUpdateJS = useRunOnJS(
+    (payload: { bestFields: OcrFieldResult[]; ocrMap: Record<string, string> }) => {
+      if (onOcrUpdate) {
+        onOcrUpdate(payload);
+      }
+    },
+    [onOcrUpdate]
+  );
+
+  const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
   // OCR History Hook for filtering and storing recognized values
   const ocrHistory = useOcrHistory({
     maxHistoryPerField: 30,
     minOccurrencesForMajority: 3,
-    commaRequired: true, // Keep comma requirement for value fields
+    commaRequired: true, // Keep comma requirement for numeric value fields
+    template: ocrTemplate,
   });
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -161,17 +137,20 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     });
   }, []);
 
-  // Function to add OCR values to history - wrapped with useRunOnJS
-  const addOcrToHistory = useCallback((ocrMap: Record<string, string>) => {
-    ocrHistory.addScanResult(ocrMap);
+  // Function to add full OCR scan (including boxes) to history - wrapped with useRunOnJS
+  const addScanResult = useCallback((scanResult: any) => {
+    // scanResult is shaped like OcrScanResult (timestamp, boxes, screenDetected, accuracy)
+    ocrHistory.addScanResult(scanResult);
   }, [ocrHistory]);
-  const addOcrToHistoryJS = useRunOnJS(addOcrToHistory, []);
+  const addScanResultJS = useRunOnJS(addScanResult, []);
 
-  // Function to add full scan result to history - wrapped with useRunOnJS
-  const addFullScanResult = useCallback((scanResult: any) => {
-    ocrHistory.addFullScanResult(scanResult);
-  }, [ocrHistory]);
-  const addFullScanResultJS = useRunOnJS(addFullScanResult, []);
+  // Whenever OCR history / map change, compute best fields and notify parent (on JS thread)
+  useEffect(() => {
+    if (!onOcrUpdate) return;
+    const bestFields = ocrHistory.getBestFields();
+    if (!bestFields || bestFields.length === 0) return;
+    onOcrUpdateJS({ bestFields, ocrMap });
+  }, [ocrHistory.fieldAggregations, ocrMap, onOcrUpdate, onOcrUpdateJS]);
 
   const screenTemplate = useMemo(
     () =>
@@ -184,9 +163,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       })),
     []
   );
-
-  // TODO: load OCR template for currentLayout (percent over warped image)
-  const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
   const frameDimensions = useMemo(() => {
     const frameW = toNumber(screenResult?.width, 0);
@@ -292,11 +268,12 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
         if (scan.ocr?.boxes?.length) {
           const map: Record<string, string> = {};
-          const scrollbarBoxes: any[] = [];
-          
-          // First pass: process all non-scrollbar boxes to populate the map
+
+          // Build a simple debug map with raw values for each box.
+          // All heavy filtering/majority logic now lives in useOcrHistory.
           for (const b of scan.ocr.boxes as any[]) {
             if (!b || !b.id) continue;
+
             if (b.type === 'value') {
               map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
             } else if (b.type === 'checkbox') {
@@ -307,44 +284,59 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
               }
             } else if (b.type === 'scrollbar') {
-              // Store scrollbar boxes for second pass
-              scrollbarBoxes.push(b);
-            }
-          }
-          
-          // Second pass: process scrollbar boxes - just store raw array joined
-          for (const b of scrollbarBoxes) {
-            // Store raw scrollbar values as semicolon-separated string
-            // The history filtering will handle pairing and filtering start/end units
-            const scrollbarValues = b.values;
-            if (Array.isArray(scrollbarValues)) {
-              const scrollbarValue = scrollbarValues
-                .map(v => String(v || '').trim())
-                .filter(v => v !== '')
-                .join('; ');
-              map[b.id] = scrollbarValue;
+              const values = Array.isArray(b.values) ? b.values : [];
+              const tokens: string[] = [];
+
+              for (const v of values) {
+                if (typeof v === 'string') {
+                  const t = v.trim();
+                  if (t.length > 0) tokens.push(t);
+                } else if (typeof v === 'number') {
+                  tokens.push(String(v));
+                } else if (v && typeof v === 'object') {
+                  const text = (v as any).text;
+                  const num = (v as any).number;
+                  if (typeof text === 'string' && text.trim().length > 0) {
+                    tokens.push(text.trim());
+                  } else if (typeof num === 'number') {
+                    tokens.push(String(num));
+                  }
+                }
+              }
+
+              if (tokens.length > 0) {
+                map[b.id] = tokens.join(', ');
+              }
             }
           }
           if (Object.keys(map).length > 0) {
             setOcrMapJS(map);
-            // Add to OCR history for filtering (legacy method)
-            addOcrToHistoryJS(map);
-            
-            // Add full scan result to history with complete box information
+
+            // Enrich boxes with template data (sameUnitAs, expectedUnits)
+            const enrichedBoxes = scan.ocr.boxes.map((box: any) => {
+              const templateBox = ocrTemplate.find(t => t.id === box.id);
+              return {
+                ...box,
+                sameUnitAs: templateBox?.sameUnitAs,
+                expectedUnits: templateBox?.expectedUnits,
+              };
+            });
+
+            // Add full scan result (with complete box information) to OCR history
             const fullScanResult = {
               timestamp: Date.now(),
-              boxes: scan.ocr.boxes,
+              boxes: enrichedBoxes,
               screenDetected: true, // We know screen was detected if we're here
               accuracy: 0.5, // Default accuracy since we don't have direct access
             };
-            addFullScanResultJS(fullScanResult);
+            addScanResultJS(fullScanResult);
           }
         }
       }
     } catch (error) {
       console.error(`Frame Processor Error: ${error}`);
     }
-  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addOcrToHistoryJS, addFullScanResultJS, viewHeight, viewWidth]);
+  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, ocrTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addScanResultJS, viewHeight, viewWidth]);
 
   // Helper function to apply homography transformation to a point
   const applyHomography = (h: number[][], point: { x: number; y: number }): { x: number; y: number } => {
@@ -439,50 +431,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     if (!cameraFeedBox) return null;
     return mapBoxToViewStyle(cameraFeedBox);
   };
-
-  // Build a summary for the current layout and notify parent when it changes
-  useEffect(() => {
-    if (!onScanSummaryChange) return;
-
-    const requiredIds = REQUIRED_FIELDS_BY_LAYOUT[currentLayout] ?? [];
-    if (!requiredIds.length) {
-      onScanSummaryChange(null);
-      return;
-    }
-
-    const byFieldId: Record<string, FieldSummary> = {};
-    let allComplete = true;
-
-    requiredIds.forEach(fieldId => {
-      // Determine field type from the latest scan
-      const scanResults = ocrHistory.getFieldScanResults(fieldId);
-      const lastScan = scanResults[0];
-      const boxType = (lastScan?.boxes?.find(b => b.id === fieldId)?.type ??
-        'value') as 'value' | 'checkbox' | 'scrollbar';
-
-      const best = ocrHistory.getBestValue(fieldId, boxType);
-
-      if (!best.value || best.majorityRatio < MAJORITY_THRESHOLD) {
-        allComplete = false;
-      }
-
-      if (best.value) {
-        byFieldId[fieldId] = {
-          value: best.value,
-          totalScans: best.totalScans,
-          majorityRatio: best.majorityRatio,
-        };
-      }
-    });
-
-    const summary: CurrentScanSummary = {
-      layout: currentLayout,
-      byFieldId,
-      isComplete: allComplete,
-    };
-
-    onScanSummaryChange(summary);
-  }, [currentLayout, ocrHistory, onScanSummaryChange]);
 
   return (
     <CameraPermissionProvider>
@@ -726,123 +674,22 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       {/* No template-pixel boxes overlay anymore */}
 
       {ocrLayoutBoxes.map(box => {
-        const fieldId = box.id;
+        // Use filtered value from history instead of raw OCR map
+        const filteredValue = ocrHistory.getFilteredValue(box.id);
+        const rawValue = ocrMap[box.id];
+        
+        // Show filtered value if available, otherwise show raw value
+        const displayValue = filteredValue || rawValue;
+        if (!displayValue) return null;
 
-        // Determine box type from latest scan result
-        const scanResults = ocrHistory.getFieldScanResults(fieldId);
-        const lastScan = scanResults[0];
-        const boxType = lastScan?.boxes?.find(b => b.id === fieldId)?.type ?? 'value';
-
-        // Compute display value:
-        // - Scrollbar: majority-by-type first, then fallback to raw OCR map
-        // - Other types: general filtered value, then fallback to raw OCR map
-        let displayValue: string | null = null;
-        if (boxType === 'scrollbar') {
-          displayValue =
-            ocrHistory.getMajorityValueByType(fieldId, 'scrollbar') ??
-            ocrMap[fieldId] ??
-            null;
-        } else {
-          displayValue =
-            ocrHistory.getFilteredValue(fieldId) ??
-            ocrMap[fieldId] ??
-            null;
-        }
-
-        if (!displayValue || !displayValue.trim()) {
-          return null;
-        }
-
-        // Special rendering for scrollbar: show key on top, value on bottom, side by side
-        if (boxType === 'scrollbar') {
-          // Values are stored as "key:value; key:value; ..." with ";" as separator.
-          // IMPORTANT: We split on ";" so decimal commas stay intact.
-          const itemStrings = displayValue
-            .split(';')
-            .map(item => item.trim())
-            .filter(item => item.length > 0);
-
-          const pairs = itemStrings
-            .map(item => {
-              const [keyPart, ...rest] = item.split(':');
-              const key = (keyPart || '').trim();
-              const value = rest.join(':').trim(); // keep any ':' that might appear in value
-              return { key, value };
-            })
-            .filter(p => p.key || p.value);
-
-          if (pairs.length === 0) {
-            return null;
-          }
-
-          const startTop = box.y + box.height + 5;
-          const itemSpacing = 6;
-          let currentLeft = box.x;
-
-          return pairs.map((pair, idx) => {
-            const keyText = pair.key;
-            const valueText = pair.value;
-
-            // Rough width estimate based on longest line
-            const longest = Math.max(keyText.length, valueText.length);
-            const estimatedWidth = Math.max(60, longest * 7 + 16);
-            const left = currentLeft;
-            currentLeft += estimatedWidth + itemSpacing;
-
-            return (
-              <Box
-                key={`${fieldId}_pair_${idx}`}
-                style={{
-                  position: 'absolute',
-                  left,
-                  top: startTop,
-                  alignItems: 'center',
-                  zIndex: 200,
-                  flexDirection: 'column',
-                }}
-              >
-                <Box
-                  style={{
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    borderRadius: 6,
-                    paddingVertical: 2,
-                    paddingHorizontal: 6,
-                    minWidth: 50,
-                    alignItems: 'center',
-                  }}
-                >
-                  {keyText ? (
-                    <GluestackText
-                      className="text-xs text-center text-cyan-400"
-                      numberOfLines={1}
-                    >
-                      {keyText}
-                    </GluestackText>
-                  ) : null}
-                  {valueText ? (
-                    <GluestackText
-                      className="text-sm text-center font-bold text-green-400"
-                      numberOfLines={1}
-                    >
-                      {valueText}
-                    </GluestackText>
-                  ) : null}
-                </Box>
-              </Box>
-            );
-          });
-        }
-
-        // Default rendering for value / checkbox: single label below box
-        const labelTop = box.y + box.height + 6;
-
+        const labelTop = box.y + box.height - 24;
         return (
           <Box
             key={box.id}
             style={{
               position: 'absolute',
               left: box.x,
-              top: labelTop,
+              top: labelTop + 30,
               alignItems: 'center',
               zIndex: 200,
             }}
@@ -854,15 +701,22 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 paddingVertical: 4,
                 paddingHorizontal: 8,
                 minWidth: 40,
-                maxWidth: Math.max(box.width * 1.5, 120),
+                maxWidth: Math.max(box.width * 1.5, 120), // Allow 50% more width or minimum 120px
               }}
             >
-              <GluestackText
-                className="text-sm text-center text-green-400"
+              <GluestackText 
+                className={`text-sm text-center ${
+                  filteredValue ? 'text-green-400' : 'text-yellow-400'
+                }`}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
                 {displayValue}
+                {filteredValue && rawValue !== filteredValue && (
+                  <GluestackText className="text-xs text-gray-400">
+                    {' '}(filtered)
+                  </GluestackText>
+                )}
               </GluestackText>
             </Box>
           </Box>
