@@ -16,6 +16,24 @@
     "height": 6.83,
     "label": "Specific Back Pressure Items",
     "type": "scrollbar",
+    "expectedUnits": {
+      "iso": {
+        "absolute": "bar",
+        "relative": "bar"
+      },
+      "imperial": {
+        "absolute": "psi",
+        "relative": "psi"
+      }
+    },
+    "expectedKeyUnits": {
+      "iso": {
+        "absolute": "s"
+      },
+      "imperial": {
+        "absolute": "s"
+      }
+    },
     "options": {
       "orientation": "horizontal",
       "cells": 10,

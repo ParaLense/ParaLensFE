@@ -17,6 +17,9 @@ export interface InjectionSubMenuScrollDto {
   id: number;
   injectionId: number;
   values: InjectionSubMenuValueDto[];
+  // Optional units detected from OCR scrollbars
+  keyUnit?: string | null;
+  valueUnit?: string | null;
 }
 
 export interface InjectionSubMenuSwitchTypeDto {
@@ -58,6 +61,8 @@ export interface DosingSubMenuDosingSpeedScrollDto {
   id: number;
   dosingId: number;
   values: DosingSubMenuDosingSpeedValueDto[];
+  keyUnit?: string | null;
+  valueUnit?: string | null;
 }
 
 export interface DosingSubMenuDosingPressureValueDto {
@@ -72,6 +77,8 @@ export interface DosingSubMenuDosingPressureScrollDto {
   id: number;
   dosingId: number;
   values: DosingSubMenuDosingPressureValueDto[];
+  keyUnit?: string | null;
+  valueUnit?: string | null;
 }
 
 export interface DosingDto {
@@ -102,6 +109,8 @@ export interface HoldingPressureSubMenuScrollDto {
   id: number;
   holdingPressureId: number;
   values: HoldingPressureSubMenuValueDto[];
+  keyUnit?: string | null;
+  valueUnit?: string | null;
 }
 
 export interface HoldingPressureDto {

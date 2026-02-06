@@ -7,7 +7,10 @@
     "height": 3.21,
     "label": "Holding Pressure Time",
     "type": "value",
-    "expectedUnits": ["s"]
+    "expectedUnits": {
+      "iso": { "absolute": "s" },
+      "imperial": { "absolute": "s" }
+    }
   },
   {
     "id": "cooling_time",
@@ -17,7 +20,10 @@
     "height": 3.31,
     "label": "Cooling Time",
     "type": "value",
-    "expectedUnits": ["s"]
+    "expectedUnits": {
+      "iso": { "absolute": "s" },
+      "imperial": { "absolute": "s" }
+    }
   },
   {
     "id": "screw_diameter",
@@ -27,6 +33,9 @@
     "height": 3.41,
     "label": "Screw Diameter",
     "type": "value",
-    "expectedUnits": ["mm", "in"]
+    "expectedUnits": {
+      "iso": { "absolute": "mm" },
+      "imperial": { "absolute": "in" }
+    }
   }
 ]

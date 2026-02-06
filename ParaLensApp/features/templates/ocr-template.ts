@@ -8,6 +8,7 @@ export type OcrTemplateBox = {
   width: number;
   height: number;
   type?: 'value' | 'checkbox' | 'scrollbar';
+  expectedKeyUnits?:string[];
   expectedUnits?: string[];
   sameUnitAs?: string;
   options?: {
@@ -28,6 +29,7 @@ export function loadOcrTemplate(layout: TemplateLayout): OcrTemplateBox[] {
     height: b.height,
     type: b.type || 'value', // Use the type from JSON, default to 'value'
     expectedUnits: b.expectedUnits,
+    expectedKeyUnits: b.expectedKeyUnits,
     sameUnitAs: b.sameUnitAs,
     options: b.options, // Include options for checkboxes and scrollbars
   }));

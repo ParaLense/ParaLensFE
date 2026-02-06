@@ -4,7 +4,7 @@ import {
   CreateScanRequest,
   FullScanDto,
 } from '../types/api';
-import {API_ENDPOINTS} from "@/features/config/api";
+import {API_ENDPOINTS} from "@/config/api";
 
 export class ScanService {
   /**

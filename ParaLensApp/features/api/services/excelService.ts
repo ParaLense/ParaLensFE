@@ -1,5 +1,5 @@
 import httpClient from './httpClient';
-import {API_CONFIG, API_ENDPOINTS} from "@/features/config/api";
+import {API_CONFIG, API_ENDPOINTS} from "@/config/api";
 import RNFS from 'react-native-fs';
 import { Alert, Platform, PermissionsAndroid } from 'react-native';
 

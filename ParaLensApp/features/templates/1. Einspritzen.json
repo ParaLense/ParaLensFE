@@ -7,7 +7,16 @@
     "height": 2.75,
     "label": "Spray Pessure Limit",
     "type": "value",
-    "expectedUnits": ["bar", "psi", "%"]
+    "expectedUnits": {
+      "iso": {
+        "absolute": "bar",
+        "relative": "%"
+      },
+      "imperial": {
+        "absolute": "psi",
+        "relative": "%"
+      }
+    }
   },
   {
     "id": "increase_specific_point_printer_checkbox",

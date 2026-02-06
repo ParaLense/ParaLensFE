@@ -20,7 +20,7 @@ import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-temp
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
 import { useOcrHistory } from '@/features/ocr';
-import type { OcrFieldResult } from '@/features/ocr/useOcrHistory';
+import type { OcrFieldResult } from '@/features/ocr';
 import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
 
@@ -40,7 +40,12 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   onOcrUpdate?: (payload: {
     bestFields: OcrFieldResult[];
     ocrMap: Record<string, string>;
+    unitConfig?: {
+      system?: import('@/features/ocr').UnitSystem;
+      mode?: import('@/features/ocr').ValueMode;
+    };
   }) => void;
+  onScanComplete?: (payload: any) => void;
 }
 
 interface FrameToViewTransform {
@@ -83,6 +88,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   style: cameraStyleProp,
   device,
   onOcrUpdate,
+    onScanComplete,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -107,7 +113,14 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const setScreenResultJS = useRunOnJS(setScreenResult, []);
   const setBase64ImageJS = useRunOnJS(setBase64Image, []);
   const onOcrUpdateJS = useRunOnJS(
-    (payload: { bestFields: OcrFieldResult[]; ocrMap: Record<string, string> }) => {
+    (payload: {
+      bestFields: OcrFieldResult[];
+      ocrMap: Record<string, string>;
+      unitConfig?: {
+        system?: import('@/features/ocr').UnitSystem;
+        mode?: import('@/features/ocr').ValueMode;
+      };
+    }) => {
       if (onOcrUpdate) {
         onOcrUpdate(payload);
       }
@@ -149,8 +162,8 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     if (!onOcrUpdate) return;
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
-    onOcrUpdateJS({ bestFields, ocrMap });
-  }, [ocrHistory.fieldAggregations, ocrMap, onOcrUpdate, onOcrUpdateJS]);
+    onOcrUpdateJS({ bestFields, ocrMap, unitConfig: ocrHistory.unitConfig });
+  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdate, onOcrUpdateJS]);
 
   const screenTemplate = useMemo(
     () =>
@@ -319,6 +332,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                 ...box,
                 sameUnitAs: templateBox?.sameUnitAs,
                 expectedUnits: templateBox?.expectedUnits,
+                expectedKeyUnits: templateBox?.expectedKeyUnits,
               };
             });
 
@@ -521,45 +535,33 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       />
 
       {/* Draw only ROI overlays using TemplateOverlay */}
-      {templateViewport ? (
-        <>
-          <TemplateOverlay
-            layout={null}
-            isActive
-            boxes={[{
-              id: 'roi-outer',
-              x: templateViewport.offsetX,
-              y: templateViewport.offsetY,
-              width: templateViewport.width,
-              height: templateViewport.height,
-              color: '#FF0000',
-            }]}
-          />
-          {/* Optional inner ROI estimate at 30/20/45/60 of viewport */}
-          <TemplateOverlay
-            layout={null}
-            isActive
-            boxes={[{
-              id: 'roi-inner',
-              x: templateViewport.offsetX + templateViewport.width * 0.30,
-              y: templateViewport.offsetY + templateViewport.height * 0.20,
-              width: templateViewport.width * 0.45,
-              height: templateViewport.height * 0.60,
-              color: '#00FF00',
-            }]}
-          />
-        </>
-      ) : (
-        <TemplateOverlay
-          layout={null}
-          isActive
-          widthPercent={SCREEN_WIDTH_RATIO}
-          aspectRatio={SCREEN_ASPECT_RATIO}
-          containerWidth={cameraLayoutSize?.width}
-          containerHeight={cameraLayoutSize?.height}
-          boxes={[]}
-        />
-      )}
+      <TemplateOverlay
+        layout={null}
+        isActive
+        boxes={templateViewport ? [
+          {
+            id: 'roi-outer',
+            x: templateViewport.offsetX,
+            y: templateViewport.offsetY,
+            width: templateViewport.width,
+            height: templateViewport.height,
+            color: '#FFFFFF',
+          },
+          {
+            id: 'roi-inner',
+            x: templateViewport.offsetX + templateViewport.width * 0.30,
+            y: templateViewport.offsetY + templateViewport.height * 0.20,
+            width: templateViewport.width * 0.45,
+            height: templateViewport.height * 0.60,
+            color: '#FFFFFF',
+            isInner: true,
+          }
+        ] : []}
+        widthPercent={SCREEN_WIDTH_RATIO}
+        aspectRatio={SCREEN_ASPECT_RATIO}
+        containerWidth={cameraLayoutSize?.width}
+        containerHeight={cameraLayoutSize?.height}
+      />
 
       {screenResult && (
         <Box

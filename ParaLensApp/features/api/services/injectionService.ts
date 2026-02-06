@@ -9,7 +9,7 @@ import {
   InjectionSubMenuSwitchTypeDto,
   CreateInjectionSubMenuSwitchTypeRequest
 } from '../types/api';
-import {API_ENDPOINTS} from "@/features/config/api";
+import {API_ENDPOINTS} from "@/config/api";
 
 export class InjectionService {
   async getInjection(scanId: number): Promise<InjectionDto> {
