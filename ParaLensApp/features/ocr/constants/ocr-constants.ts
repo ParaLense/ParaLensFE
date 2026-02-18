@@ -21,3 +21,14 @@ export const SCROLLBAR_DECIMALS = 4;
 // Default maximum history entries per field
 export const DEFAULT_MAX_HISTORY_PER_FIELD = 30;
 
+
+/**
+ * OCR Constant for Frame Processor Plugin
+ */
+
+export const ROI_INNER = {};
+export const ROI_OUTER = {};
+export const minAspectW = 3;
+export const minAspectH = 4;
+export const rotate90CW = true;
+export const imageQuality = 80;

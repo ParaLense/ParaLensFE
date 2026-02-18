@@ -89,7 +89,9 @@ export const  detectMatchingUnit = (raw: string, keywords: readonly string[]): s
   const simplified = cleaned.replace(/[^a-z0-9%/^³²]/g, '');
 
   if (!simplified) return null;
-
+  if(simplified == "cin"){
+    console.log("cin -> cm or cm^3, but not in!") // testing down with startsWith instead of includes
+  }
   for (const kw of keywords) {
     const kwClean = kw.toLowerCase();
 
@@ -115,7 +117,8 @@ export const  detectMatchingUnit = (raw: string, keywords: readonly string[]): s
       kwSimplified.replace('/s', 's'),
     ];
 
-    if (permutations.some(p => simplified.includes(p))) {
+    if (permutations.some(p => simplified.startsWith(p))) {  //testing instead of simplified.includes(p)
+
       return kw;
     }
   }

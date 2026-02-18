@@ -35,8 +35,6 @@
   @try {
     // Parse arguments using Utils
     std::vector<SDBOX> templateBoxes = [Utils parseTemplate:arguments options:self.options];
-    int screenAspectW = [Utils getInt:arguments key:@"screenAspectW" defaultValue:[Utils getInt:self.options key:@"screenAspectW" defaultValue:3]];
-    int screenAspectH = [Utils getInt:arguments key:@"screenAspectH" defaultValue:[Utils getInt:self.options key:@"screenAspectH" defaultValue:4]];
     int templateTargetW = [Utils getInt:arguments key:@"templateTargetW" defaultValue:[Utils getInt:self.options key:@"templateTargetW" defaultValue:1200]];
     int templateTargetH = [Utils getInt:arguments key:@"templateTargetH" defaultValue:[Utils getInt:self.options key:@"templateTargetH" defaultValue:1600]];
     BOOL returnWarpedImage = [Utils getBool:arguments key:@"returnWarpedImage" defaultValue:[Utils getBool:self.options key:@"returnWarpedImage" defaultValue:NO]];
@@ -64,17 +62,17 @@
     int frameW = rotated.cols, frameH = rotated.rows;
 
     // Resolve ROIs in pixels, enforce min aspect
-    cv::Rect roiOuterPx = [Utils enforceMinAspect:[Utils normToPx:roiOuterArg width:frameW height:frameH] 
+    cv::Rect roiOuterPx = [Utils enforceMinAspect:[Utils normToPx:roiOuterArg width:frameW height:frameH]
                                              width:frameW height:frameH minAspect:minAspect];
-    cv::Rect roiInnerPx = [Utils enforceMinAspect:[Utils normToPx:roiInnerArg width:frameW height:frameH] 
+    cv::Rect roiInnerPx = [Utils enforceMinAspect:[Utils normToPx:roiInnerArg width:frameW height:frameH]
                                              width:frameW height:frameH minAspect:minAspect];
 
     // Preprocess image for better edge detection
     cv::Mat normalized = [ImageProcessing preprocessImage:rotated];
-    
+
     // Create edge map
     cv::Mat edges = [ImageProcessing createEdgeMap:normalized];
-    
+
     // Find contours
     std::vector<std::vector<cv::Point>> contours = [ImageProcessing findContours:edges];
 
@@ -84,7 +82,7 @@
                                                                          roiOuter:roiOuterPx
                                                                          frameW:frameW
                                                                          frameH:frameH];
-    
+
     // Build homography matrix
     cv::Mat H;
     cv::Mat mask;
@@ -93,7 +91,7 @@
                                    templateTargetW:templateTargetW
                                    templateTargetH:templateTargetH];
     }
-    
+
     // Match template boxes
     struct TemplateMatchResult matchResult = {0.0, [NSMutableArray array], [NSMutableArray array]};
     if (!H.empty() && !templateBoxes.empty()) {
@@ -105,7 +103,7 @@
                 contourRects.push_back(rect);
             }
         }
-        
+
         matchResult = [ScreenDetection matchTemplateBoxes:templateBoxes
                                                homography:H
                                              contourRects:contourRects
@@ -115,7 +113,7 @@
                                             templateTargetH:templateTargetH
                                              minIouForMatch:minIouForMatch];
     }
-    
+
     BOOL detected = !H.empty() && (
         templateBoxes.empty() ? YES : (matchResult.accuracy >= accuracyThreshold)
     );
@@ -135,7 +133,7 @@
     if (detected && runOcr && ocrTemplate && ocrTemplate.count > 0 && !H.empty()) {
         cv::Mat warped;
         cv::warpPerspective(gray, warped, H, cv::Size(outputW, outputH));
-        
+
         NSMutableArray* ocrResults = [OcrProcessor processOcrBoxes:warped
                                                           ocrBoxes:ocrTemplate
                                                            outputW:outputW
@@ -154,8 +152,6 @@
                                                                 frameH:frameH
                                                               srcWidth:width
                                                              srcHeight:height
-                                                          screenAspectW:screenAspectW
-                                                          screenAspectH:screenAspectH
                                                         templateTargetW:templateTargetW
                                                         templateTargetH:templateTargetH
                                                            homography:H

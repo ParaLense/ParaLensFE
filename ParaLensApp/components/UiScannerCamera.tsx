@@ -11,7 +11,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { performScan } from 'vision-camera-screen-detector';
+import {
+  OcrCheckboxBoxResult, OcrScrollBarResult,
+  OcrValueBoxResult,
+  performScan,
+  ScanResult,
+  ScreenResult
+} from 'vision-camera-screen-detector';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { Text as GluestackText } from '@/components/ui/text';
@@ -19,7 +25,7 @@ import { useRunOnJS } from 'react-native-worklets-core';
 import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-template-layout';
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
-import { useOcrHistory } from '@/features/ocr';
+import {OcrScanResult, useOcrHistory} from '@/features/ocr';
 import type { OcrFieldResult } from '@/features/ocr';
 import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
@@ -80,7 +86,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const viewHeight = cameraLayoutSize?.height ?? windowDimensions.height;
 
   const [ocrMap, setOcrMap] = useState<Record<string, string>>({});
-  const [screenResult, setScreenResult] = useState<any | null>(null);
+  const [screenResult, setScreenResult] = useState<ScreenResult | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const lastFrameTime = useSharedValue(0);
   const setOcrMapJS = useRunOnJS(setOcrMap, []);
@@ -125,7 +131,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   }, []);
 
   // Function to add full OCR scan (including boxes) to history - wrapped with useRunOnJS
-  const addScanResult = useCallback((scanResult: any) => {
+  const addScanResult = useCallback((scanResult: OcrScanResult) => {
     // scanResult is shaped like OcrScanResult (timestamp, boxes, screenDetected, accuracy)
     ocrHistory.addScanResult(scanResult);
   }, [ocrHistory]);
@@ -229,8 +235,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         screenTemplate,
         ocrTemplate,
         runOcr: true,
-        screenAspectW: SCREEN_ASPECT_W,
-        screenAspectH: SCREEN_ASPECT_H,
         templateTargetW: 1200,
         templateTargetH: 1600,
         returnWarpedImage: true,
@@ -255,7 +259,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
           // Build a simple debug map with raw values for each box.
           // All heavy filtering/majority logic now lives in useOcrHistory.
-          for (const b of scan.ocr.boxes as any[]) {
+          for (const b of scan.ocr.boxes) {
             if (!b || !b.id) continue;
 
             if (b.type === 'value') {
@@ -272,19 +276,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
               const tokens: string[] = [];
 
               for (const v of values) {
-                if (typeof v === 'string') {
-                  const t = v.trim();
-                  if (t.length > 0) tokens.push(t);
-                } else if (typeof v === 'number') {
-                  tokens.push(String(v));
-                } else if (v && typeof v === 'object') {
-                  const text = (v as any).text;
-                  const num = (v as any).number;
-                  if (typeof text === 'string' && text.trim().length > 0) {
-                    tokens.push(text.trim());
-                  } else if (typeof num === 'number') {
-                    tokens.push(String(num));
-                  }
+                // v ist vom Typ { index: number; text?: string; number?: number; confidence?: number }
+                const {text} = v;
+                const num = v.number;
+                if (typeof text === 'string' && text.trim().length > 0) {
+                  tokens.push(text.trim());
+                } else if (typeof num === 'number') {
+                  tokens.push(String(num));
                 }
               }
 
@@ -297,7 +295,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
             setOcrMapJS(map);
 
             // Enrich boxes with template data (sameUnitAs, expectedUnits)
-            const enrichedBoxes = scan.ocr.boxes.map((box: any) => {
+            const enrichedBoxes = scan.ocr.boxes.map((box: OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult) => {
               const templateBox = ocrTemplate.find(t => t.id === box.id);
               return {
                 ...box,

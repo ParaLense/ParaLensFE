@@ -45,8 +45,6 @@ NS_ASSUME_NONNULL_BEGIN
                                  frameH:(int)frameH
                                srcWidth:(size_t)srcWidth
                               srcHeight:(size_t)srcHeight
-                           screenAspectW:(int)screenAspectW
-                           screenAspectH:(int)screenAspectH
                          templateTargetW:(int)templateTargetW
                          templateTargetH:(int)templateTargetH
                             homography:(const cv::Mat&)H
