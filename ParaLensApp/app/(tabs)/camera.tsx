@@ -86,6 +86,7 @@ export default function CameraScreen() {
           bestFields: ocrSnapshot.bestFields,
           ocrMap: ocrSnapshot.ocrMap,
           unitConfig: ocrSnapshot.unitConfig,
+          screenshotBase64: ocrSnapshot.screenshotBase64,
         });
       } catch {
         // Ignore serialization errors and navigate without OCR data

@@ -60,6 +60,8 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
       system?: import('@/features/ocr').UnitSystem;
       mode?: import('@/features/ocr').ValueMode;
     };
+    /** Base64-encoded JPEG screenshot of the screen at scan time */
+    screenshotBase64?: string;
   }) => void;
   onScanComplete?: (payload: any) => void;
 }
@@ -100,6 +102,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         system?: import('@/features/ocr').UnitSystem;
         mode?: import('@/features/ocr').ValueMode;
       };
+      screenshotBase64?: string;
     }) => {
       if (onOcrUpdate) {
         onOcrUpdate(payload);
@@ -142,8 +145,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     if (!onOcrUpdate) return;
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
-    onOcrUpdateJS({ bestFields, ocrMap, unitConfig: ocrHistory.unitConfig });
-  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdate, onOcrUpdateJS]);
+    onOcrUpdateJS({
+      bestFields,
+      ocrMap,
+      unitConfig: ocrHistory.unitConfig,
+      screenshotBase64: base64Image ?? undefined,
+    });
+  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, base64Image, onOcrUpdate, onOcrUpdateJS]);
 
   const screenTemplate = useMemo(
     () =>

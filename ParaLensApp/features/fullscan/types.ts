@@ -145,6 +145,26 @@ export interface OverlayBox {
   color: string;
 }
 
+/**
+ * Screenshot data for a section scan, stored as base64 JPEG image
+ */
+export interface SectionScreenshot {
+    /** Base64-encoded JPEG image of the screen at scan time */
+    imageBase64: string;
+    /** Timestamp when the screenshot was taken */
+    timestamp: string;
+    /** Optional sub-mode (e.g., 'mainMenu', 'subMenuGraphic', 'switchType') */
+    subMode?: string;
+}
+
+/**
+ * Map of section screenshots keyed by section name and optional sub-mode
+ * Key format: `${section}` or `${section}_${subMode}`
+ */
+export type SectionScreenshots = {
+    [key: string]: SectionScreenshot;
+};
+
 export interface FullScanDto {
     id: number;
     author: string;
@@ -153,6 +173,8 @@ export interface FullScanDto {
     holdingPressure?: HoldingPressureDto;
     dosing?: DosingDto;
     cylinderHeating?: CylinderHeatingDto;
+    /** Screenshots of each scanned section for verification */
+    sectionScreenshots?: SectionScreenshots;
     serverId?: number;
     uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
     uploadError?: string;

@@ -171,12 +171,14 @@ export default function ScanReviewScreen() {
           system?: import('@/features/ocr').UnitSystem;
           mode?: import('@/features/ocr').ValueMode;
         };
+        screenshotBase64?: string;
       };
       if (parsed && parsed.bestFields && parsed.ocrMap) {
         setOcrSnapshot({
           bestFields: parsed.bestFields,
           ocrMap: parsed.ocrMap,
           unitConfig: parsed.unitConfig,
+          screenshotBase64: parsed.screenshotBase64,
         });
       }
     } catch {
@@ -478,10 +480,13 @@ export default function ScanReviewScreen() {
               return;
             }
             let payload: any = {};
+            let subMode: string | undefined;
             if (selectedMenu === "injection") {
-              if (injectionMode === "mainMenu")
+              if (injectionMode === "mainMenu") {
                 payload = { mainMenu: { ...injMainForm } };
-              if (injectionMode === "subMenuGraphic")
+                subMode = "mainMenu";
+              }
+              if (injectionMode === "subMenuGraphic") {
                 payload = {
                   subMenuValues: {
                     values: injGraphicValues,
@@ -489,12 +494,18 @@ export default function ScanReviewScreen() {
                     valueUnit: injGraphicUnits.valueUnit,
                   },
                 };
-              if (injectionMode === "switchType")
+                subMode = "subMenuGraphic";
+              }
+              if (injectionMode === "switchType") {
                 payload = { switchType: { ...injSwitchForm } };
+                subMode = "switchType";
+              }
             } else if (selectedMenu === "holdingPressure") {
-              if (holdingMode === "mainMenu")
+              if (holdingMode === "mainMenu") {
                 payload = { mainMenu: { ...holdMainForm } };
-              if (holdingMode === "subMenuGraphic")
+                subMode = "mainMenu";
+              }
+              if (holdingMode === "subMenuGraphic") {
                 payload = {
                   subMenusValues: {
                     values: holdGraphicValues,
@@ -502,10 +513,14 @@ export default function ScanReviewScreen() {
                     valueUnit: holdGraphicUnits.valueUnit,
                   },
                 };
+                subMode = "subMenuGraphic";
+              }
             } else if (selectedMenu === "dosing") {
-              if (dosingMode === "mainMenu")
+              if (dosingMode === "mainMenu") {
                 payload = { mainMenu: { ...doseMainForm } };
-              if (dosingMode === "subMenuGraphic")
+                subMode = "mainMenu";
+              }
+              if (dosingMode === "subMenuGraphic") {
                 payload = {
                   dosingSpeedsValues: {
                     values: doseSpeedValues,
@@ -518,10 +533,18 @@ export default function ScanReviewScreen() {
                     valueUnit: dosePressureUnits.valueUnit,
                   },
                 };
+                subMode = "subMenuGraphic";
+              }
             } else if (selectedMenu === "cylinderHeating") {
               payload = { ...cylinderForm };
             }
-            upsertSection(selectedFullScanId, selectedMenu, payload);
+
+            // Pass screenshot if available
+            const screenshot = ocrSnapshot?.screenshotBase64
+              ? { imageBase64: ocrSnapshot.screenshotBase64, subMode }
+              : undefined;
+
+            upsertSection(selectedFullScanId, selectedMenu, payload, screenshot);
             onSave();
           }}
         >
