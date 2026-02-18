@@ -173,8 +173,10 @@ export interface FullScanDto {
     holdingPressure?: HoldingPressureDto;
     dosing?: DosingDto;
     cylinderHeating?: CylinderHeatingDto;
-    /** Screenshots of each scanned section for verification */
+    /** Screenshots of each scanned section for verification (loaded on demand, not at app start) */
     sectionScreenshots?: SectionScreenshots;
+    /** Flag indicating screenshots exist in separate storage */
+    hasScreenshots?: boolean;
     serverId?: number;
     uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
     uploadError?: string;

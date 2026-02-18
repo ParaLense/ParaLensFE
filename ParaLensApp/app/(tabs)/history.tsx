@@ -315,9 +315,9 @@ export default function HistoryScreen() {
         }
     };
 
-    const handleDownloadExcelFromLocal = async (scanId: number) => {
+    const handleDownloadExcelFromLocal = async (scanId: number, includeImages: boolean = false) => {
         if (!selected) return;
-        await handleLocalExcelDownload(scanId, fullScans ?? []);
+        await handleLocalExcelDownload(scanId, fullScans ?? [], includeImages);
     };
 
     const handleDownloadExcel = async (scanId: number) => {
@@ -332,8 +332,12 @@ export default function HistoryScreen() {
                     onPress: () => handleDownloadExcelFromServer(scanId),
                 },
                 {
-                    text: "Local",
-                    onPress: () => handleDownloadExcelFromLocal(scanId),
+                    text: "Local (ohne Bilder)",
+                    onPress: () => handleDownloadExcelFromLocal(scanId, false),
+                },
+                {
+                    text: "Local (mit Bildern)",
+                    onPress: () => handleDownloadExcelFromLocal(scanId, true),
                 },
                 {
                     text: "Cancel",

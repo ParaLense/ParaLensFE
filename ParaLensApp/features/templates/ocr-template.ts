@@ -1,5 +1,6 @@
 import { TemplateLayout } from './use-template-layout';
 import { loadTemplateConfig } from './template';
+import type { ExpectedUnitConfig } from '@/features/ocr';
 
 export type OcrTemplateBox = {
   id: string;
@@ -8,8 +9,8 @@ export type OcrTemplateBox = {
   width: number;
   height: number;
   type?: 'value' | 'checkbox' | 'scrollbar';
-  expectedKeyUnits?:string[];
-  expectedUnits?: string[];
+  expectedKeyUnits?: string[] | ExpectedUnitConfig;
+  expectedUnits?: string[] | ExpectedUnitConfig;
   sameUnitAs?: string;
   options?: {
     orientation?: 'horizontal' | 'vertical';

@@ -4,7 +4,8 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import {
+// Use internal barrel imports (not the public @/features/ocr) to avoid circular dependency
+import type {
   OcrScanResult,
   OcrFieldResult,
   OcrFieldType,
@@ -13,21 +14,23 @@ import {
   ExpectedUnitConfig,
   UnitSystem,
   ValueMode,
-} from '@/features/ocr';
+} from '../types';
 import {
   DEFAULT_MAX_HISTORY_PER_FIELD,
   DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY,
   START_KEYWORDS,
   END_KEYWORDS,
-} from '@/features/ocr';
-import { parseScrollbarFromScan } from '@/features/ocr';
-import { parseValueFromScan } from '@/features/ocr';
-import { parseCheckboxFromScan } from '@/features/ocr';
+} from '../constants';
+import {
+  parseScrollbarFromScan,
+  parseValueFromScan,
+  parseCheckboxFromScan,
+} from '../parsers';
 import {
   mergeParsedScrollbar,
   computeMajorityString,
   computeBestScrollbar,
-} from '@/features/ocr';
+} from '../aggregation';
 
 type UnitConfig = {
   system?: UnitSystem;

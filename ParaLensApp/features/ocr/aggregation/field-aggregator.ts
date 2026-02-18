@@ -3,9 +3,9 @@
  * Handles aggregation logic for OCR field values
  */
 
-import { ParsedScrollbarValue } from '@/features/ocr';
-import { pickMajorityValue } from '@/features/ocr';
-import { SCROLLBAR_DECIMALS } from '@/features/ocr';
+import type { ParsedScrollbarValue } from '../types';
+import { pickMajorityValue } from '../utils';
+import { SCROLLBAR_DECIMALS } from '../constants';
 
 /**
  * Merge two parsed scrollbar values

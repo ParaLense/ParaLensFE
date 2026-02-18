@@ -1,6 +1,4 @@
 /**
-export * from './ocr-constants';
-
- */
  * OCR Constants Barrel Export
-
+ */
+export * from './ocr-constants';

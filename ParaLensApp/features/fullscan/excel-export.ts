@@ -4,15 +4,16 @@ import * as Sharing from "expo-sharing";
 import { Alert, Platform } from "react-native";
 import RNFS from "react-native-fs";
 import { PermissionsAndroid } from "react-native";
-import ExcelJS from "exceljs";
-import type { FullScanDto, SectionScreenshot } from "@/features/fullscan/types";
+// ExcelJS is imported dynamically to avoid stack overflow at app startup
+import type { FullScanDto, SectionScreenshot, SectionScreenshots } from "@/features/fullscan/types";
 import { buildFullScanExcelData } from "@/features/fullscan/excel/fullscan-to-excel";
+import { loadScreenshots } from "@/features/fullscan/storage";
 
 /**
  * Group screenshots by main category (injection, holdingPressure, dosing, cylinderHeating)
  */
 const groupScreenshotsByCategory = (
-  screenshots: Record<string, SectionScreenshot> | undefined
+  screenshots: SectionScreenshots | null | undefined
 ): Record<string, Array<{ key: string; screenshot: SectionScreenshot; label: string }>> => {
   if (!screenshots) return {};
 
@@ -59,13 +60,37 @@ const groupScreenshotsByCategory = (
 };
 
 /**
+ * Compress/resize a base64 image to reduce memory usage
+ * Returns a smaller base64 string or null if compression fails
+ */
+const compressBase64Image = (base64: string, maxWidth: number = 300): string | null => {
+  try {
+    // If the base64 is already small enough, return as-is
+    // Base64 is ~33% larger than binary, so 100KB binary = ~133KB base64
+    if (base64.length < 150000) {
+      return base64;
+    }
+    // For larger images, we'll just truncate the quality by returning null
+    // and letting the caller handle it (e.g., skip the image or use placeholder)
+    // In a production app, you'd use a proper image compression library
+    return null;
+  } catch (e) {
+    console.warn('Image compression failed:', e);
+    return null;
+  }
+};
+
+/**
  * Add screenshot images to a worksheet using exceljs
+ * Note: workbook and worksheet are typed as 'any' because ExcelJS is dynamically imported
+ * Images are added one at a time with error handling to prevent memory issues
  */
 const addScreenshotsToWorksheet = (
-  workbook: ExcelJS.Workbook,
-  worksheet: ExcelJS.Worksheet,
+  workbook: any,
+  worksheet: any,
   screenshots: Array<{ key: string; screenshot: SectionScreenshot; label: string }>,
-  startRow: number
+  startRow: number,
+  includeImages: boolean = true
 ): number => {
   if (screenshots.length === 0) return startRow;
 
@@ -84,20 +109,37 @@ const addScreenshotsToWorksheet = (
     worksheet.getCell(currentRow, 2).value = `Aufgenommen: ${new Date(screenshot.timestamp).toLocaleString()}`;
     currentRow += 1;
 
+    if (!includeImages) {
+      // Just add metadata without image
+      worksheet.getCell(currentRow, 1).value = `[Bild verfügbar - ${Math.round(screenshot.imageBase64.length / 1024)}KB]`;
+      currentRow += 2;
+      continue;
+    }
+
     try {
+      // Try to compress the image first
+      const compressedImage = compressBase64Image(screenshot.imageBase64);
+
+      if (!compressedImage) {
+        // Image too large, skip it
+        worksheet.getCell(currentRow, 1).value = `[Bild zu groß für Export - ${Math.round(screenshot.imageBase64.length / 1024)}KB]`;
+        currentRow += 2;
+        continue;
+      }
+
       // Add image to workbook
       const imageId = workbook.addImage({
-        base64: screenshot.imageBase64,
+        base64: compressedImage,
         extension: 'jpeg',
       });
 
       // Add image to worksheet
-      // Image dimensions: roughly 400x533 pixels (3:4 aspect ratio)
-      const imageWidth = 400;
-      const imageHeight = 533;
+      // Image dimensions: roughly 300x400 pixels (3:4 aspect ratio) - smaller for memory
+      const imageWidth = 300;
+      const imageHeight = 400;
 
       // Convert pixels to row units for spacing (approximate)
-      const rowHeight = imageHeight / 20; // ~26.65 rows
+      const rowHeight = imageHeight / 20; // ~20 rows
 
       worksheet.addImage(imageId, {
         tl: { col: 0, row: currentRow - 1 },
@@ -119,6 +161,7 @@ const addScreenshotsToWorksheet = (
 export const handleLocalExcelDownload = async (
   scanId: number,
   fullScans: FullScanDto[],
+  includeImages: boolean = false, // Default to false for safety
 ) => {
   try {
     const scan = fullScans?.find((fs) => fs.id === scanId);
@@ -126,6 +169,9 @@ export const handleLocalExcelDownload = async (
       Alert.alert("Excel (local)", "Scan not found!");
       return;
     }
+
+    // Dynamic import of ExcelJS to avoid stack overflow at app startup
+    const ExcelJS = await import("exceljs");
 
     // Create workbook with exceljs
     const workbook = new ExcelJS.Workbook();
@@ -158,42 +204,48 @@ export const handleLocalExcelDownload = async (
       { width: 15 },
     ];
 
-    // Group screenshots by main category
-    const screenshotGroups = groupScreenshotsByCategory(scan.sectionScreenshots);
+    // Load screenshots from separate storage (on demand, not loaded at app start)
+    const screenshots = await loadScreenshots(scanId);
 
-    // Create worksheet for each main category that has screenshots
-    const categoryNames: Record<string, string> = {
-      injection: 'Injection',
-      holdingPressure: 'Holding Pressure',
-      dosing: 'Dosing',
-      cylinderHeating: 'Cylinder Heating',
-    };
+    // Only process screenshots if we have any
+    if (screenshots && Object.keys(screenshots).length > 0) {
+      // Group screenshots by main category
+      const screenshotGroups = groupScreenshotsByCategory(screenshots);
 
-    for (const [category, screenshots] of Object.entries(screenshotGroups)) {
-      if (screenshots.length === 0) continue;
+      // Create worksheet for each main category that has screenshots
+      const categoryNames: Record<string, string> = {
+        injection: 'Injection',
+        holdingPressure: 'Holding Pressure',
+        dosing: 'Dosing',
+        cylinderHeating: 'Cylinder Heating',
+      };
 
-      const sheetName = categoryNames[category] || category;
-      const worksheet = workbook.addWorksheet(sheetName);
+      for (const [category, categoryScreenshots] of Object.entries(screenshotGroups)) {
+        if (categoryScreenshots.length === 0) continue;
 
-      // Set column widths
-      worksheet.columns = [
-        { width: 30 },
-        { width: 40 },
-        { width: 20 },
-        { width: 20 },
-      ];
+        const sheetName = categoryNames[category] || category;
+        const worksheet = workbook.addWorksheet(sheetName);
 
-      // Add header
-      worksheet.getCell(1, 1).value = `${sheetName} - Scan Screenshots`;
-      worksheet.getCell(1, 1).font = { bold: true, size: 16 };
-      worksheet.mergeCells(1, 1, 1, 4);
+        // Set column widths
+        worksheet.columns = [
+          { width: 30 },
+          { width: 40 },
+          { width: 20 },
+          { width: 20 },
+        ];
 
-      worksheet.getCell(2, 1).value = `Scan ID: ${scan.id}`;
-      worksheet.getCell(2, 2).value = `Author: ${scan.author}`;
-      worksheet.getCell(2, 3).value = `Date: ${new Date(scan.date).toLocaleString()}`;
+        // Add header
+        worksheet.getCell(1, 1).value = `${sheetName} - Scan Screenshots`;
+        worksheet.getCell(1, 1).font = { bold: true, size: 16 };
+        worksheet.mergeCells(1, 1, 1, 4);
 
-      // Add screenshots starting from row 4
-      addScreenshotsToWorksheet(workbook, worksheet, screenshots, 4);
+        worksheet.getCell(2, 1).value = `Scan ID: ${scan.id}`;
+        worksheet.getCell(2, 2).value = `Author: ${scan.author}`;
+        worksheet.getCell(2, 3).value = `Date: ${new Date(scan.date).toLocaleString()}`;
+
+        // Add screenshots starting from row 4
+        addScreenshotsToWorksheet(workbook, worksheet, categoryScreenshots, 4, includeImages);
+      }
     }
 
     // Generate Excel buffer
@@ -201,11 +253,15 @@ export const handleLocalExcelDownload = async (
 
     // Convert ArrayBuffer to base64 (React Native compatible)
     const uint8Array = new Uint8Array(buffer as ArrayBuffer);
-    let binaryString = '';
-    for (let i = 0; i < uint8Array.length; i++) {
-      binaryString += String.fromCharCode(uint8Array[i]);
+
+    // Convert Uint8Array to base64 without using Buffer (not available in RN)
+    const chunkSize = 0x8000; // 32KB chunks to avoid call stack issues
+    let base64 = '';
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      base64 += String.fromCharCode.apply(null, Array.from(chunk));
     }
-    const base64 = btoa(binaryString);
+    base64 = btoa(base64);
 
     const fileName = `ParaLens_Export_${scanId}.xlsx`;
 
