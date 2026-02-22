@@ -1,4 +1,4 @@
-import { useMemo, useReducer } from "react";
+import { useCallback, useMemo, useReducer } from "react";
 import { TemplateLayout } from "@/features/templates/use-template-layout";
 import type { OcrFieldResult, UnitSystem, ValueMode } from "@/features/ocr";
 import type { ScanMenu } from "@/features/fullscan/types";
@@ -103,6 +103,28 @@ export const useScanSelection = () => {
     return null;
   }, [state]);
 
+  const setSelectedMenu = useCallback(
+    (menu: ScanMenu | null) => dispatch({ type: "setMenu", menu }),
+    [],
+  );
+  const setInjectionMode = useCallback(
+    (mode: InjectionMode) => dispatch({ type: "setInjectionMode", mode }),
+    [],
+  );
+  const setHoldingMode = useCallback(
+    (mode: HoldingPressureMode) => dispatch({ type: "setHoldingMode", mode }),
+    [],
+  );
+  const setDosingMode = useCallback(
+    (mode: DosingMode) => dispatch({ type: "setDosingMode", mode }),
+    [],
+  );
+  const resetToRootMenu = useCallback(() => dispatch({ type: "reset" }), []);
+  const setOcrSnapshot = useCallback(
+    (snapshot: OcrSnapshot) => dispatch({ type: "setOcrSnapshot", snapshot }),
+    [],
+  );
+
   return {
     // expose state slices for convenience
     selectedMenu: state.selectedMenu,
@@ -112,15 +134,12 @@ export const useScanSelection = () => {
     ocrSnapshot: state.ocrSnapshot,
     headerLabel,
     currentLayout,
-    setSelectedMenu: (menu: ScanMenu | null) => dispatch({ type: "setMenu", menu }),
-    setInjectionMode: (mode: InjectionMode) =>
-      dispatch({ type: "setInjectionMode", mode }),
-    setHoldingMode: (mode: HoldingPressureMode) =>
-      dispatch({ type: "setHoldingMode", mode }),
-    setDosingMode: (mode: DosingMode) => dispatch({ type: "setDosingMode", mode }),
-    resetToRootMenu: () => dispatch({ type: "reset" }),
-    setOcrSnapshot: (snapshot: OcrSnapshot) =>
-      dispatch({ type: "setOcrSnapshot", snapshot }),
+    setSelectedMenu,
+    setInjectionMode,
+    setHoldingMode,
+    setDosingMode,
+    resetToRootMenu,
+    setOcrSnapshot,
   };
 };
 

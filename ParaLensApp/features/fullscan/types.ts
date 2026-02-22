@@ -1,8 +1,12 @@
+export interface ValueUnit {
+  value: number;
+  unit: string;
+}
 export interface InjectionMainMenuDto {
   id: number;
   injectionId: number;
-  sprayPressureLimit: number;
-  increasedSpecificPointPrinter: number;
+  sprayPressureLimit: ValueUnit;
+  increasedSpecificPointPrinter: ValueUnit;
 }
 
 export interface InjectionSubMenuValueDto {
@@ -25,9 +29,12 @@ export interface InjectionSubMenuScrollDto {
 export interface InjectionSubMenuSwitchTypeDto {
   id: number;
   injectionId: number;
-  transshipmentPosition: number;
-  switchOverTime: number;
-  switchingPressure: number;
+  transshipmentPosition: ValueUnit;
+  switchOverTime: ValueUnit;
+  switchingPressure: ValueUnit;
+  switchOverWay: boolean;
+  switchOverTimeActive: boolean;
+  switchOverHydraulic: boolean;
 }
 
 export interface InjectionDto {
@@ -41,12 +48,12 @@ export interface InjectionDto {
 export interface DosingMainMenuDto {
   id: number;
   dosingId: number;
-  dosingStroke: number;
-  dosingDelayTime: number;
-  relieveDosing: number;
-  relieveAfterDosing: number;
-  dischargeSpeedBeforeDosing: number;
-  dischargeSpeedAfterDosing: number;
+  dosingStroke: ValueUnit;
+  dosingDelayTime: ValueUnit;
+  relieveDosing: ValueUnit;
+  relieveAfterDosing: ValueUnit;
+  dischargeSpeedBeforeDosing: ValueUnit;
+  dischargeSpeedAfterDosing: ValueUnit;
 }
 
 export interface DosingSubMenuDosingSpeedValueDto {
@@ -92,9 +99,9 @@ export interface DosingDto {
 export interface HoldingPressureMainMenuDto {
   id: number;
   holdingPressureId: number;
-  holdingTime: number;
-  coolTime: number;
-  screwDiameter: number;
+  holdingTime: ValueUnit;
+  coolTime: ValueUnit;
+  screwDiameter: ValueUnit;
 }
 
 export interface HoldingPressureSubMenuValueDto {
@@ -153,6 +160,8 @@ export interface FullScanDto {
     holdingPressure?: HoldingPressureDto;
     dosing?: DosingDto;
     cylinderHeating?: CylinderHeatingDto;
+    /** Base64 screenshots keyed by "section.subMode" (e.g. "injection.mainMenu") */
+    sectionScreenshots?: Record<string, string>;
     serverId?: number;
     uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
     uploadError?: string;

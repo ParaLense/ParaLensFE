@@ -42,6 +42,13 @@ import { DosingMainMenuReview } from "@/features/scan-session/components/DosingM
 import { DosingSubMenuGraphicReview } from "@/features/scan-session/components/DosingSubMenuGraphicReview";
 import { CylinderHeatingReview } from "@/features/scan-session/components/CylinderHeatingReview";
 import {
+  mapInjectionMainMenu,
+  mapInjectionSwitchType,
+  mapHoldingMainMenu,
+  mapDosingMainMenu,
+  mapCylinderHeating,
+} from "@/features/fullscan/form-to-dto";
+import {
   BOX_ID_COOLING_TIME,
   BOX_ID_CYLINDER_HEATING_ITEMS,
   BOX_ID_DISCHARGE_SPEED_AFTER,
@@ -86,6 +93,7 @@ export default function ScanReviewScreen() {
 
   const [ocrSnapshot, setOcrSnapshot] = useState<OcrSnapshot>(null);
   const [ocrApplied, setOcrApplied] = useState(false);
+  const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
 
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
@@ -171,6 +179,7 @@ export default function ScanReviewScreen() {
           system?: import('@/features/ocr').UnitSystem;
           mode?: import('@/features/ocr').ValueMode;
         };
+        screenshotBase64?: string;
       };
       if (parsed && parsed.bestFields && parsed.ocrMap) {
         setOcrSnapshot({
@@ -178,6 +187,9 @@ export default function ScanReviewScreen() {
           ocrMap: parsed.ocrMap,
           unitConfig: parsed.unitConfig,
         });
+      }
+      if (parsed?.screenshotBase64) {
+        setScreenshotBase64(parsed.screenshotBase64);
       }
     } catch {
       // ignore parse errors
@@ -480,7 +492,7 @@ export default function ScanReviewScreen() {
             let payload: any = {};
             if (selectedMenu === "injection") {
               if (injectionMode === "mainMenu")
-                payload = { mainMenu: { ...injMainForm } };
+                payload = mapInjectionMainMenu(injMainForm);
               if (injectionMode === "subMenuGraphic")
                 payload = {
                   subMenuValues: {
@@ -490,10 +502,10 @@ export default function ScanReviewScreen() {
                   },
                 };
               if (injectionMode === "switchType")
-                payload = { switchType: { ...injSwitchForm } };
+                payload = mapInjectionSwitchType(injSwitchForm);
             } else if (selectedMenu === "holdingPressure") {
               if (holdingMode === "mainMenu")
-                payload = { mainMenu: { ...holdMainForm } };
+                payload = mapHoldingMainMenu(holdMainForm);
               if (holdingMode === "subMenuGraphic")
                 payload = {
                   subMenusValues: {
@@ -504,7 +516,7 @@ export default function ScanReviewScreen() {
                 };
             } else if (selectedMenu === "dosing") {
               if (dosingMode === "mainMenu")
-                payload = { mainMenu: { ...doseMainForm } };
+                payload = mapDosingMainMenu(doseMainForm);
               if (dosingMode === "subMenuGraphic")
                 payload = {
                   dosingSpeedsValues: {
@@ -519,9 +531,15 @@ export default function ScanReviewScreen() {
                   },
                 };
             } else if (selectedMenu === "cylinderHeating") {
-              payload = { ...cylinderForm };
+              payload = mapCylinderHeating(cylinderForm);
             }
-            upsertSection(selectedFullScanId, selectedMenu, payload);
+            // Determine the sub-mode for screenshot keying
+            let subMode: string | undefined;
+            if (selectedMenu === "injection") subMode = injectionMode ?? undefined;
+            else if (selectedMenu === "holdingPressure") subMode = holdingMode ?? undefined;
+            else if (selectedMenu === "dosing") subMode = dosingMode ?? undefined;
+
+            upsertSection(selectedFullScanId, selectedMenu, payload, screenshotBase64 ?? undefined, subMode);
             onSave();
           }}
         >

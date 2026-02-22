@@ -3,7 +3,7 @@ import {
   ReadonlyFrameProcessor,
   useFrameProcessor,
 } from 'react-native-vision-camera';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -62,6 +62,8 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
     };
   }) => void;
   onScanComplete?: (payload: any) => void;
+  /** Callback to expose the latest warped base64 screenshot to parent */
+  onScreenshotUpdate?: (base64: string) => void;
 }
 const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   currentLayout,
@@ -69,6 +71,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   device,
   onOcrUpdate,
     onScanComplete,
+    onScreenshotUpdate,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -92,6 +95,11 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const setOcrMapJS = useRunOnJS(setOcrMap, []);
   const setScreenResultJS = useRunOnJS(setScreenResult, []);
   const setBase64ImageJS = useRunOnJS(setBase64Image, []);
+
+  // Keep a stable ref so the useRunOnJS callback never changes identity
+  const onOcrUpdateRef = useRef(onOcrUpdate);
+  onOcrUpdateRef.current = onOcrUpdate;
+
   const onOcrUpdateJS = useRunOnJS(
     (payload: {
       bestFields: OcrFieldResult[];
@@ -101,12 +109,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         mode?: import('@/features/ocr').ValueMode;
       };
     }) => {
-      if (onOcrUpdate) {
-        onOcrUpdate(payload);
-      }
+      onOcrUpdateRef.current?.(payload);
     },
-    [onOcrUpdate]
+    []
   );
+
+  const onScreenshotUpdateRef = useRef(onScreenshotUpdate);
+  onScreenshotUpdateRef.current = onScreenshotUpdate;
 
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
 
@@ -139,11 +148,18 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   // Whenever OCR history / map change, compute best fields and notify parent (on JS thread)
   useEffect(() => {
-    if (!onOcrUpdate) return;
+    if (!onOcrUpdateRef.current) return;
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
     onOcrUpdateJS({ bestFields, ocrMap, unitConfig: ocrHistory.unitConfig });
-  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdate, onOcrUpdateJS]);
+  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdateJS]);
+
+  // Forward the latest warped base64 screenshot to parent
+  useEffect(() => {
+    if (base64Image && onScreenshotUpdateRef.current) {
+      onScreenshotUpdateRef.current(base64Image);
+    }
+  }, [base64Image]);
 
   const screenTemplate = useMemo(
     () =>

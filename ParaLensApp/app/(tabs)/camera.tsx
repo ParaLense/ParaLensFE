@@ -57,6 +57,7 @@ export default function CameraScreen() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [authorInput, setAuthorInput] = useState("");
+  const [latestScreenshot, setLatestScreenshot] = useState<string | null>(null);
 
   const selectedLabel = useMemo(() => {
     if (!selectedFullScanId) {
@@ -86,6 +87,7 @@ export default function CameraScreen() {
           bestFields: ocrSnapshot.bestFields,
           ocrMap: ocrSnapshot.ocrMap,
           unitConfig: ocrSnapshot.unitConfig,
+          screenshotBase64: latestScreenshot ?? undefined,
         });
       } catch {
         // Ignore serialization errors and navigate without OCR data
@@ -214,8 +216,9 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         isActive
         device={device}
-        onOcrUpdate={(payload) => setOcrSnapshot(payload)}
+        onOcrUpdate={setOcrSnapshot}
         onScanComplete={goReview}
+        onScreenshotUpdate={setLatestScreenshot}
       />
 
       <Box
