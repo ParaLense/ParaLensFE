@@ -21,9 +21,10 @@
     "height": 2.76,
     "label": "Transshipment Position",
     "type": "value",
-    "expectedUnits": [
-      "cm^3","in^3","mm","in"
-    ]
+    "expectedUnits": {
+      "iso": { "absolute": "cm^3" },
+      "imperial": { "absolute": "in^3" }
+    }
   },
   {
     "id": "switch_over_time_checkbox",
@@ -47,9 +48,10 @@
     "height": 2.93,
     "label": "Switch Over Time",
     "type": "value",
-    "expectedUnits": [
-      "s"
-    ]
+    "expectedUnits": {
+      "iso": { "absolute": "s" },
+      "imperial": { "absolute": "s" }
+    }
   },
   {
     "id": "switching_pressure_checkbox",
@@ -73,8 +75,9 @@
     "height": 2.82,
     "label": "Switching Pressure",
     "type": "value",
-    "expectedUnits": [
-      "bar","psi"
-    ]
+    "expectedUnits": {
+      "iso": { "absolute": "bar" },
+      "imperial": { "absolute": "psi" }
+    }
   }
 ]

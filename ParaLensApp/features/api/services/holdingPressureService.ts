@@ -1,5 +1,5 @@
 import httpClient from './httpClient';
-import {API_ENDPOINTS} from "@/features/config/api";
+import {API_ENDPOINTS} from "@/config/api";
 import { 
   HoldingPressureDto, 
   CreateHoldingPressureRequest,

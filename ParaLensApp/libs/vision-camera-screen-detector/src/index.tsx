@@ -34,6 +34,127 @@ export type OcrTemplateBox = {
 
 // JSON-artiger Param-Typ für Frame-Processor-Argumente (ersetzt fehlenden ParameterType)
 
+export type OcrValueBoxResult = {
+  id: string;
+  type: 'value';
+  text?: string;
+  number?: number;
+  confidence?: number;
+};
+
+export type OcrCheckboxBoxResult = {
+  id: string;
+  type: 'checkbox';
+  checked: boolean;
+  confidence?: number;
+  valueText?: string;
+  valueNumber?: number;
+  valueBoxId?: string;
+};
+
+export type OcrScrollBarResult = {
+  id: string;
+  type: 'scrollbar';
+  positionPercent: number;
+  values?: Array<{
+    index: number;
+    text?: string;
+    number?: number;
+    confidence?: number;
+  }>;
+  selectedIndex?: number;
+  selectedValue?: number | string;
+  confidence?: number;
+};
+
+/** Größenangabe (Breite/Höhe) */
+export type Size = {
+  w: number;
+  h: number;
+};
+
+/** Rechteck (Position + Größe) */
+export type Rect = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+/** Template-Pixel-Box */
+export type TemplatePixelBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+/** Matched Box mit Scoring-Informationen */
+export type MatchedBox = {
+  boxId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  score: number;
+  avgBorderGrad?: number;
+  borderEdgeRatio?: number;
+  cornerScore?: number;
+};
+
+/** Homographie-Matrix (3x3) */
+export type HomographyMatrix = [
+  [number, number, number],
+  [number, number, number],
+  [number, number, number],
+];
+
+export type ScreenResult = {
+  // Erkennungsstatus
+  detected: boolean;
+  accuracy: number;
+  accuracy_threshold: number;
+  detection_count: number;
+  detection_rate: number;
+  total_frames: number;
+
+  // Quell-Frame-Größe
+  width: number;
+  height: number;
+  source_frame_size: Size;
+
+  // Template-Konfiguration
+  template_target_size: Size;
+  template_rect: Rect;
+  template_pixel_boxes: TemplatePixelBox[];
+
+  // Matched Boxes mit Scoring
+  matched_boxes: MatchedBox[];
+
+  // Bildschirm-Geometrie
+  screen_rect: Rect;
+
+  // ROI (Region of Interest)
+  roi_outer_px: Rect;
+  roi_inner_px: Rect;
+
+  // Homographie
+  homography?: HomographyMatrix;
+  homography_inliers_mask?: boolean[];
+
+  // Optionales Bild
+  image_base64?: string;
+  image_format?: 'jpeg' | 'png';
+  image_size?: Size;
+};
+
+export type ScanResult = {
+  screen: ScreenResult;
+  ocr?: {
+    boxes: Array<OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult>;
+  };
+};
+
 export type PerformScanOptions = {
   // Backward-compatible: screen detection template
   template?: TemplateBox[];
@@ -42,8 +163,6 @@ export type PerformScanOptions = {
   ocrTemplate?: OcrTemplateBox[];
   runOcr?: boolean;
   screenWidthRatio?: number; // 0..1, default 0.80
-  screenAspectW?: number; // default 3
-  screenAspectH?: number; // default 4
   minIouForMatch?: number; // default 0.30
   accuracyThreshold?: number; // default 0.80 (plan)
   templateTargetW?: number; // default 1200
@@ -70,42 +189,13 @@ export type PerformScanOptions = {
 export function performScan(
   frame: Frame,
   opts: PerformScanOptions
-): {
-  screen: {
-    template_pixel_boxes?: { x: number; y: number; w: number; h: number }[];
-    matched_boxes?: any;
-    image_base64?: string;
-  };
-  ocr?: {
-    boxes: Array<
-      | { id: string; type: 'value'; text?: string; number?: number; confidence?: number }
-      | { 
-          id: string; 
-          type: 'checkbox'; 
-          checked: boolean; 
-          confidence?: number;
-          valueText?: string;
-          valueNumber?: number;
-          valueBoxId?: string;
-        }
-      | {
-          id: string;
-          type: 'scrollbar';
-          positionPercent: number;
-          values?: Array<{ index: number; text?: string; number?: number; confidence?: number }>;
-          selectedIndex?: number;
-          selectedValue?: number | string;
-          confidence?: number;
-        }
-    >;
-  };
-} | null {
+): ScanResult | null {
   'worklet';
   if (plugin == null)
     throw new Error('Failed to load Frame Processor Plugin "detectScreen"!');
 
   // Nur primitive/plain Werte erlauben (JSI-sicher)
-  const screenTemplate = (opts.screenTemplate ?? opts.template) ?? [];
+  const screenTemplate = opts.screenTemplate ?? opts.template ?? [];
   const boxes = screenTemplate.map((b) => ({
     id: b.id ?? undefined,
     x: +b.x,
@@ -130,10 +220,11 @@ export function performScan(
             ...(b.options
               ? {
                   options: {
-                    ...(b.options.orientation ? { orientation: b.options.orientation } : {}),
-                    ...(b.options.cells != null ? { cells: +b.options.cells } : {}),
-                    ...(b.options.checkboxThreshold != null
-                      ? { checkboxThreshold: +b.options.checkboxThreshold }
+                    ...(b.options.orientation
+                      ? { orientation: b.options.orientation }
+                      : {}),
+                    ...(b.options.cells != null
+                      ? { cells: +b.options.cells }
                       : {}),
                     ...(b.options.valuesRegion
                       ? {
@@ -154,12 +245,6 @@ export function performScan(
     ...(opts.runOcr != null ? { runOcr: !!opts.runOcr } : {}),
     ...(opts.screenWidthRatio != null
       ? { screenWidthRatio: +opts.screenWidthRatio }
-      : {}),
-    ...(opts.screenAspectW != null
-      ? { screenAspectW: +opts.screenAspectW }
-      : {}),
-    ...(opts.screenAspectH != null
-      ? { screenAspectH: +opts.screenAspectH }
       : {}),
     ...(opts.minIouForMatch != null
       ? { minIouForMatch: +opts.minIouForMatch }

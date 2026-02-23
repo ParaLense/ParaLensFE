@@ -1,5 +1,6 @@
 import { TemplateLayout } from './use-template-layout';
 import { loadTemplateConfig } from './template';
+import type { ExpectedUnitConfig } from '@/features/ocr';
 
 export type OcrTemplateBox = {
   id: string;
@@ -8,7 +9,8 @@ export type OcrTemplateBox = {
   width: number;
   height: number;
   type?: 'value' | 'checkbox' | 'scrollbar';
-  expectedUnits?: string[];
+  expectedKeyUnits?: string[] | ExpectedUnitConfig;
+  expectedUnits?: string[] | ExpectedUnitConfig;
   sameUnitAs?: string;
   options?: {
     orientation?: 'horizontal' | 'vertical';
@@ -28,6 +30,7 @@ export function loadOcrTemplate(layout: TemplateLayout): OcrTemplateBox[] {
     height: b.height,
     type: b.type || 'value', // Use the type from JSON, default to 'value'
     expectedUnits: b.expectedUnits,
+    expectedKeyUnits: b.expectedKeyUnits,
     sameUnitAs: b.sameUnitAs,
     options: b.options, // Include options for checkboxes and scrollbars
   }));

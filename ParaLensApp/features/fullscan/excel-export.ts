@@ -1,543 +1,531 @@
-import { File } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Alert, Platform } from "react-native";
 import RNFS from "react-native-fs";
 import { PermissionsAndroid } from "react-native";
+import type {
+  Workbook as ExcelWorkbook,
+  Worksheet as ExcelWorksheet,
+  Fill as ExcelFill,
+  Font as ExcelFont,
+} from "exceljs";
+import type {
+  FullScanDto,
+  ScanMenu,
+  ValueUnit,
+  InjectionDto,
+  InjectionMainMenuDto,
+  InjectionSubMenuScrollDto,
+  InjectionSubMenuValueDto,
+  InjectionSubMenuSwitchTypeDto,
+  HoldingPressureDto,
+  HoldingPressureMainMenuDto,
+  HoldingPressureSubMenuScrollDto,
+  HoldingPressureSubMenuValueDto,
+  DosingDto,
+  DosingMainMenuDto,
+  DosingSubMenuDosingSpeedScrollDto,
+  DosingSubMenuDosingSpeedValueDto,
+  DosingSubMenuDosingPressureScrollDto,
+  DosingSubMenuDosingPressureValueDto,
+  CylinderHeatingDto,
+  CylinderHeatingMainMenuDto,
+} from "@/features/fullscan/types";
 
-export const handleLocalExcelDownload = async (scanId: number, fullScans: any[]) => {
-    try {
-        // Lazy load xlsx to avoid Metro parsing issues
-        // Wrap require in a function to defer evaluation
-        const getXLSX = () => {
-            try {
-                // @ts-ignore - xlsx may not have perfect TypeScript support in RN
-                return require("xlsx");
-            } catch (e) {
-                throw new Error("Failed to load xlsx library. Please restart Metro bundler.");
-            }
-        };
-        const XLSX = getXLSX();
-        
-        const scan = fullScans?.find((fs: any) => fs.id === scanId);
-        if (!scan) {
-            Alert.alert("Excel (local)", "Scan not found!");
-            return;
-        }
+// ---------------------------------------------------------------------------
+// Lazy-loaded ExcelJS – only imported when actually needed via init()
+// ---------------------------------------------------------------------------
+let _ExcelJS: typeof import("exceljs") | null = null;
+let NodeBuffer: typeof import("buffer").Buffer;
 
-        // Handle both camelCase (local) and PascalCase (server) property names
-        const injection = scan?.injection || scan?.Injection;
-        const holdingPressure = scan?.holdingPressure || scan?.HoldingPressure;
-        const dosing = scan?.dosing || scan?.Dosing;
-        const cylinderHeating = scan?.cylinderHeating || scan?.CylinderHeating;
+async function init() {
+  if (!_ExcelJS) {
+    _ExcelJS = await import("exceljs");
+  }
+  if (!NodeBuffer) {
+    const bufMod = await import("buffer");
+    NodeBuffer = bufMod.Buffer;
+  }
+}
 
-        const injCount = injection?.subMenuValues?.values?.length || injection?.SubMenuValues?.Values?.length || 0;
-        const hpCount = holdingPressure?.subMenusValues?.values?.length || holdingPressure?.SubMenusValues?.Values?.length || 0;
-        const dosingSpeedCount = dosing?.dosingSpeedsValues?.values?.length || dosing?.DosingSpeedsValues?.Values?.length || 0;
-        const dosingPressureCount = dosing?.dosingPressuresValues?.values?.length || dosing?.DosingPressuresValues?.Values?.length || 0;
+/** Helper – returns the lazily loaded ExcelJS module (must call init() first) */
+function getExcelJS() {
+  if (!_ExcelJS) throw new Error("ExcelJS not initialised – call init() first");
+  return _ExcelJS;
+}
 
-        // Create a 2D array to represent the worksheet
-        // We'll build rows manually - xlsx uses 0-based indexing for arrays
-        const rows: (string | number | null)[][] = [];
-        
-        // Initialize all rows with empty arrays
-        const maxRowCount = 30 + injCount + hpCount + dosingSpeedCount + dosingPressureCount + 5; // Increased for new row
-        for (let i = 0; i <= maxRowCount; i++) {
-            rows[i] = [];
-        }
+// ---------------------------------------------------------------------------
+// Shared styling helpers
+// ---------------------------------------------------------------------------
+const HEADER_FILL: ExcelFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+const HEADER_FONT: Partial<ExcelFont> = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+const SUB_HEADER_FILL: ExcelFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E2F3" } };
+const COL_WIDTHS_DEFAULT = [
+  { width: 20 }, { width: 30 }, { width: 18 }, { width: 14 },
+  { width: 14 }, { width: 16 },
+];
 
-        // Helper to set cell value (1-based row/col to 0-based array)
-        const setCell = (row: number, col: number, value: string | number | null) => {
-            rows[row - 1][col - 1] = value;
-        };
-        
-        const setCellValueAndUnit = (row: number, col: number, data: { value: any, unit?: string } | any) => {
-            if (typeof data === 'object' && data !== null && 'value' in data) {
-                setCell(row, col, data.value);
-                if (data.unit) {
-                    setCell(row, col - 2, data.unit); // Place unit in column D (Unit 1) - assuming value is in F (col 6)
-                }
-            } else {
-                setCell(row, col, data);
-            }
-        };
+/** Extract value + unit from a ValueUnit field into two cell entries */
+function vu(field: ValueUnit | undefined): [value: number | string, unit: string] {
+  if (!field) return ["", ""];
+  return [field.value ?? "", field.unit ?? ""];
+}
 
-        // Row indices (1-based Excel rows)
-        const valuesStartCol = 6; // F column
-        const unitCol = 4; // D column
+function addHeaderRow(ws: ExcelWorksheet, label: string) {
+  const r = ws.addRow([label, "", "", "", "", ""]);
+  r.font = HEADER_FONT;
+  r.fill = HEADER_FILL;
+}
 
-        const injHeaderRow = 5;             // C5: Actual Value (List)
-        const hpHeaderRow = 14;             // C14: Actual Value (List)
-        const dosingSpeedHeaderRow = 23;    // C23
-        const dosingPressureHeaderRow = 24; // C24
+function addSubHeaderRow(ws: ExcelWorksheet, col1: string, col2: string) {
+  const r = ws.addRow(["", col1, col2]);
+  r.fill = SUB_HEADER_FILL;
+  r.font = { bold: true };
+}
 
-        // Calculate row positions after insertions
-        const injListStartRow = injHeaderRow + 1;
-        const injWayRow = 6 + injCount;
-        const injTimeRow = 7 + injCount;
-        const injHydRow = 8 + injCount;
-        const injActiveModeRow = 9 + injCount; // New row for active mode
+// ---------------------------------------------------------------------------
+// Build worksheets – fully typed, no `as any`
+// ---------------------------------------------------------------------------
 
-        const hpListStartRow = hpHeaderRow + 1 + injCount;
-        const hpMainStartRow = 10 + injCount;
-        const hpUndermenuStartRow = 13 + injCount;
-        const hpHeaderRowAfter = hpHeaderRow + injCount;
+function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Injection");
+  ws.columns = COL_WIDTHS_DEFAULT;
 
-        const dosingMainStartRow = 16 + injCount + hpCount;
-        const dosingUndermenuStartRow = 22 + injCount + hpCount;
-        const dosingSpeedListStartRow = dosingSpeedHeaderRow + 1 + injCount + hpCount;
-        const dosingPressureHeaderRowAdjusted = dosingPressureHeaderRow + injCount + hpCount + dosingSpeedCount;
-        const dosingPressureListStartRow = dosingPressureHeaderRowAdjusted + 1;
+  // --- Main Menu ---
+  const mm: InjectionMainMenuDto | undefined = inj.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.sprayPressureLimit);
+    ws.addRow(["", "Spray Pressure Limit", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.increasedSpecificPointPrinter);
+    ws.addRow(["", "Increased Specific Point Printer", val, unit]);
+  }
+  ws.addRow([]);
 
-        const cylStartRow = 29 + injCount + hpCount + dosingSpeedCount + dosingPressureCount;
-        const cylEndRow = cylStartRow + 4;
+  // --- Sub Menu (Injection Speed Scroll) ---
+  const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
+  addHeaderRow(ws, "Sub Menu – Injection Speed");
+  addSubHeaderRow(ws, sub?.keyUnit ?? "v", sub?.valueUnit ?? "v2");
 
-        // ========================
-        // Set all labels
-        // ========================
-        
-        // Injection section
-        const injEndRow = 9 + injCount; // Adjusted for new row
-        setCell(2, 1, "Injection"); // A2
-        setCell(2, 2, "Mainpage"); // B2
-        setCell(2, 3, "Injection Pressure");
-        setCell(3, 2, null); // B3 (merged)
-        setCell(3, 3, "IsIncreasedSpecificPressure");
+  const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
+  [...subValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
+  ws.addRow([]);
 
-        setCell(4, 2, "Undermenu"); // B4
-        setCell(4, 3, "Injection Speed"); 
-        setCell(4, 4, "v"); setCell(4, 5, "v2"); 
-        setCell(5, 3, "Actual Value (List)"); // C5
+  // --- Switch Type ---
+  const sw: InjectionSubMenuSwitchTypeDto | undefined = inj.switchType;
+  addHeaderRow(ws, "Switch Over");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(sw?.transshipmentPosition);
+    ws.addRow(["", "Way (Transshipment Position)", val, unit]);
+  }
+  {
+    const [val, unit] = vu(sw?.switchOverTime);
+    ws.addRow(["", "Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(sw?.switchingPressure);
+    ws.addRow(["", "Hydraulic Pressure", val, unit]);
+  }
 
-        setCell(6, 2, "Switch Over"); // B6
-        setCell(injWayRow, 3, "Way");
-        setCell(injTimeRow, 3, "Time");
-        setCell(injHydRow, 3, "Hydraulic Pressure");
-        setCell(injActiveModeRow, 3, "Active Switch Over Mode"); // New label
+  let activeMode = "";
+  if (sw?.switchOverWay) activeMode = "Way";
+  else if (sw?.switchOverTimeActive) activeMode = "Time";
+  else if (sw?.switchOverHydraulic) activeMode = "Hydraulic Pressure";
+  ws.addRow(["", "Active Switch Over Mode", activeMode]);
 
-        // Holding Pressure section
-        const hpEndRow = 14 + injCount + hpCount;
-        setCell(hpMainStartRow, 1, "Holding Pressure"); // A10
-        setCell(hpMainStartRow, 2, "Mainpage"); // B10
-        setCell(hpMainStartRow, 3, "ReprintTime");
-        setCell(hpMainStartRow + 1, 2, null); // B11 (merged)
-        setCell(hpMainStartRow + 1, 3, "CoolTime");
-        setCell(hpMainStartRow + 2, 2, null); // B12 (merged)
-        setCell(hpMainStartRow + 2, 3, "ScrewDiameter");
+  return ws;
+}
 
-        setCell(hpUndermenuStartRow, 2, "Undermenu"); // B13
-        setCell(hpUndermenuStartRow, 3, "Holding Pressure"); setCell(hpUndermenuStartRow, 4, "t"); setCell(hpUndermenuStartRow, 5, "p");
-        setCell(hpHeaderRowAfter, 3, "Actual Value (List)"); // C14
+function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Holding Pressure");
+  ws.columns = COL_WIDTHS_DEFAULT;
 
-        // Dosing section
-        const dosingPressureEndRow = dosingPressureHeaderRowAdjusted + dosingPressureCount;
-        const dosingEndRow = dosingPressureEndRow;
-        
-        setCell(dosingMainStartRow, 1, "Dosing"); // A16
-        setCell(dosingMainStartRow, 2, "Mainpage"); // B16
-        setCell(dosingMainStartRow, 3, "DosingStroke");
-        setCell(dosingMainStartRow + 1, 2, null); // B17 (merged)
-        setCell(dosingMainStartRow + 1, 3, "DosingDelayTime");
-        setCell(dosingMainStartRow + 2, 2, null); // B18 (merged)
-        setCell(dosingMainStartRow + 2, 3, "RelieveDosing");
-        setCell(dosingMainStartRow + 3, 2, null); // B19 (merged)
-        setCell(dosingMainStartRow + 3, 3, "RelieveAfterDosing");
-        setCell(dosingMainStartRow + 4, 2, null); // B20 (merged)
-        setCell(dosingMainStartRow + 4, 3, "DischargeSpeedBeforeDosing");
-        setCell(dosingMainStartRow + 5, 2, null); // B21 (merged)
-        setCell(dosingMainStartRow + 5, 3, "DischargeSpeedAfterDosing");
+  // --- Main Menu ---
+  const mm: HoldingPressureMainMenuDto | undefined = hp.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.holdingTime);
+    ws.addRow(["", "Holding Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.coolTime);
+    ws.addRow(["", "Cool Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.screwDiameter);
+    ws.addRow(["", "Screw Diameter", val, unit]);
+  }
+  ws.addRow([]);
 
-        // Dosing Speed section
-        setCell(dosingUndermenuStartRow, 2, "Undermenu"); // B22
-        setCell(dosingUndermenuStartRow, 3, "DosingSpeed"); setCell(dosingUndermenuStartRow, 4, "v"); setCell(dosingUndermenuStartRow, 5, "v2");
-        setCell(dosingSpeedHeaderRow + injCount + hpCount, 3, "Actual Value (List)"); // C23
-        
-        // Dosing Pressure section
-        setCell(dosingPressureHeaderRowAdjusted, 3, "DosingPressure"); setCell(dosingPressureHeaderRowAdjusted, 4, "v"); setCell(dosingPressureHeaderRowAdjusted, 5, "p");
+  // --- Sub Menu (Holding Pressure Scroll) ---
+  const sub: HoldingPressureSubMenuScrollDto | undefined = hp.subMenusValues;
+  addHeaderRow(ws, "Sub Menu – Holding Pressure");
+  addSubHeaderRow(ws, sub?.keyUnit ?? "t", sub?.valueUnit ?? "p");
 
-        // Cylinder Heating section
-        setCell(cylStartRow, 1, "Cylinder Heating"); // A29
-        setCell(cylStartRow, 2, "Mainpage"); // B29
-        setCell(cylStartRow, 3, "Sollwert1");
-        setCell(cylStartRow + 1, 2, null); // B30 (merged)
-        setCell(cylStartRow + 1, 3, "Sollwert2");
-        setCell(cylStartRow + 2, 2, null); // B31 (merged)
-        setCell(cylStartRow + 2, 3, "Sollwert3");
-        setCell(cylStartRow + 3, 2, null); // B32 (merged)
-        setCell(cylStartRow + 3, 3, "Sollwert4");
-        setCell(cylStartRow + 4, 2, null); // B33 (merged)
-        setCell(cylStartRow + 4, 3, "Sollwert5");
+  const subValues: HoldingPressureSubMenuValueDto[] = sub?.values ?? [];
+  [...subValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.t, val.p]);
+    });
 
-        // ========================
-        // Populate scalar values (column F) and dynamic units (column D)
-        // ========================
-        const injMainMenu = injection?.mainMenu || injection?.MainMenu;
-        const injSwitchType = injection?.switchType || injection?.SwitchType;
-        const hpMainMenu = holdingPressure?.mainMenu || holdingPressure?.MainMenu;
-        const dosingMainMenu = dosing?.mainMenu || dosing?.MainMenu;
-        const cylMainMenu = cylinderHeating?.mainMenu || cylinderHeating?.MainMenu || 
-            (cylinderHeating && (cylinderHeating.setpoint1 !== undefined || cylinderHeating.Setpoint1 !== undefined) ? cylinderHeating : null);
+  return ws;
+}
 
-        if (injMainMenu) {
-            setCellValueAndUnit(2, valuesStartCol, injMainMenu.sprayPressureLimit ?? injMainMenu.SprayPressureLimit ?? null); // F2
-            setCellValueAndUnit(3, valuesStartCol, injMainMenu.increasedSpecificPointPrinter ?? injMainMenu.IncreasedSpecificPointPrinter ?? null); // F3
-        }
+function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Dosing");
+  ws.columns = COL_WIDTHS_DEFAULT;
 
-        if (injSwitchType) {
-            setCellValueAndUnit(injWayRow, valuesStartCol, injSwitchType.transshipmentPosition ?? injSwitchType.TransshipmentPosition ?? null);
-            setCellValueAndUnit(injTimeRow, valuesStartCol, injSwitchType.switchOverTime ?? injSwitchType.SwitchOverTime ?? null);
-            setCellValueAndUnit(injHydRow, valuesStartCol, injSwitchType.switchingPressure ?? injSwitchType.SwitchingPressure ?? null);
-            
-            // Determine and set active switch over mode
-            let activeMode = "";
-            if (injSwitchType.switch_over_way?.value === "1" || injSwitchType.switch_over_way?.value === true) {
-                activeMode = "Way";
-            } else if (injSwitchType.switch_over_time?.value === "1" || injSwitchType.switch_over_time?.value === true) {
-                activeMode = "Time";
-            } else if (injSwitchType.switch_over_hydraulic?.value === "1" || injSwitchType.switch_over_hydraulic?.value === true) {
-                activeMode = "Hydraulic Pressure";
-            }
-            setCell(injActiveModeRow, valuesStartCol, activeMode);
-        }
+  // --- Main Menu ---
+  const mm: DosingMainMenuDto | undefined = dos.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.dosingStroke);
+    ws.addRow(["", "Dosing Stroke", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dosingDelayTime);
+    ws.addRow(["", "Dosing Delay Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.relieveDosing);
+    ws.addRow(["", "Relieve Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.relieveAfterDosing);
+    ws.addRow(["", "Relieve After Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dischargeSpeedBeforeDosing);
+    ws.addRow(["", "Discharge Speed Before Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dischargeSpeedAfterDosing);
+    ws.addRow(["", "Discharge Speed After Dosing", val, unit]);
+  }
+  ws.addRow([]);
 
-        if (hpMainMenu) {
-            setCellValueAndUnit(hpMainStartRow + 0, valuesStartCol, hpMainMenu.holdingTime ?? hpMainMenu.HoldingTime ?? null);
-            setCellValueAndUnit(hpMainStartRow + 1, valuesStartCol, hpMainMenu.coolTime ?? hpMainMenu.CoolTime ?? null);
-            setCellValueAndUnit(hpMainStartRow + 2, valuesStartCol, hpMainMenu.screwDiameter ?? hpMainMenu.ScrewDiameter ?? null);
-        }
+  // --- Dosing Speed ---
+  const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
+  addHeaderRow(ws, "Sub Menu – Dosing Speed");
+  addSubHeaderRow(ws, speed?.keyUnit ?? "v", speed?.valueUnit ?? "v2");
 
-        if (dosingMainMenu) {
-            setCellValueAndUnit(dosingMainStartRow + 0, valuesStartCol, dosingMainMenu.dosingStroke ?? dosingMainMenu.DosingStroke ?? null);
-            setCellValueAndUnit(dosingMainStartRow + 1, valuesStartCol, dosingMainMenu.dosingDelayTime ?? dosingMainMenu.DosingDelayTime ?? null);
-            setCellValueAndUnit(dosingMainStartRow + 2, valuesStartCol, dosingMainMenu.relieveDosing ?? dosingMainMenu.RelieveDosing ?? null);
-            setCellValueAndUnit(dosingMainStartRow + 3, valuesStartCol, dosingMainMenu.relieveAfterDosing ?? dosingMainMenu.RelieveAfterDosing ?? null);
-            setCellValueAndUnit(dosingMainStartRow + 4, valuesStartCol, dosingMainMenu.dischargeSpeedBeforeDosing ?? dosingMainMenu.DischargeSpeedBeforeDosing ?? null);
-            setCellValueAndUnit(dosingMainStartRow + 5, valuesStartCol, dosingMainMenu.dischargeSpeedAfterDosing ?? dosingMainMenu.DischargeSpeedAfterDosing ?? null);
-        }
+  const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
+  [...speedValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
+  ws.addRow([]);
 
-        if (cylMainMenu) {
-            const getSetpoint = (obj: any, num: number) => {
-                const camelKey = `setpoint${num}`;
-                const pascalKey = `Setpoint${num}`;
-                return obj[camelKey] !== undefined ? obj[camelKey] : (obj[pascalKey] !== undefined ? obj[pascalKey] : null);
-            };
-            
-            setCellValueAndUnit(cylStartRow + 0, valuesStartCol, getSetpoint(cylMainMenu, 1));
-            setCellValueAndUnit(cylStartRow + 1, valuesStartCol, getSetpoint(cylMainMenu, 2));
-            setCellValueAndUnit(cylStartRow + 2, valuesStartCol, getSetpoint(cylMainMenu, 3));
-            setCellValueAndUnit(cylStartRow + 3, valuesStartCol, getSetpoint(cylMainMenu, 4));
-            setCellValueAndUnit(cylStartRow + 4, valuesStartCol, getSetpoint(cylMainMenu, 5));
-        }
+  // --- Dosing Pressure ---
+  const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
+  addHeaderRow(ws, "Sub Menu – Dosing Pressure");
+  addSubHeaderRow(ws, pressure?.keyUnit ?? "v", pressure?.valueUnit ?? "p");
 
-        // ========================
-        // Populate lists (columns D/E) with ordering by Index
-        // ========================
-        if (injCount > 0) {
-            const injValues = injection?.subMenuValues?.values || injection?.SubMenuValues?.Values || [];
-            let r = injListStartRow;
-            [...injValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
-                .forEach((v: any) => {
-                    setCell(r, 4, v.v ?? v.V ?? null);   // D
-                    setCell(r, 5, v.v2 ?? v.V2 ?? null);  // E
-                    r++;
-                });
-        }
+  const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
+  [...pressureValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
 
-        if (hpCount > 0) {
-            const hpValues = holdingPressure?.subMenusValues?.values || holdingPressure?.SubMenusValues?.Values || [];
-            let r = hpListStartRow;
-            [...hpValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
-                .forEach((v: any) => {
-                    setCell(r, 4, v.t ?? v.T ?? null);   // D
-                    setCell(r, 5, v.p ?? v.P ?? null);   // E
-                    r++;
-                });
-        }
+  return ws;
+}
 
-        if (dosingSpeedCount > 0) {
-            const dosingSpeedValues = dosing?.dosingSpeedsValues?.values || dosing?.DosingSpeedsValues?.Values || [];
-            let r = dosingSpeedListStartRow;
-            [...dosingSpeedValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
-                .forEach((v: any) => {
-                    setCell(r, 4, v.v ?? v.V ?? null);   // D
-                    setCell(r, 5, v.v2 ?? v.V2 ?? null);  // E
-                    r++;
-                });
-        }
+function buildCylinderHeatingSheet(wb: ExcelWorkbook, cyl: CylinderHeatingDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Cylinder Heating");
+  ws.columns = COL_WIDTHS_DEFAULT;
 
-        if (dosingPressureCount > 0) {
-            const dosingPressureValues = dosing?.dosingPressuresValues?.values || dosing?.DosingPressuresValues?.Values || [];
-            let r = dosingPressureListStartRow;
-            [...dosingPressureValues].sort((a: any, b: any) => (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0))
-                .forEach((v: any) => {
-                    setCell(r, 4, v.v ?? v.V ?? null);   // D
-                    setCell(r, 5, v.p ?? v.P ?? null);   // E
-                    r++;
-                });
-        }
+  const mm: CylinderHeatingMainMenuDto | undefined = cyl.mainMenu;
+  if (!mm) {
+    ws.addRow(["No cylinder heating data"]);
+    return ws;
+  }
 
-        // Convert rows array to worksheet
-        const ws = XLSX.utils.aoa_to_sheet(rows);
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value"]);
+  ws.addRow(["", "Setpoint 1", mm.setpoint1]);
+  ws.addRow(["", "Setpoint 2", mm.setpoint2]);
+  ws.addRow(["", "Setpoint 3", mm.setpoint3]);
+  ws.addRow(["", "Setpoint 4", mm.setpoint4]);
+  ws.addRow(["", "Setpoint 5", mm.setpoint5]);
 
-        // Set column widths
-        ws['!cols'] = [
-            { wch: 20 }, // A: Category
-            { wch: 20 }, // B: Menu
-            { wch: 35 }, // C: Parameter
-            { wch: 12 }, // D: Unit 1
-            { wch: 12 }, // E: Unit 2
-            { wch: 15 }, // F: Value
-        ];
+  return ws;
+}
 
-        // Helper function to convert Excel address to cell reference (e.g., "A2" -> {r:1, c:0})
-        const addressToCell = (addr: string) => {
-            const match = addr.match(/([A-Z]+)(\d+)/);
-            if (!match) return null;
-            const col = match[1];
-            const row = parseInt(match[2]) - 1;
-            let colNum = 0;
-            for (let i = 0; i < col.length; i++) {
-                colNum = colNum * 26 + (col.charCodeAt(i) - 64);
-            }
-            return { r: row, c: colNum - 1 };
-        };
+// ---------------------------------------------------------------------------
+// Add section screenshot as an embedded image to the worksheet
+// ---------------------------------------------------------------------------
+function addScreenshotToSheet(
+  wb: ExcelWorkbook,
+  ws: ExcelWorksheet,
+  base64Data: string,
+  label: string = "Screenshot",
+) {
+  // Strip data URI prefix if present
+  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
 
-        // Helper to get cell reference string
-        const cellRef = (row: number, col: number) => {
-            const colLetter = String.fromCharCode(65 + col);
-            return `${colLetter}${row + 1}`;
-        };
+  const imageId = wb.addImage({
+    base64: raw,
+    extension: "jpeg",
+  });
 
-        // Helper to set cell style
-        const setCellStyle = (row: number, col: number, style: any) => {
-            const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
-            if (!ws[cellAddr]) ws[cellAddr] = { v: null, t: 's' };
-            ws[cellAddr].s = style;
-        };
+  // Insert image starting after the data rows
+  const startRow = (ws.rowCount || 0) + 2;
 
-        // Define border style
-        const thinBorder = {
-            top: { style: 'thin', color: { rgb: '000000' } },
-            bottom: { style: 'thin', color: { rgb: '000000' } },
-            left: { style: 'thin', color: { rgb: '000000' } },
-            right: { style: 'thin', color: { rgb: '000000' } },
-        };
+  ws.addRow([]);
+  const labelRow = ws.addRow([label]);
+  labelRow.font = { bold: true, size: 12 };
 
-        // Define center alignment style
-        const centerAlign = {
-            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-            border: thinBorder,
-        };
+  ws.addImage(imageId, {
+    tl: { col: 0, row: startRow },
+    ext: { width: 400, height: 530 },
+  });
 
-        const leftAlign = {
-            alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
-            border: thinBorder,
-        };
+  // Add empty rows so the next image doesn't overlap
+  for (let i = 0; i < 28; i++) ws.addRow([]);
+}
 
-        // Initialize merges array
-        const merges: any[] = [];
+/**
+ * Collect all screenshots whose key starts with `sectionPrefix`.
+ * Keys are "section.subMode" (e.g. "injection.mainMenu") or legacy "section".
+ */
+function getScreenshotsForSection(
+  screenshots: Record<string, string>,
+  sectionKey: ScanMenu,
+): { subMode: string; base64: string }[] {
+  const result: { subMode: string; base64: string }[] = [];
+  const prefix = `${sectionKey}.`;
 
-        // ========================
-        // Apply merges and styles
-        // ========================
-        
-        // Injection section merges
-        merges.push({ s: addressToCell("A2")!, e: addressToCell(`A${injEndRow}`)! }); // A2:A{injEndRow}
-        merges.push({ s: addressToCell("B2")!, e: addressToCell("B3")! }); // B2:B3
-        merges.push({ s: addressToCell("B4")!, e: addressToCell(`B${injHeaderRow}`)! }); // B4:B{injHeaderRow}
-        merges.push({ s: addressToCell("B6")!, e: addressToCell(`B${injEndRow}`)! }); // B6:B{injEndRow}
-
-        // Holding Pressure section merges
-        merges.push({ s: addressToCell(`A${hpMainStartRow}`)!, e: addressToCell(`A${hpEndRow}`)! }); // A{hpMainStartRow}:A{hpEndRow}
-        merges.push({ s: addressToCell(`B${hpMainStartRow}`)!, e: addressToCell(`B${hpMainStartRow + 2}`)! }); // B{hpMainStartRow}:B{hpMainStartRow+2}
-        merges.push({ s: addressToCell(`B${hpUndermenuStartRow}`)!, e: addressToCell(`B${hpHeaderRowAfter}`)! }); // B{hpUndermenuStartRow}:B{hpHeaderRowAfter}
-
-        // Dosing section merges
-        merges.push({ s: addressToCell(`A${dosingMainStartRow}`)!, e: addressToCell(`A${dosingEndRow}`)! }); // A{dosingMainStartRow}:A{dosingEndRow}
-        merges.push({ s: addressToCell(`B${dosingMainStartRow}`)!, e: addressToCell(`B${dosingMainStartRow + 5}`)! }); // B{dosingMainStartRow}:B{dosingMainStartRow+5}
-        merges.push({ s: addressToCell(`B${dosingUndermenuStartRow}`)!, e: addressToCell(`B${dosingPressureEndRow}`)! }); // B{dosingUndermenuStartRow}:B{dosingPressureEndRow}
-
-        // Cylinder Heating section merges
-        merges.push({ s: addressToCell(`A${cylStartRow}`)!, e: addressToCell(`A${cylEndRow}`)! }); // A{cylStartRow}:A{cylEndRow}
-        merges.push({ s: addressToCell(`B${cylStartRow}`)!, e: addressToCell(`B${cylEndRow}`)! }); // B{cylStartRow}:B{cylEndRow}
-
-        // Apply merges to worksheet
-        ws['!merges'] = merges;
-
-        // Apply styles to all cells with data
-        const maxRow = Math.max(cylEndRow, dosingEndRow, hpEndRow, injEndRow);
-        for (let r = 1; r <= maxRow; r++) {
-            for (let c = 0; c < 6; c++) {
-                const cellAddr = XLSX.utils.encode_cell({ r: r - 1, c: c });
-                if (ws[cellAddr] && ws[cellAddr].v !== null && ws[cellAddr].v !== undefined) {
-                    // Check if this is a merged cell that should be centered
-                    const isMergedCenter = merges.some(m => {
-                        const cellRow = r - 1;
-                        const cellCol = c;
-                        return (
-                            (m.s.r <= cellRow && cellRow <= m.e.r) &&
-                            (m.s.c <= cellCol && cellCol <= m.e.c) &&
-                            (m.s.r === cellRow && m.s.c === cellCol) // Only apply to top-left cell of merge
-                        );
-                    });
-                    
-                    if (isMergedCenter || c === 0 || c === 1) {
-                        // Category and Menu columns, and merged cells should be centered
-                        setCellStyle(r - 1, c, centerAlign);
-                    } else {
-                        // Other cells left-aligned
-                        setCellStyle(r - 1, c, leftAlign);
-                    }
-                } else if (ws[cellAddr]) {
-                    // Empty cells still get borders
-                    setCellStyle(r - 1, c, { border: thinBorder });
-                }
-            }
-        }
-
-        // Create workbook and add worksheet
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Parameters");
-
-        const fileName = `ParaLens_Export_${scanId}.xlsx`;
-
-        // Generate Excel file as base64
-        const excelBuffer = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-
-        // Use cache directory for temporary file storage
-        const cacheDir = FileSystem.cacheDirectory;
-        if (!cacheDir) {
-            Alert.alert("Export failed", "Cache directory is not available");
-            return;
-        }
-
-        const fileUri = cacheDir + fileName;
-        const file = new File(fileUri);
-
-        // Write the file as base64-encoded string
-        await file.write(excelBuffer, { encoding: 'base64' });
-
-        // Ask user what they want to do with the file
-        Alert.alert(
-            "Excel File Ready",
-            "What would you like to do with the file?",
-            [
-                {
-                    text: "Share",
-                    onPress: async () => {
-                        try {
-                            if (await Sharing.isAvailableAsync()) {
-                                await Sharing.shareAsync(fileUri, {
-                                    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    UTI: "com.microsoft.excel.xlsx",
-                                });
-                            } else {
-                                Alert.alert("Share Unavailable", "Sharing is not available on this device.");
-                            }
-                        } catch (shareError: any) {
-                            Alert.alert(
-                                "Share failed",
-                                shareError?.message || "Could not share the file."
-                            );
-                        }
-                    },
-                },
-                {
-                    text: "Save to Downloads",
-                    onPress: async () => {
-                        try {
-                            if (Platform.OS === 'android') {
-                                const androidVersion = Platform.Version as number;
-                                let hasPermission = true;
-
-                                if (androidVersion < 33) {
-                                    const granted = await PermissionsAndroid.request(
-                                        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                                        {
-                                            title: 'Storage Permission',
-                                            message: 'This app needs access to storage to save the file.',
-                                            buttonNeutral: 'Ask Me Later',
-                                            buttonNegative: 'Cancel',
-                                            buttonPositive: 'OK',
-                                        }
-                                    );
-                                    hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
-                                }
-
-                                if (!hasPermission) {
-                                    Alert.alert("Permission Denied", "Storage permission is required to save the file.");
-                                    return;
-                                }
-
-                                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-                                
-                                try {
-                                    const sourceExists = await RNFS.exists(fileUri);
-                                    if (!sourceExists) {
-                                        Alert.alert("Error", "Source file not found. Please try again.");
-                                        return;
-                                    }
-                                    
-                                    const fileContent = await RNFS.readFile(fileUri, 'base64');
-                                    await RNFS.writeFile(downloadPath, fileContent, 'base64');
-                                    
-                                    const fileExists = await RNFS.exists(downloadPath);
-                                    if (!fileExists) {
-                                        Alert.alert("Error", "Failed to save file. Please check storage permissions.");
-                                        return;
-                                    }
-                                } catch (writeError: any) {
-                                    console.warn('Direct write failed, trying copy:', writeError);
-                                    const sourceExists = await RNFS.exists(fileUri);
-                                    if (!sourceExists) {
-                                        Alert.alert("Error", "Source file not found. Please try again.");
-                                        return;
-                                    }
-                                    await RNFS.copyFile(fileUri, downloadPath);
-                                }
-                                
-                                try {
-                                    await RNFS.scanFile(downloadPath);
-                                } catch (scanError) {
-                                    console.warn('Failed to scan file:', scanError);
-                                }
-                                
-                                Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
-                            } else {
-                                const documentDir = FileSystem.documentDirectory;
-                                if (documentDir) {
-                                    const documentPath = documentDir + fileName;
-                                    const documentFile = new File(documentPath);
-                                    await documentFile.write(excelBuffer, { encoding: 'base64' });
-                                    
-                                    if (await Sharing.isAvailableAsync()) {
-                                        await Sharing.shareAsync(documentPath, {
-                                            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                            UTI: "com.microsoft.excel.xlsx",
-                                        });
-                                    } else {
-                                        Alert.alert("File Saved", `Excel file saved to:\n${documentPath}`);
-                                    }
-                                } else {
-                                    Alert.alert("Error", "Could not access document directory.");
-                                }
-                            }
-                        } catch (saveError: any) {
-                            Alert.alert(
-                                "Save failed",
-                                saveError?.message || "Could not save the file to downloads."
-                            );
-                        }
-                    },
-                },
-                {
-                    text: "Cancel",
-                    style: "cancel",
-                },
-            ],
-            { cancelable: true }
-        );
-    } catch (e: any) {
-        Alert.alert("Export failed", e?.message ?? String(e));
+  for (const [key, value] of Object.entries(screenshots)) {
+    if (key === sectionKey) {
+      // Legacy key without sub-mode
+      result.push({ subMode: "", base64: value });
+    } else if (key.startsWith(prefix)) {
+      result.push({ subMode: key.slice(prefix.length), base64: value });
     }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Main export function
+// ---------------------------------------------------------------------------
+
+export const handleLocalExcelDownload = async (
+  scanId: number,
+  fullScans: FullScanDto[],
+) => {
+  try {
+    const scan = fullScans?.find((fs) => fs.id === scanId);
+    if (!scan) {
+      Alert.alert("Excel (local)", "Scan not found!");
+      return;
+    }
+
+    // Lazy-load ExcelJS & Buffer only when export is actually triggered
+    await init();
+
+    const wb = new (getExcelJS().Workbook)();
+    wb.creator = "ParaLens";
+    wb.created = new Date();
+    wb.modified = new Date();
+
+    const screenshots = scan.sectionScreenshots ?? {};
+
+    // Build a worksheet per section using the typed DTO properties directly
+    const sectionBuilders: { key: ScanMenu; data: unknown; build: () => ExcelWorksheet }[] = [
+      { key: "injection", data: scan.injection, build: () => buildInjectionSheet(wb, scan.injection!) },
+      { key: "holdingPressure", data: scan.holdingPressure, build: () => buildHoldingPressureSheet(wb, scan.holdingPressure!) },
+      { key: "dosing", data: scan.dosing, build: () => buildDosingSheet(wb, scan.dosing!) },
+      { key: "cylinderHeating", data: scan.cylinderHeating, build: () => buildCylinderHeatingSheet(wb, scan.cylinderHeating!) },
+    ];
+
+    for (const { key, data, build } of sectionBuilders) {
+      if (!data) continue;
+
+      const ws = build();
+
+      // Embed all sub-mode screenshots for this section
+      const sectionScreenshots = getScreenshotsForSection(screenshots, key);
+      for (const { subMode, base64 } of sectionScreenshots) {
+        const label = subMode ? `Screenshot – ${subMode}` : "Screenshot";
+        addScreenshotToSheet(wb, ws, base64, label);
+      }
+    }
+
+    // If no sheets were added (no data at all), add a placeholder
+    if (wb.worksheets.length === 0) {
+      const ws = wb.addWorksheet("Info");
+      ws.addRow(["No scan data available for this scan."]);
+    }
+
+    const fileName = `ParaLens_Export_${scanId}.xlsx`;
+
+    // Write workbook to buffer
+    const buffer = await wb.xlsx.writeBuffer();
+    const nodeBuffer = NodeBuffer.from(buffer);
+    const bufferStr = nodeBuffer.toString("base64");
+
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      Alert.alert("Export failed", "Cache directory is not available");
+      return;
+    }
+
+    const fileUri = cacheDir + fileName;
+
+    await FileSystem.writeAsStringAsync(fileUri, bufferStr, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    // Ask user what they want to do with the file
+    Alert.alert(
+      "Excel File Ready",
+      "What would you like to do with the file?",
+      [
+        {
+          text: "Share",
+          onPress: async () => {
+            try {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(fileUri, {
+                  mimeType:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  UTI: "com.microsoft.excel.xlsx",
+                });
+              } else {
+                Alert.alert(
+                  "Share Unavailable",
+                  "Sharing is not available on this device.",
+                );
+              }
+            } catch (shareError: any) {
+              Alert.alert(
+                "Share failed",
+                shareError?.message || "Could not share the file.",
+              );
+            }
+          },
+        },
+        {
+          text: "Save to Downloads",
+          onPress: async () => {
+            try {
+              if (Platform.OS === "android") {
+                const androidVersion = Platform.Version as number;
+                let hasPermission = true;
+
+                if (androidVersion < 33) {
+                  const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                    {
+                      title: "Storage Permission",
+                      message:
+                        "This app needs access to storage to save the file.",
+                      buttonNeutral: "Ask Me Later",
+                      buttonNegative: "Cancel",
+                      buttonPositive: "OK",
+                    },
+                  );
+                  hasPermission =
+                    granted === PermissionsAndroid.RESULTS.GRANTED;
+                }
+
+                if (!hasPermission) {
+                  Alert.alert(
+                    "Permission Denied",
+                    "Storage permission is required to save the file.",
+                  );
+                  return;
+                }
+
+                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+
+                try {
+                  const sourceExists = await RNFS.exists(fileUri);
+                  if (!sourceExists) {
+                    Alert.alert(
+                      "Error",
+                      "Source file not found. Please try again.",
+                    );
+                    return;
+                  }
+
+                  const fileContent = await RNFS.readFile(fileUri, "base64");
+                  await RNFS.writeFile(downloadPath, fileContent, "base64");
+
+                  const fileExists = await RNFS.exists(downloadPath);
+                  if (!fileExists) {
+                    Alert.alert(
+                      "Error",
+                      "Failed to save file. Please check storage permissions.",
+                    );
+                    return;
+                  }
+                } catch (writeError: any) {
+                  console.warn("Direct write failed, trying copy:", writeError);
+                  const sourceExists = await RNFS.exists(fileUri);
+                  if (!sourceExists) {
+                    Alert.alert(
+                      "Error",
+                      "Source file not found. Please try again.",
+                    );
+                    return;
+                  }
+                  await RNFS.copyFile(fileUri, downloadPath);
+                }
+
+                try {
+                  await RNFS.scanFile(downloadPath);
+                } catch (scanError) {
+                  console.warn("Failed to scan file:", scanError);
+                }
+
+                Alert.alert(
+                  "File Saved",
+                  `Excel file saved to Downloads:\n${downloadPath}`,
+                );
+              } else {
+                // iOS – just share (save to Files via share sheet)
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(fileUri, {
+                    mimeType:
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    UTI: "com.microsoft.excel.xlsx",
+                  });
+                } else {
+                  Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
+                }
+              }
+            } catch (saveError: any) {
+              Alert.alert(
+                "Save failed",
+                saveError?.message ||
+                  "Could not save the file to downloads.",
+              );
+            }
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true },
+    );
+  } catch (e: any) {
+    Alert.alert("Export failed", e?.message ?? String(e));
+  }
 };

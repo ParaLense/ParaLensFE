@@ -1,5 +1,5 @@
 import httpClient from "./http-client";
-import { API_ENDPOINTS } from "@/features/config/api";
+import { API_ENDPOINTS } from "@/config/api";
 import {
   CylinderHeatingDto,
   CreateCylinderHeatingMainMenuRequest,

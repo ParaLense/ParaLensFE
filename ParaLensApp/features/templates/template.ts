@@ -1,4 +1,6 @@
 
+import type { ExpectedUnitConfig } from '@/features/ocr';
+
 interface TemplateBox{
   id: string;
   x: number;
@@ -16,7 +18,8 @@ interface TemplateBox{
     valueBoxId?: string;
   };
   sameUnitAs?: string;
-  expectedUnits?: string[];
+  expectedUnits?: string[] | ExpectedUnitConfig;
+  expectedKeyUnits?: string[] | ExpectedUnitConfig;
 }
 
 enum TemplateLayout {

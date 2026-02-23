@@ -13,12 +13,13 @@ interface Props {
   rows: IndexValuePair[];
   setRows: (rows: IndexValuePair[]) => void;
   labels: { v?: string; v2?: string; t?: string; p?: string };
+  units?: { v?: string; v2?: string; t?: string; p?: string };
   isDark?: boolean;
 }
 
 const hydrateRow = (row: IndexValuePair): IndexValuePair => ({ index: row.index, v: row.v, v2: row.v2, t: row.t, p: row.p });
 
-const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, isDark = false }) => {
+const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, units = {}, isDark = false }) => {
   const normalized = rows.map(hydrateRow);
 
   const updateRow = (idx: number, key: keyof IndexValuePair, value: string) => {
@@ -39,6 +40,9 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, isDark = fal
 
   const iconColor = isDark ? "#ffffff" : "#000000";
   const boxBgClass = isDark ? "bg-background-800" : "bg-background-200";
+  const textColor = isDark ? "text-typography-50" : "text-typography-900";
+
+  const hasUnits = Object.values(units).some(unit => typeof unit === 'string' && unit.length > 0);
 
   return (
     <VStack className="gap-2">
@@ -75,11 +79,31 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, isDark = fal
           </Pressable>
         </HStack>
       ))}
+      {hasUnits && (
+          <HStack className="gap-2 items-center justify-between">
+            <Box className={`px-2.5 py-2.5 rounded-sm`} />
+            <HStack className="gap-2 items-center flex-1">
+              {labels.v !== undefined && (
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.v ?? ''}</Text>
+              )}
+              {labels.v2 !== undefined && (
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.v2 ?? ''}</Text>
+              )}
+              {labels.t !== undefined && (
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.t ?? ''}</Text>
+              )}
+              {labels.p !== undefined && (
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.p ?? ''}</Text>
+              )}
+            </HStack>
+            <Box className="w-5" />
+          </HStack>
+      )}
       <HStack className="mt-4 items-center justify-start">
         <Pressable accessibilityLabel="Zeile hinzufügen" onPress={addRow}>
           <HStack className="gap-2 items-center">
             <Icon name="plus" size={20} color={iconColor} />
-            <Text className={isDark ? "text-typography-50" : "text-typography-900"}>Zeile hinzufügen</Text>
+            <Text className={textColor}>Zeile hinzufügen</Text>
           </HStack>
         </Pressable>
       </HStack>
@@ -88,5 +112,3 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, isDark = fal
 };
 
 export default DynamicValueList;
-
-

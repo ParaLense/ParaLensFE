@@ -16,6 +16,26 @@
     "height": 6.82,
     "label": "Injection Speed Items",
     "type": "scrollbar",
+    "expectedUnits": {
+      "iso": {
+        "absolute": "cm^3/s",
+        "relative": "mm/s"
+      },
+      "imperial": {
+        "absolute": "in^3/s",
+        "relative": "in/s"
+      }
+    },
+    "expectedKeyUnits": {
+      "iso": {
+        "absolute": "cm^3",
+        "relative": "mm"
+      },
+      "imperial": {
+        "absolute": "in^3",
+        "relative": "in"
+      }
+    },
     "options": {
       "orientation": "horizontal",
       "cells": 10,

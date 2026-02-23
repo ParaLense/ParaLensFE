@@ -422,4 +422,5 @@ export function isValidString(value: any): boolean {
 
 export function isValidArray(value: any): boolean {
   return Array.isArray(value) && value.length > 0;
-} 
+}
+

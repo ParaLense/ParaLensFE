@@ -38,8 +38,6 @@ class ScreenDetectorFrameProcessorPlugin(
     try {
       // Parse arguments using Utils
       val templateBoxes = ScreenDetection.parseTemplate(arguments, pluginOptions)
-      val screenAspectW = Utils.getInt(arguments, "screenAspectW", Utils.getInt(pluginOptions, "screenAspectW", 3))
-      val screenAspectH = Utils.getInt(arguments, "screenAspectH", Utils.getInt(pluginOptions, "screenAspectH", 4))
       val runOcr = Utils.getBool(arguments, "runOcr", false)
       val ocrBoxes = if (runOcr) OcrProcessor.parseOcrTemplate(arguments) else null
       val minIouForMatch = Utils.getDouble(arguments, "minIouForMatch", Utils.getDouble(pluginOptions, "minIouForMatch", 0.30))
@@ -235,9 +233,9 @@ class ScreenDetectorFrameProcessorPlugin(
       // Create screen data
       val screenData = ScreenDetection.createScreenData(
         detected, accuracy, accuracyThreshold, detectionCounter, totalFrameCounter,
-        frameW, frameH, srcWidth, srcHeight, screenAspectW, screenAspectH,
+        frameW, frameH, srcWidth, srcHeight,
         templateTargetW, templateTargetH, H, mask, roiOuterPx, roiInnerPx,
-        bestRect, emptyList(), templatePixelRectsArr, matchedArr,
+        bestRect, templatePixelRectsArr, matchedArr,
         warpedImageBase64, outputW, outputH
       )
 

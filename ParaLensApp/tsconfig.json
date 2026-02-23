@@ -6,6 +6,12 @@
       "@/*": [
         "./*"
       ],
+      "@/config/*": [
+        "./config/*"
+      ],
+      "@/utils/*": [
+        "./utils/*"
+      ],
       "@/features/*": [
         "./features/*"
       ],

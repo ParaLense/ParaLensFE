@@ -995,7 +995,7 @@ function SectionDetails({
             return !!(data?.mainMenu || data?.dosingSpeedsValues?.values || data?.dosingPressuresValues?.values);
         }
         if (sectionKey === "cylinderHeating") {
-            return !!data && Object.keys(data).length > 0;
+            return !!data?.mainMenu && Object.keys(data.mainMenu).length > 0;
         }
         return false;
     };
@@ -1028,6 +1028,10 @@ function SectionDetails({
                         title="Sub Menu · Werte"
                         entries={data.subMenuValues.values}
                         columns={["index", "v", "v2"]}
+                        unitLabels={{
+                          v: data?.subMenuValues?.keyUnit,
+                          v2: data?.subMenuValues?.valueUnit,
+                        }}
                         isDark={isDark}
                     />
                 )}
@@ -1049,6 +1053,10 @@ function SectionDetails({
                         title="Sub Menu · Werte"
                         entries={data.subMenusValues.values}
                         columns={["index", "t", "p"]}
+                        unitLabels={{
+                          t: data?.subMenusValues?.keyUnit,
+                          p: data?.subMenusValues?.valueUnit,
+                        }}
                         isDark={isDark}
                     />
                 )}
@@ -1063,13 +1071,26 @@ function SectionDetails({
                     <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
                 )}
                 {Array.isArray(data?.dosingSpeedsValues?.values) && data.dosingSpeedsValues.values.length > 0 && (
-                    <ArrayBlock title="Speeds" entries={data.dosingSpeedsValues.values} columns={["index", "v", "v2"]} isDark={isDark} />
+                    <ArrayBlock
+                      title="Speeds"
+                      entries={data.dosingSpeedsValues.values}
+                      columns={["index", "v", "v2"]}
+                      unitLabels={{
+                        v: data?.dosingSpeedsValues?.keyUnit,
+                        v2: data?.dosingSpeedsValues?.valueUnit,
+                      }}
+                      isDark={isDark}
+                    />
                 )}
                 {Array.isArray(data?.dosingPressuresValues?.values) && data.dosingPressuresValues.values.length > 0 && (
                     <ArrayBlock
                         title="Pressures"
                         entries={data.dosingPressuresValues.values}
                         columns={["index", "v", "v2"]}
+                        unitLabels={{
+                          v: data?.dosingPressuresValues?.keyUnit,
+                          v2: data?.dosingPressuresValues?.valueUnit,
+                        }}
                         isDark={isDark}
                     />
                 )}
@@ -1078,15 +1099,16 @@ function SectionDetails({
     }
 
     if (sectionKey === "cylinderHeating") {
-        if (!data || typeof data !== 'object') {
+        const mainMenu = data?.mainMenu;
+        if (!mainMenu || typeof mainMenu !== 'object') {
             return (
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                    Invalid data format
+                    No data available
                 </Text>
             );
         }
 
-        const entries = Object.entries(data).filter(([_, value]) => value != null);
+        const entries = Object.entries(mainMenu).filter(([key, value]) => value != null && key !== 'id' && key !== 'cylinderHeatingId');
 
         if (entries.length === 0) {
             return (
@@ -1163,13 +1185,20 @@ function ArrayBlock({
                         title,
                         entries,
                         columns,
+                        unitLabels,
                         isDark,
                     }: {
     title: string;
     entries: any[];
     columns: string[];
+    unitLabels?: Record<string, string | null | undefined>;
     isDark: boolean;
 }) {
+    const formatColumnLabel = (col: string) => {
+        const unit = unitLabels?.[col];
+        return unit ? `${col} (${unit})` : col;
+    };
+
     return (
         <VStack className="gap-2">
             <Text className={`text-sm font-semibold mb-1 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
@@ -1198,7 +1227,7 @@ function ArrayBlock({
                             className={`text-xs font-semibold uppercase ${isDark ? "text-typography-400" : "text-typography-500"}`}
                             style={{ flex: 1 }}
                         >
-                            {col}
+                            {formatColumnLabel(col)}
                         </Text>
                     ))}
                 </HStack>

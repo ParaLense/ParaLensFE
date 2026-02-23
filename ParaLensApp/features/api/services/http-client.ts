@@ -1,4 +1,4 @@
-import { API_CONFIG } from "@/features/config/api";
+import { API_CONFIG } from "@/config/api";
 
 class HttpClient {
   private baseURL: string;

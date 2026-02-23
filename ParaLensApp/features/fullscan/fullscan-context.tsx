@@ -9,7 +9,7 @@ interface FullScanContextValue {
     selectedFullScanId: number | null;
     selectFullScan: (id: number | null) => void;
     createFullScan: (author: string) => number;
-    upsertSection: (fullScanId: number, section: ScanMenu, payload: any) => void;
+    upsertSection: (fullScanId: number, section: ScanMenu, payload: any, screenshotBase64?: string, subMode?: string) => void;
     uploadScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
     updateScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
     getUploadStatus: (scanId: number) => 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
@@ -42,7 +42,7 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return record.id;
     }, []);
 
-    const upsertSection = useCallback((fullScanId: number, section: ScanMenu, payload: any) => {
+    const upsertSection = useCallback((fullScanId: number, section: ScanMenu, payload: any, screenshotBase64?: string, subMode?: string) => {
         setFullScans(prev => prev.map(fs => {
             if (fs.id !== fullScanId) return fs;
             
@@ -62,7 +62,14 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
             const mergedSection = { ...existingSectionData, ...mergedPayload };
 
-            const updatedScan = { ...fs, [section]: mergedSection, lastModified: new Date().toISOString() } as FullScanDto;
+            // Store screenshot keyed by "section.subMode" (e.g. "injection.mainMenu")
+            const updatedScreenshots: Record<string, string> = { ...(fs.sectionScreenshots || {}) };
+            if (screenshotBase64) {
+                const screenshotKey = subMode ? `${section}.${subMode}` : section;
+                updatedScreenshots[screenshotKey] = screenshotBase64;
+            }
+
+            const updatedScan = { ...fs, [section]: mergedSection, sectionScreenshots: updatedScreenshots, lastModified: new Date().toISOString() } as FullScanDto;
 
             // If this scan was previously uploaded, mark it as needing update
             if (updatedScan.uploadStatus === 'uploaded') {
