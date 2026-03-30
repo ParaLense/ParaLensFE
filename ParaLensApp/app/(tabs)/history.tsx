@@ -999,7 +999,7 @@ function SectionDetails({
             return !!(data?.mainMenu || data?.dosingSpeedsValues?.values || data?.dosingPressuresValues?.values);
         }
         if (sectionKey === "cylinderHeating") {
-            return !!data && Object.keys(data).length > 0;
+            return !!data?.mainMenu && Object.keys(data.mainMenu).length > 0;
         }
         return false;
     };
@@ -1103,15 +1103,16 @@ function SectionDetails({
     }
 
     if (sectionKey === "cylinderHeating") {
-        if (!data || typeof data !== 'object') {
+        const mainMenu = data?.mainMenu;
+        if (!mainMenu || typeof mainMenu !== 'object') {
             return (
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                    Invalid data format
+                    No data available
                 </Text>
             );
         }
 
-        const entries = Object.entries(data).filter(([_, value]) => value != null);
+        const entries = Object.entries(mainMenu).filter(([key, value]) => value != null && key !== 'id' && key !== 'cylinderHeatingId');
 
         if (entries.length === 0) {
             return (

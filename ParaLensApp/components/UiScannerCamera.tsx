@@ -3,7 +3,7 @@ import {
   ReadonlyFrameProcessor,
   useFrameProcessor,
 } from 'react-native-vision-camera';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -25,7 +25,7 @@ import { useRunOnJS } from 'react-native-worklets-core';
 import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-template-layout';
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
-import {OcrScanResult, UnitSystem, useOcrHistory, ValueMode} from '@/features/ocr';
+import {OcrScanResult, useOcrHistory} from '@/features/ocr';
 import type { OcrFieldResult } from '@/features/ocr';
 import { CameraPermissionProvider } from '@/features/camera';
 import TemplateOverlay from './TemplateOverlay';
@@ -52,7 +52,6 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   /**
    * Optional callback to expose the current best OCR field values and raw map
    * to parent components (e.g. CameraScreen for scan-review prefill).
-   * Note: screenshotBase64 is NOT included here to avoid memory issues.
    */
   onOcrUpdate?: (payload: {
     bestFields: OcrFieldResult[];
@@ -62,20 +61,17 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
       mode?: import('@/features/ocr').ValueMode;
     };
   }) => void;
-  /**
-   * Callback to get the latest screenshot on demand (e.g., when navigating to review).
-   * Called once with a function that returns the current base64 image.
-   */
-  onScreenshotReady?: (getScreenshot: () => string | null) => void;
   onScanComplete?: (payload: any) => void;
+  /** Callback to expose the latest warped base64 screenshot to parent */
+  onScreenshotUpdate?: (base64: string) => void;
 }
 const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   currentLayout,
   style: cameraStyleProp,
   device,
   onOcrUpdate,
-  onScreenshotReady,
-  onScanComplete,
+    onScanComplete,
+    onScreenshotUpdate,
   ...restCameraProps
 }: UiScannerCameraProps) => {
 
@@ -95,58 +91,33 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const [ocrMap, setOcrMap] = useState<Record<string, string>>({});
   const [screenResult, setScreenResult] = useState<ScreenResult | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
-  const hasScreenshotRef = React.useRef(false); // Track if we already have a screenshot
   const lastFrameTime = useSharedValue(0);
-  const setOcrMapJS = useRunOnJS(setOcrMap, [setOcrMap]);
-  const setScreenResultJS = useRunOnJS(setScreenResult, [setScreenResult]);
-  // Only set base64 image if we don't have one yet
-  const setBase64ImageIfNeeded = useCallback((img: string) => {
-    if (!hasScreenshotRef.current) {
-      hasScreenshotRef.current = true;
-      setBase64Image(img);
-    }
-  }, []);
-  const setBase64ImageJS = useRunOnJS(setBase64ImageIfNeeded, [setBase64ImageIfNeeded]);
+  const setOcrMapJS = useRunOnJS(setOcrMap, []);
+  const setScreenResultJS = useRunOnJS(setScreenResult, []);
+  const setBase64ImageJS = useRunOnJS(setBase64Image, []);
 
-  // Store onOcrUpdate in a ref to avoid re-creating the callback on every render
-  const onOcrUpdateRef = React.useRef(onOcrUpdate);
-  useEffect(() => {
-    onOcrUpdateRef.current = onOcrUpdate;
-  }, [onOcrUpdate]);
+  // Keep a stable ref so the useRunOnJS callback never changes identity
+  const onOcrUpdateRef = useRef(onOcrUpdate);
+  onOcrUpdateRef.current = onOcrUpdate;
 
   const onOcrUpdateJS = useRunOnJS(
     (payload: {
       bestFields: OcrFieldResult[];
       ocrMap: Record<string, string>;
       unitConfig?: {
-        system?: UnitSystem;
-        mode?: ValueMode;
+        system?: import('@/features/ocr').UnitSystem;
+        mode?: import('@/features/ocr').ValueMode;
       };
     }) => {
-      if (onOcrUpdateRef.current) {
-        onOcrUpdateRef.current(payload);
-      }
+      onOcrUpdateRef.current?.(payload);
     },
-    [] // No dependencies - uses ref
+    []
   );
 
-  // Provide a function to get the latest screenshot on demand
-  const getLatestScreenshot = useCallback(() => base64Image, [base64Image]);
-
-  // Register the screenshot getter with parent component
-  useEffect(() => {
-    if (onScreenshotReady) {
-      onScreenshotReady(getLatestScreenshot);
-    }
-  }, [onScreenshotReady, getLatestScreenshot]);
+  const onScreenshotUpdateRef = useRef(onScreenshotUpdate);
+  onScreenshotUpdateRef.current = onScreenshotUpdate;
 
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
-
-  // Reset screenshot when layout changes (new scan session)
-  useEffect(() => {
-    hasScreenshotRef.current = false;
-    setBase64Image(null);
-  }, [currentLayout]);
 
   // OCR History Hook for filtering and storing recognized values
   const ocrHistory = useOcrHistory({
@@ -175,33 +146,20 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   }, [ocrHistory]);
   const addScanResultJS = useRunOnJS(addScanResult, []);
 
-  // Track last sent data to avoid duplicate calls
-  const lastSentRef = React.useRef<string>('');
-
   // Whenever OCR history / map change, compute best fields and notify parent (on JS thread)
-  // Note: screenshotBase64 is NOT included here to avoid memory issues - it's captured separately on demand
   useEffect(() => {
     if (!onOcrUpdateRef.current) return;
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
-
-    // Create a simple hash to check if data actually changed
-    const dataHash = JSON.stringify({
-      fields: bestFields.map(f => f.box_id + ':' + (typeof f.value === 'string' ? f.value : JSON.stringify(f.value))),
-      map: ocrMap,
-    });
-
-    // Only call onOcrUpdate if data actually changed
-    if (dataHash === lastSentRef.current) return;
-    lastSentRef.current = dataHash;
-
-    onOcrUpdateJS({
-      bestFields,
-      ocrMap,
-      unitConfig: ocrHistory.unitConfig,
-      // screenshotBase64 is passed separately via getLatestScreenshot callback
-    });
+    onOcrUpdateJS({ bestFields, ocrMap, unitConfig: ocrHistory.unitConfig });
   }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdateJS]);
+
+  // Forward the latest warped base64 screenshot to parent
+  useEffect(() => {
+    if (base64Image && onScreenshotUpdateRef.current) {
+      onScreenshotUpdateRef.current(base64Image);
+    }
+  }, [base64Image]);
 
   const screenTemplate = useMemo(
     () =>

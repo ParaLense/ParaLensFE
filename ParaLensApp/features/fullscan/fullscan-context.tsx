@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import {FullScanDto, ScanMenu, SectionScreenshot, SectionScreenshots} from "@/features/fullscan/types";
-import {createEmptyFullScan, loadFullScans, saveFullScans, saveScreenshots, loadScreenshots} from "@/features/fullscan/storage";
+import {FullScanDto, ScanMenu} from "@/features/fullscan/types";
+import {createEmptyFullScan, loadFullScans, saveFullScans} from "@/features/fullscan/storage";
 import scanUploadService from "@/features/api/services/scanUploadService";
 
 
@@ -9,12 +9,10 @@ interface FullScanContextValue {
     selectedFullScanId: number | null;
     selectFullScan: (id: number | null) => void;
     createFullScan: (author: string) => number;
-    upsertSection: (fullScanId: number, section: ScanMenu, payload: any, screenshot?: { imageBase64: string; subMode?: string }) => void;
+    upsertSection: (fullScanId: number, section: ScanMenu, payload: any, screenshotBase64?: string, subMode?: string) => void;
     uploadScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
     updateScan: (scanId: number) => Promise<{ success: boolean; error?: string }>;
     getUploadStatus: (scanId: number) => 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';
-    /** Load screenshots for a scan on demand (not loaded at app start) */
-    getScreenshots: (scanId: number) => Promise<SectionScreenshots | null>;
 }
 
 const FullScanContext = createContext<FullScanContextValue | undefined>(undefined);
@@ -44,25 +42,7 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return record.id;
     }, []);
 
-    const upsertSection = useCallback((fullScanId: number, section: ScanMenu, payload: any, screenshot?: { imageBase64: string; subMode?: string }) => {
-        // If screenshot is provided, save it separately (not in state)
-        if (screenshot?.imageBase64) {
-            const screenshotKey = screenshot.subMode ? `${section}_${screenshot.subMode}` : section;
-            const newScreenshot: SectionScreenshot = {
-                imageBase64: screenshot.imageBase64,
-                timestamp: new Date().toISOString(),
-                subMode: screenshot.subMode,
-            };
-            // Load existing screenshots, merge, and save (async, fire-and-forget)
-            loadScreenshots(fullScanId).then(existing => {
-                const merged: SectionScreenshots = {
-                    ...(existing || {}),
-                    [screenshotKey]: newScreenshot,
-                };
-                saveScreenshots(fullScanId, merged);
-            });
-        }
-
+    const upsertSection = useCallback((fullScanId: number, section: ScanMenu, payload: any, screenshotBase64?: string, subMode?: string) => {
         setFullScans(prev => prev.map(fs => {
             if (fs.id !== fullScanId) return fs;
             
@@ -82,12 +62,14 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
             const mergedSection = { ...existingSectionData, ...mergedPayload };
 
-            const updatedScan = { ...fs, [section]: mergedSection, lastModified: new Date().toISOString() } as FullScanDto;
-
-            // Mark that this scan has screenshots (without storing the actual base64 data in state)
-            if (screenshot?.imageBase64) {
-                updatedScan.hasScreenshots = true;
+            // Store screenshot keyed by "section.subMode" (e.g. "injection.mainMenu")
+            const updatedScreenshots: Record<string, string> = { ...(fs.sectionScreenshots || {}) };
+            if (screenshotBase64) {
+                const screenshotKey = subMode ? `${section}.${subMode}` : section;
+                updatedScreenshots[screenshotKey] = screenshotBase64;
             }
+
+            const updatedScan = { ...fs, [section]: mergedSection, sectionScreenshots: updatedScreenshots, lastModified: new Date().toISOString() } as FullScanDto;
 
             // If this scan was previously uploaded, mark it as needing update
             if (updatedScan.uploadStatus === 'uploaded') {
@@ -201,11 +183,6 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return scan.uploadStatus || 'not_uploaded';
     }, [fullScans]);
 
-    /** Load screenshots for a scan on demand */
-    const getScreenshots = useCallback(async (scanId: number): Promise<SectionScreenshots | null> => {
-        return loadScreenshots(scanId);
-    }, []);
-
     const value = useMemo(() => ({
         fullScans,
         selectedFullScanId,
@@ -214,9 +191,8 @@ export const FullScanProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         upsertSection,
         uploadScan,
         updateScan,
-        getUploadStatus,
-        getScreenshots,
-    }), [fullScans, selectedFullScanId, selectFullScan, createFullScan, upsertSection, uploadScan, updateScan, getUploadStatus, getScreenshots]);
+        getUploadStatus
+    }), [fullScans, selectedFullScanId, selectFullScan, createFullScan, upsertSection, uploadScan, updateScan, getUploadStatus]);
 
     return (
         <FullScanContext.Provider value={value}>{children}</FullScanContext.Provider>

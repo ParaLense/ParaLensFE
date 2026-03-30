@@ -62,6 +62,7 @@ const FullScanCreateModal: React.FC<Props> = ({
           <Box className="mt-4">
             <Input>
               <InputField
+                  className={isDark ? "text-typography-50" : "text-typography-900"}
                 value={authorInput}
                 onChangeText={onChangeAuthor}
                 placeholder={t("author") ?? "Autor"}

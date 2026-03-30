@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Modal as RNModal } from "react-native";
 
@@ -57,9 +57,7 @@ export default function CameraScreen() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [authorInput, setAuthorInput] = useState("");
-
-  // Reference to get the latest screenshot on demand
-  const getScreenshotRef = useRef<(() => string | null) | null>(null);
+  const [latestScreenshot, setLatestScreenshot] = useState<string | null>(null);
 
   const selectedLabel = useMemo(() => {
     if (!selectedFullScanId) {
@@ -75,7 +73,7 @@ export default function CameraScreen() {
       : t("selectFullScan") ?? "Full Scan auswählen";
   }, [fullScans, selectedFullScanId, t]);
 
-  const goReview = useCallback(() => {
+  const goReview = () => {
     const params: Record<string, string> = {
       selectedMenu: selectedMenu ?? "",
       injectionMode: injectionMode ?? "",
@@ -85,14 +83,11 @@ export default function CameraScreen() {
 
     if (ocrSnapshot && ocrSnapshot.bestFields.length > 0) {
       try {
-        // Get the latest screenshot on demand (only when navigating)
-        const screenshotBase64 = getScreenshotRef.current?.() ?? undefined;
-
         params.ocrData = JSON.stringify({
           bestFields: ocrSnapshot.bestFields,
           ocrMap: ocrSnapshot.ocrMap,
           unitConfig: ocrSnapshot.unitConfig,
-          screenshotBase64,
+          screenshotBase64: latestScreenshot ?? undefined,
         });
       } catch {
         // Ignore serialization errors and navigate without OCR data
@@ -103,7 +98,7 @@ export default function CameraScreen() {
       pathname: "/scan-review",
       params,
     });
-  }, [selectedMenu, injectionMode, holdingMode, dosingMode, ocrSnapshot, router]);
+  };
 
   if (!device) {
     return (
@@ -221,9 +216,9 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         isActive
         device={device}
-        onOcrUpdate={(payload) => setOcrSnapshot({ ...payload, screenshotBase64: undefined })}
-        onScreenshotReady={(getScreenshot) => { getScreenshotRef.current = getScreenshot; }}
+        onOcrUpdate={setOcrSnapshot}
         onScanComplete={goReview}
+        onScreenshotUpdate={setLatestScreenshot}
       />
 
       <Box

@@ -21,6 +21,8 @@ export interface FullScanDto {
   holdingPressure?: import('./holdingPressure').HoldingPressureDto;
   dosing?: import('./dosing').DosingDto;
   cylinderHeating?: import('./cylinderHeating').CylinderHeatingDto;
+  /** Base64 screenshots keyed by "section.subMode" (e.g. "injection.mainMenu") */
+  sectionScreenshots?: Record<string, string>;
   // Upload status fields
   serverId?: number;
   uploadStatus?: 'not_uploaded' | 'uploading' | 'uploaded' | 'error' | 'needs_update';

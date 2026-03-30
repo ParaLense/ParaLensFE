@@ -250,16 +250,19 @@ export function buildFullScanExcelData(
 
     let activeMode = "";
     if (
+      injSwitchType.switchOverWay ||
       injSwitchType.switch_over_way?.value === "1" ||
       injSwitchType.switch_over_way?.value === true
     ) {
       activeMode = "Way";
     } else if (
+      injSwitchType.switchOverTimeActive ||
       injSwitchType.switch_over_time?.value === "1" ||
       injSwitchType.switch_over_time?.value === true
     ) {
       activeMode = "Time";
     } else if (
+      injSwitchType.switchOverHydraulic ||
       injSwitchType.switch_over_hydraulic?.value === "1" ||
       injSwitchType.switch_over_hydraulic?.value === true
     ) {

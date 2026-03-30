@@ -1,167 +1,331 @@
-import { File } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Alert, Platform } from "react-native";
 import RNFS from "react-native-fs";
 import { PermissionsAndroid } from "react-native";
-// ExcelJS is imported dynamically to avoid stack overflow at app startup
-import type { FullScanDto, SectionScreenshot, SectionScreenshots } from "@/features/fullscan/types";
-import { buildFullScanExcelData } from "@/features/fullscan/excel/fullscan-to-excel";
-import { loadScreenshots } from "@/features/fullscan/storage";
+import type {
+  Workbook as ExcelWorkbook,
+  Worksheet as ExcelWorksheet,
+  Fill as ExcelFill,
+  Font as ExcelFont,
+} from "exceljs";
+import type {
+  FullScanDto,
+  ScanMenu,
+  ValueUnit,
+  InjectionDto,
+  InjectionMainMenuDto,
+  InjectionSubMenuScrollDto,
+  InjectionSubMenuValueDto,
+  InjectionSubMenuSwitchTypeDto,
+  HoldingPressureDto,
+  HoldingPressureMainMenuDto,
+  HoldingPressureSubMenuScrollDto,
+  HoldingPressureSubMenuValueDto,
+  DosingDto,
+  DosingMainMenuDto,
+  DosingSubMenuDosingSpeedScrollDto,
+  DosingSubMenuDosingSpeedValueDto,
+  DosingSubMenuDosingPressureScrollDto,
+  DosingSubMenuDosingPressureValueDto,
+  CylinderHeatingDto,
+  CylinderHeatingMainMenuDto,
+} from "@/features/fullscan/types";
 
-/**
- * Group screenshots by main category (injection, holdingPressure, dosing, cylinderHeating)
- */
-const groupScreenshotsByCategory = (
-  screenshots: SectionScreenshots | null | undefined
-): Record<string, Array<{ key: string; screenshot: SectionScreenshot; label: string }>> => {
-  if (!screenshots) return {};
+// ---------------------------------------------------------------------------
+// Lazy-loaded ExcelJS – only imported when actually needed via init()
+// ---------------------------------------------------------------------------
+let _ExcelJS: typeof import("exceljs") | null = null;
+let NodeBuffer: typeof import("buffer").Buffer;
 
-  const subModeLabels: Record<string, string> = {
-    'mainMenu': 'Main Menu',
-    'subMenuGraphic': 'Scrollbar / Graphic',
-    'switchType': 'Switch Type',
-  };
+async function init() {
+  if (!_ExcelJS) {
+    _ExcelJS = await import("exceljs");
+  }
+  if (!NodeBuffer) {
+    const bufMod = await import("buffer");
+    NodeBuffer = bufMod.Buffer;
+  }
+}
 
-  const groups: Record<string, Array<{ key: string; screenshot: SectionScreenshot; label: string }>> = {
-    injection: [],
-    holdingPressure: [],
-    dosing: [],
-    cylinderHeating: [],
-  };
+/** Helper – returns the lazily loaded ExcelJS module (must call init() first) */
+function getExcelJS() {
+  if (!_ExcelJS) throw new Error("ExcelJS not initialised – call init() first");
+  return _ExcelJS;
+}
 
-  for (const [key, screenshot] of Object.entries(screenshots)) {
-    if (!screenshot?.imageBase64) continue;
+// ---------------------------------------------------------------------------
+// Shared styling helpers
+// ---------------------------------------------------------------------------
+const HEADER_FILL: ExcelFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+const HEADER_FONT: Partial<ExcelFont> = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+const SUB_HEADER_FILL: ExcelFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E2F3" } };
+const COL_WIDTHS_DEFAULT = [
+  { width: 20 }, { width: 30 }, { width: 18 }, { width: 14 },
+  { width: 14 }, { width: 16 },
+];
 
-    // Determine main category from key
-    let category: string;
-    let label: string;
+/** Extract value + unit from a ValueUnit field into two cell entries */
+function vu(field: ValueUnit | undefined): [value: number | string, unit: string] {
+  if (!field) return ["", ""];
+  return [field.value ?? "", field.unit ?? ""];
+}
 
-    if (key.startsWith('injection')) {
-      category = 'injection';
-      label = screenshot.subMode ? subModeLabels[screenshot.subMode] || screenshot.subMode : 'Main';
-    } else if (key.startsWith('holdingPressure')) {
-      category = 'holdingPressure';
-      label = screenshot.subMode ? subModeLabels[screenshot.subMode] || screenshot.subMode : 'Main';
-    } else if (key.startsWith('dosing')) {
-      category = 'dosing';
-      label = screenshot.subMode ? subModeLabels[screenshot.subMode] || screenshot.subMode : 'Main';
-    } else if (key.startsWith('cylinderHeating')) {
-      category = 'cylinderHeating';
-      label = screenshot.subMode ? subModeLabels[screenshot.subMode] || screenshot.subMode : 'Main';
-    } else {
-      continue; // Unknown category
-    }
+function addHeaderRow(ws: ExcelWorksheet, label: string) {
+  const r = ws.addRow([label, "", "", "", "", ""]);
+  r.font = HEADER_FONT;
+  r.fill = HEADER_FILL;
+}
 
-    groups[category].push({ key, screenshot, label });
+function addSubHeaderRow(ws: ExcelWorksheet, col1: string, col2: string) {
+  const r = ws.addRow(["", col1, col2]);
+  r.fill = SUB_HEADER_FILL;
+  r.font = { bold: true };
+}
+
+// ---------------------------------------------------------------------------
+// Build worksheets – fully typed, no `as any`
+// ---------------------------------------------------------------------------
+
+function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Injection");
+  ws.columns = COL_WIDTHS_DEFAULT;
+
+  // --- Main Menu ---
+  const mm: InjectionMainMenuDto | undefined = inj.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.sprayPressureLimit);
+    ws.addRow(["", "Spray Pressure Limit", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.increasedSpecificPointPrinter);
+    ws.addRow(["", "Increased Specific Point Printer", val, unit]);
+  }
+  ws.addRow([]);
+
+  // --- Sub Menu (Injection Speed Scroll) ---
+  const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
+  addHeaderRow(ws, "Sub Menu – Injection Speed");
+  addSubHeaderRow(ws, sub?.keyUnit ?? "v", sub?.valueUnit ?? "v2");
+
+  const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
+  [...subValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
+  ws.addRow([]);
+
+  // --- Switch Type ---
+  const sw: InjectionSubMenuSwitchTypeDto | undefined = inj.switchType;
+  addHeaderRow(ws, "Switch Over");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(sw?.transshipmentPosition);
+    ws.addRow(["", "Way (Transshipment Position)", val, unit]);
+  }
+  {
+    const [val, unit] = vu(sw?.switchOverTime);
+    ws.addRow(["", "Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(sw?.switchingPressure);
+    ws.addRow(["", "Hydraulic Pressure", val, unit]);
   }
 
-  return groups;
-};
+  let activeMode = "";
+  if (sw?.switchOverWay) activeMode = "Way";
+  else if (sw?.switchOverTimeActive) activeMode = "Time";
+  else if (sw?.switchOverHydraulic) activeMode = "Hydraulic Pressure";
+  ws.addRow(["", "Active Switch Over Mode", activeMode]);
+
+  return ws;
+}
+
+function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Holding Pressure");
+  ws.columns = COL_WIDTHS_DEFAULT;
+
+  // --- Main Menu ---
+  const mm: HoldingPressureMainMenuDto | undefined = hp.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.holdingTime);
+    ws.addRow(["", "Holding Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.coolTime);
+    ws.addRow(["", "Cool Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.screwDiameter);
+    ws.addRow(["", "Screw Diameter", val, unit]);
+  }
+  ws.addRow([]);
+
+  // --- Sub Menu (Holding Pressure Scroll) ---
+  const sub: HoldingPressureSubMenuScrollDto | undefined = hp.subMenusValues;
+  addHeaderRow(ws, "Sub Menu – Holding Pressure");
+  addSubHeaderRow(ws, sub?.keyUnit ?? "t", sub?.valueUnit ?? "p");
+
+  const subValues: HoldingPressureSubMenuValueDto[] = sub?.values ?? [];
+  [...subValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.t, val.p]);
+    });
+
+  return ws;
+}
+
+function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Dosing");
+  ws.columns = COL_WIDTHS_DEFAULT;
+
+  // --- Main Menu ---
+  const mm: DosingMainMenuDto | undefined = dos.mainMenu;
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  {
+    const [val, unit] = vu(mm?.dosingStroke);
+    ws.addRow(["", "Dosing Stroke", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dosingDelayTime);
+    ws.addRow(["", "Dosing Delay Time", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.relieveDosing);
+    ws.addRow(["", "Relieve Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.relieveAfterDosing);
+    ws.addRow(["", "Relieve After Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dischargeSpeedBeforeDosing);
+    ws.addRow(["", "Discharge Speed Before Dosing", val, unit]);
+  }
+  {
+    const [val, unit] = vu(mm?.dischargeSpeedAfterDosing);
+    ws.addRow(["", "Discharge Speed After Dosing", val, unit]);
+  }
+  ws.addRow([]);
+
+  // --- Dosing Speed ---
+  const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
+  addHeaderRow(ws, "Sub Menu – Dosing Speed");
+  addSubHeaderRow(ws, speed?.keyUnit ?? "v", speed?.valueUnit ?? "v2");
+
+  const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
+  [...speedValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
+  ws.addRow([]);
+
+  // --- Dosing Pressure ---
+  const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
+  addHeaderRow(ws, "Sub Menu – Dosing Pressure");
+  addSubHeaderRow(ws, pressure?.keyUnit ?? "v", pressure?.valueUnit ?? "p");
+
+  const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
+  [...pressureValues]
+    .sort((a, b) => a.index - b.index)
+    .forEach((val) => {
+      ws.addRow(["", val.v, val.v2]);
+    });
+
+  return ws;
+}
+
+function buildCylinderHeatingSheet(wb: ExcelWorkbook, cyl: CylinderHeatingDto): ExcelWorksheet {
+  const ws = wb.addWorksheet("Cylinder Heating");
+  ws.columns = COL_WIDTHS_DEFAULT;
+
+  const mm: CylinderHeatingMainMenuDto | undefined = cyl.mainMenu;
+  if (!mm) {
+    ws.addRow(["No cylinder heating data"]);
+    return ws;
+  }
+
+  addHeaderRow(ws, "Main Menu");
+  ws.addRow(["", "Parameter", "Value"]);
+  ws.addRow(["", "Setpoint 1", mm.setpoint1]);
+  ws.addRow(["", "Setpoint 2", mm.setpoint2]);
+  ws.addRow(["", "Setpoint 3", mm.setpoint3]);
+  ws.addRow(["", "Setpoint 4", mm.setpoint4]);
+  ws.addRow(["", "Setpoint 5", mm.setpoint5]);
+
+  return ws;
+}
+
+// ---------------------------------------------------------------------------
+// Add section screenshot as an embedded image to the worksheet
+// ---------------------------------------------------------------------------
+function addScreenshotToSheet(
+  wb: ExcelWorkbook,
+  ws: ExcelWorksheet,
+  base64Data: string,
+  label: string = "Screenshot",
+) {
+  // Strip data URI prefix if present
+  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+
+  const imageId = wb.addImage({
+    base64: raw,
+    extension: "jpeg",
+  });
+
+  // Insert image starting after the data rows
+  const startRow = (ws.rowCount || 0) + 2;
+
+  ws.addRow([]);
+  const labelRow = ws.addRow([label]);
+  labelRow.font = { bold: true, size: 12 };
+
+  ws.addImage(imageId, {
+    tl: { col: 0, row: startRow },
+    ext: { width: 400, height: 530 },
+  });
+
+  // Add empty rows so the next image doesn't overlap
+  for (let i = 0; i < 28; i++) ws.addRow([]);
+}
 
 /**
- * Compress/resize a base64 image to reduce memory usage
- * Returns a smaller base64 string or null if compression fails
+ * Collect all screenshots whose key starts with `sectionPrefix`.
+ * Keys are "section.subMode" (e.g. "injection.mainMenu") or legacy "section".
  */
-const compressBase64Image = (base64: string, maxWidth: number = 300): string | null => {
-  try {
-    // If the base64 is already small enough, return as-is
-    // Base64 is ~33% larger than binary, so 100KB binary = ~133KB base64
-    if (base64.length < 150000) {
-      return base64;
-    }
-    // For larger images, we'll just truncate the quality by returning null
-    // and letting the caller handle it (e.g., skip the image or use placeholder)
-    // In a production app, you'd use a proper image compression library
-    return null;
-  } catch (e) {
-    console.warn('Image compression failed:', e);
-    return null;
-  }
-};
+function getScreenshotsForSection(
+  screenshots: Record<string, string>,
+  sectionKey: ScanMenu,
+): { subMode: string; base64: string }[] {
+  const result: { subMode: string; base64: string }[] = [];
+  const prefix = `${sectionKey}.`;
 
-/**
- * Add screenshot images to a worksheet using exceljs
- * Note: workbook and worksheet are typed as 'any' because ExcelJS is dynamically imported
- * Images are added one at a time with error handling to prevent memory issues
- */
-const addScreenshotsToWorksheet = (
-  workbook: any,
-  worksheet: any,
-  screenshots: Array<{ key: string; screenshot: SectionScreenshot; label: string }>,
-  startRow: number,
-  includeImages: boolean = true
-): number => {
-  if (screenshots.length === 0) return startRow;
-
-  let currentRow = startRow;
-
-  // Header for screenshots section
-  worksheet.getCell(currentRow, 1).value = 'Screenshots zur Verifizierung';
-  worksheet.getCell(currentRow, 1).font = { bold: true, size: 14 };
-  worksheet.mergeCells(currentRow, 1, currentRow, 4);
-  currentRow += 2;
-
-  for (const { screenshot, label } of screenshots) {
-    // Add label
-    worksheet.getCell(currentRow, 1).value = label;
-    worksheet.getCell(currentRow, 1).font = { bold: true };
-    worksheet.getCell(currentRow, 2).value = `Aufgenommen: ${new Date(screenshot.timestamp).toLocaleString()}`;
-    currentRow += 1;
-
-    if (!includeImages) {
-      // Just add metadata without image
-      worksheet.getCell(currentRow, 1).value = `[Bild verfügbar - ${Math.round(screenshot.imageBase64.length / 1024)}KB]`;
-      currentRow += 2;
-      continue;
-    }
-
-    try {
-      // Try to compress the image first
-      const compressedImage = compressBase64Image(screenshot.imageBase64);
-
-      if (!compressedImage) {
-        // Image too large, skip it
-        worksheet.getCell(currentRow, 1).value = `[Bild zu groß für Export - ${Math.round(screenshot.imageBase64.length / 1024)}KB]`;
-        currentRow += 2;
-        continue;
-      }
-
-      // Add image to workbook
-      const imageId = workbook.addImage({
-        base64: compressedImage,
-        extension: 'jpeg',
-      });
-
-      // Add image to worksheet
-      // Image dimensions: roughly 300x400 pixels (3:4 aspect ratio) - smaller for memory
-      const imageWidth = 300;
-      const imageHeight = 400;
-
-      // Convert pixels to row units for spacing (approximate)
-      const rowHeight = imageHeight / 20; // ~20 rows
-
-      worksheet.addImage(imageId, {
-        tl: { col: 0, row: currentRow - 1 },
-        ext: { width: imageWidth, height: imageHeight },
-      });
-
-      // Reserve space for the image
-      currentRow += Math.ceil(rowHeight) + 2;
-    } catch (imgError) {
-      console.warn('Failed to add image:', imgError);
-      worksheet.getCell(currentRow, 1).value = '[Bild konnte nicht eingefügt werden]';
-      currentRow += 2;
+  for (const [key, value] of Object.entries(screenshots)) {
+    if (key === sectionKey) {
+      // Legacy key without sub-mode
+      result.push({ subMode: "", base64: value });
+    } else if (key.startsWith(prefix)) {
+      result.push({ subMode: key.slice(prefix.length), base64: value });
     }
   }
+  return result;
+}
 
-  return currentRow;
-};
+// ---------------------------------------------------------------------------
+// Main export function
+// ---------------------------------------------------------------------------
 
 export const handleLocalExcelDownload = async (
   scanId: number,
   fullScans: FullScanDto[],
-  includeImages: boolean = false, // Default to false for safety
 ) => {
   try {
     const scan = fullScans?.find((fs) => fs.id === scanId);
@@ -170,100 +334,49 @@ export const handleLocalExcelDownload = async (
       return;
     }
 
-    // Dynamic import of ExcelJS to avoid stack overflow at app startup
-    const ExcelJS = await import("exceljs");
+    // Lazy-load ExcelJS & Buffer only when export is actually triggered
+    await init();
 
-    // Create workbook with exceljs
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'ParaLens';
-    workbook.created = new Date();
+    const wb = new (getExcelJS().Workbook)();
+    wb.creator = "ParaLens";
+    wb.created = new Date();
+    wb.modified = new Date();
 
-    // Get XLSX for building the data rows (reuse existing logic)
-    const XLSX = require("xlsx");
-    const { rows } = buildFullScanExcelData(scan, XLSX);
+    const screenshots = scan.sectionScreenshots ?? {};
 
-    // Create Parameters worksheet
-    const parametersSheet = workbook.addWorksheet('Parameters');
-
-    // Add data rows to parameters sheet
-    rows.forEach((row, rowIndex) => {
-      row.forEach((cell, colIndex) => {
-        if (cell !== null && cell !== undefined) {
-          parametersSheet.getCell(rowIndex + 1, colIndex + 1).value = cell;
-        }
-      });
-    });
-
-    // Set column widths for parameters sheet
-    parametersSheet.columns = [
-      { width: 20 },
-      { width: 20 },
-      { width: 35 },
-      { width: 12 },
-      { width: 12 },
-      { width: 15 },
+    // Build a worksheet per section using the typed DTO properties directly
+    const sectionBuilders: { key: ScanMenu; data: unknown; build: () => ExcelWorksheet }[] = [
+      { key: "injection", data: scan.injection, build: () => buildInjectionSheet(wb, scan.injection!) },
+      { key: "holdingPressure", data: scan.holdingPressure, build: () => buildHoldingPressureSheet(wb, scan.holdingPressure!) },
+      { key: "dosing", data: scan.dosing, build: () => buildDosingSheet(wb, scan.dosing!) },
+      { key: "cylinderHeating", data: scan.cylinderHeating, build: () => buildCylinderHeatingSheet(wb, scan.cylinderHeating!) },
     ];
 
-    // Load screenshots from separate storage (on demand, not loaded at app start)
-    const screenshots = await loadScreenshots(scanId);
+    for (const { key, data, build } of sectionBuilders) {
+      if (!data) continue;
 
-    // Only process screenshots if we have any
-    if (screenshots && Object.keys(screenshots).length > 0) {
-      // Group screenshots by main category
-      const screenshotGroups = groupScreenshotsByCategory(screenshots);
+      const ws = build();
 
-      // Create worksheet for each main category that has screenshots
-      const categoryNames: Record<string, string> = {
-        injection: 'Injection',
-        holdingPressure: 'Holding Pressure',
-        dosing: 'Dosing',
-        cylinderHeating: 'Cylinder Heating',
-      };
-
-      for (const [category, categoryScreenshots] of Object.entries(screenshotGroups)) {
-        if (categoryScreenshots.length === 0) continue;
-
-        const sheetName = categoryNames[category] || category;
-        const worksheet = workbook.addWorksheet(sheetName);
-
-        // Set column widths
-        worksheet.columns = [
-          { width: 30 },
-          { width: 40 },
-          { width: 20 },
-          { width: 20 },
-        ];
-
-        // Add header
-        worksheet.getCell(1, 1).value = `${sheetName} - Scan Screenshots`;
-        worksheet.getCell(1, 1).font = { bold: true, size: 16 };
-        worksheet.mergeCells(1, 1, 1, 4);
-
-        worksheet.getCell(2, 1).value = `Scan ID: ${scan.id}`;
-        worksheet.getCell(2, 2).value = `Author: ${scan.author}`;
-        worksheet.getCell(2, 3).value = `Date: ${new Date(scan.date).toLocaleString()}`;
-
-        // Add screenshots starting from row 4
-        addScreenshotsToWorksheet(workbook, worksheet, categoryScreenshots, 4, includeImages);
+      // Embed all sub-mode screenshots for this section
+      const sectionScreenshots = getScreenshotsForSection(screenshots, key);
+      for (const { subMode, base64 } of sectionScreenshots) {
+        const label = subMode ? `Screenshot – ${subMode}` : "Screenshot";
+        addScreenshotToSheet(wb, ws, base64, label);
       }
     }
 
-    // Generate Excel buffer
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Convert ArrayBuffer to base64 (React Native compatible)
-    const uint8Array = new Uint8Array(buffer as ArrayBuffer);
-
-    // Convert Uint8Array to base64 without using Buffer (not available in RN)
-    const chunkSize = 0x8000; // 32KB chunks to avoid call stack issues
-    let base64 = '';
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      base64 += String.fromCharCode.apply(null, Array.from(chunk));
+    // If no sheets were added (no data at all), add a placeholder
+    if (wb.worksheets.length === 0) {
+      const ws = wb.addWorksheet("Info");
+      ws.addRow(["No scan data available for this scan."]);
     }
-    base64 = btoa(base64);
 
     const fileName = `ParaLens_Export_${scanId}.xlsx`;
+
+    // Write workbook to buffer
+    const buffer = await wb.xlsx.writeBuffer();
+    const nodeBuffer = NodeBuffer.from(buffer);
+    const bufferStr = nodeBuffer.toString("base64");
 
     const cacheDir = FileSystem.cacheDirectory;
     if (!cacheDir) {
@@ -272,9 +385,10 @@ export const handleLocalExcelDownload = async (
     }
 
     const fileUri = cacheDir + fileName;
-    const file = new File(fileUri);
 
-    await file.write(base64, { encoding: "base64" });
+    await FileSystem.writeAsStringAsync(fileUri, bufferStr, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
 
     // Ask user what they want to do with the file
     Alert.alert(
@@ -287,16 +401,20 @@ export const handleLocalExcelDownload = async (
             try {
               if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(fileUri, {
-                  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  mimeType:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                   UTI: "com.microsoft.excel.xlsx",
                 });
               } else {
-                Alert.alert("Share Unavailable", "Sharing is not available on this device.");
+                Alert.alert(
+                  "Share Unavailable",
+                  "Sharing is not available on this device.",
+                );
               }
             } catch (shareError: any) {
               Alert.alert(
                 "Share failed",
-                shareError?.message || "Could not share the file."
+                shareError?.message || "Could not share the file.",
               );
             }
           },
@@ -305,7 +423,7 @@ export const handleLocalExcelDownload = async (
           text: "Save to Downloads",
           onPress: async () => {
             try {
-              if (Platform.OS === 'android') {
+              if (Platform.OS === "android") {
                 const androidVersion = Platform.Version as number;
                 let hasPermission = true;
 
@@ -313,18 +431,23 @@ export const handleLocalExcelDownload = async (
                   const granted = await PermissionsAndroid.request(
                     PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
                     {
-                      title: 'Storage Permission',
-                      message: 'This app needs access to storage to save the file.',
-                      buttonNeutral: 'Ask Me Later',
-                      buttonNegative: 'Cancel',
-                      buttonPositive: 'OK',
-                    }
+                      title: "Storage Permission",
+                      message:
+                        "This app needs access to storage to save the file.",
+                      buttonNeutral: "Ask Me Later",
+                      buttonNegative: "Cancel",
+                      buttonPositive: "OK",
+                    },
                   );
-                  hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+                  hasPermission =
+                    granted === PermissionsAndroid.RESULTS.GRANTED;
                 }
 
                 if (!hasPermission) {
-                  Alert.alert("Permission Denied", "Storage permission is required to save the file.");
+                  Alert.alert(
+                    "Permission Denied",
+                    "Storage permission is required to save the file.",
+                  );
                   return;
                 }
 
@@ -333,23 +456,32 @@ export const handleLocalExcelDownload = async (
                 try {
                   const sourceExists = await RNFS.exists(fileUri);
                   if (!sourceExists) {
-                    Alert.alert("Error", "Source file not found. Please try again.");
+                    Alert.alert(
+                      "Error",
+                      "Source file not found. Please try again.",
+                    );
                     return;
                   }
 
-                  const fileContent = await RNFS.readFile(fileUri, 'base64');
-                  await RNFS.writeFile(downloadPath, fileContent, 'base64');
+                  const fileContent = await RNFS.readFile(fileUri, "base64");
+                  await RNFS.writeFile(downloadPath, fileContent, "base64");
 
                   const fileExists = await RNFS.exists(downloadPath);
                   if (!fileExists) {
-                    Alert.alert("Error", "Failed to save file. Please check storage permissions.");
+                    Alert.alert(
+                      "Error",
+                      "Failed to save file. Please check storage permissions.",
+                    );
                     return;
                   }
                 } catch (writeError: any) {
-                  console.warn('Direct write failed, trying copy:', writeError);
+                  console.warn("Direct write failed, trying copy:", writeError);
                   const sourceExists = await RNFS.exists(fileUri);
                   if (!sourceExists) {
-                    Alert.alert("Error", "Source file not found. Please try again.");
+                    Alert.alert(
+                      "Error",
+                      "Source file not found. Please try again.",
+                    );
                     return;
                   }
                   await RNFS.copyFile(fileUri, downloadPath);
@@ -358,33 +490,30 @@ export const handleLocalExcelDownload = async (
                 try {
                   await RNFS.scanFile(downloadPath);
                 } catch (scanError) {
-                  console.warn('Failed to scan file:', scanError);
+                  console.warn("Failed to scan file:", scanError);
                 }
 
-                Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
+                Alert.alert(
+                  "File Saved",
+                  `Excel file saved to Downloads:\n${downloadPath}`,
+                );
               } else {
-                const documentDir = FileSystem.documentDirectory;
-                if (documentDir) {
-                  const documentPath = documentDir + fileName;
-                  const documentFile = new File(documentPath);
-                  await documentFile.write(base64, { encoding: 'base64' });
-
-                  if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(documentPath, {
-                      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                      UTI: "com.microsoft.excel.xlsx",
-                    });
-                  } else {
-                    Alert.alert("File Saved", `Excel file saved to:\n${documentPath}`);
-                  }
+                // iOS – just share (save to Files via share sheet)
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(fileUri, {
+                    mimeType:
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    UTI: "com.microsoft.excel.xlsx",
+                  });
                 } else {
-                  Alert.alert("Error", "Could not access document directory.");
+                  Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
                 }
               }
             } catch (saveError: any) {
               Alert.alert(
                 "Save failed",
-                saveError?.message || "Could not save the file to downloads."
+                saveError?.message ||
+                  "Could not save the file to downloads.",
               );
             }
           },
@@ -394,7 +523,7 @@ export const handleLocalExcelDownload = async (
           style: "cancel",
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   } catch (e: any) {
     Alert.alert("Export failed", e?.message ?? String(e));

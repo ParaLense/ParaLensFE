@@ -42,7 +42,7 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, units = {}, 
   const boxBgClass = isDark ? "bg-background-800" : "bg-background-200";
   const textColor = isDark ? "text-typography-50" : "text-typography-900";
 
-  const hasUnits = Object.values(units).some(unit => unit !== undefined);
+  const hasUnits = Object.values(units).some(unit => typeof unit === 'string' && unit.length > 0);
 
   return (
     <VStack className="gap-2">
@@ -84,16 +84,16 @@ const DynamicValueList: React.FC<Props> = ({ rows, setRows, labels, units = {}, 
             <Box className={`px-2.5 py-2.5 rounded-sm`} />
             <HStack className="gap-2 items-center flex-1">
               {labels.v !== undefined && (
-                  <Text className={`flex-1 text-center ${textColor}`}>{units.v}</Text>
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.v ?? ''}</Text>
               )}
               {labels.v2 !== undefined && (
-                  <Text className={`flex-1 text-center ${textColor}`}>{units.v2}</Text>
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.v2 ?? ''}</Text>
               )}
               {labels.t !== undefined && (
-                  <Text className={`flex-1 text-center ${textColor}`}>{units.t}</Text>
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.t ?? ''}</Text>
               )}
               {labels.p !== undefined && (
-                  <Text className={`flex-1 text-center ${textColor}`}>{units.p}</Text>
+                  <Text className={`flex-1 text-center ${textColor}`}>{units.p ?? ''}</Text>
               )}
             </HStack>
             <Box className="w-5" />
