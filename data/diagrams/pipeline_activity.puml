@@ -1,0 +1,107 @@
+@startuml pipeline_activity
+' ─────────────────────────────────────────────
+'  ParaLens IM – Verarbeitungs-Pipeline
+' ─────────────────────────────────────────────
+
+left to right direction
+
+skinparam defaultFontName  "Segoe UI"
+skinparam defaultFontSize  11
+skinparam shadowing        false
+skinparam dpi              300
+
+skinparam rectangle {
+  BackgroundColor   White
+  BorderColor       Black
+  BorderThickness   1.2
+  RoundCorner       6
+  FontColor         Black
+}
+
+skinparam arrow {
+  Color      Black
+  Thickness  1.2
+}
+
+skinparam package {
+  BackgroundColor  #F5F5F5
+  BorderColor      #555555
+  BorderThickness  1.0
+  FontStyle        bold
+  FontSize         12
+}
+
+' ── INPUT ──
+rectangle "<b>Kamera-Frame</b>\nYUV-Bild (VisionCamera)" as input
+
+' ── PHASE 1 ──
+package "1 – Vorverarbeitung" {
+  rectangle "Y-Plane → Graustufen" as gray
+  rectangle "CLAHE-Normalisierung\n(Kontrastanpassung)" as clahe
+  rectangle "ROI-Bereiche\ndefinieren" as roi
+  gray -down-> clahe
+  clahe -down-> roi
+}
+
+' ── PHASE 2 ──
+package "2 – Kantenerkennung" {
+  rectangle "<b>Screen Edges</b>\nCanny + Closing\n(Display-Umriss)" as screenEdge
+  rectangle "<b>Detail Edges</b>\nCanny ohne Closing\n(nur für Debug)" as detailEdge
+}
+
+' ── PHASE 3 ──
+package "3 – Display-Lokalisierung" {
+  rectangle "Konturen finden\n+ Polygon-Approximation" as contours
+  rectangle "ROI-Validierung\n→ bestes Viereck" as roiCheck
+  rectangle "Ecken sortieren\n(TL, TR, BR, BL)" as orderQuad
+  contours -down-> roiCheck
+  roiCheck -down-> orderQuad
+}
+
+' ── PHASE 4 ──
+package "4 – Perspektivkorrektur" {
+  rectangle "Homographie\nberechnen (RANSAC)" as homo
+  rectangle "Warping → entzerrtes\nBild (1200 × 1600 px)" as warp
+  homo -down-> warp
+}
+
+' ── PHASE 5 ──
+package "5 – Template-Verifizierung" {
+  rectangle "Pro Template-Box:\nCanny (30,80) ohne Closing\nauf ROI im warped image" as match
+  rectangle "Edge + Corner +\nGradient Score" as scoring
+  rectangle "Screen-Validierung:\nAccuracy ≥ 40%?\n→ Display erkannt" as accuracy
+  match -down-> scoring
+  scoring -down-> accuracy
+}
+
+' ── PHASE 6 ──
+package "6 – OCR-Auslesung" {
+  rectangle "ROI-Ausschnitt\npro Template-Box" as ocrRoi
+  rectangle "Typ-Erkennung\nValue | Checkbox |\nScrollbar" as ocrProcess
+  ocrRoi -down-> ocrProcess
+}
+
+' ── PHASE 7 ──
+package "7 – Nachverarbeitung (JS)" {
+  rectangle "Werte + Einheiten\nparsen & normalisieren" as valueParse
+  rectangle "OCR-History &\nStabilisierung\n(Majority Voting)" as history
+  valueParse -down-> history
+}
+
+' ── OUTPUT ──
+rectangle "<b>Ergebnis</b>\nStabilisierte Werte,\nEinheiten & Zustände" as output
+
+' ── VERBINDUNGEN zwischen Phasen ──
+input      --> gray
+
+roi        --> screenEdge
+
+screenEdge --> contours
+
+orderQuad  --> homo       : " 4 Ecken"
+warp       --> match      : " Entzerrtes Bild"
+accuracy   --> ocrRoi     : " detected = true"
+ocrProcess --> valueParse  : " Rohergebnisse"
+history    --> output
+
+@enduml
