@@ -137,7 +137,7 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
   // --- Sub Menu (Injection Speed Scroll) ---
   const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
   addHeaderRow(ws, "Sollwertgrafik - Einspritzgeschwindigkeit");
-  addSubHeaderRow(ws, labelWithUnit("V", sub?.keyUnit), labelWithUnit("v", sub?.valueUnit));
+  addSubHeaderRow(ws, "V (cm^3)", "v (cm^3/s)");
 
   const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]

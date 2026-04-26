@@ -1049,11 +1049,7 @@ function SectionDetails({
                         title={t("subMenuValues")}
                         entries={data.subMenuValues.values}
                         columns={["index", "v", "v2"]}
-                        columnLabels={{ v: "V", v2: "v" }}
-                        unitLabels={{
-                          v: data?.subMenuValues?.keyUnit,
-                          v2: data?.subMenuValues?.valueUnit,
-                        }}
+                        columnLabels={{ v: "V (cm^3)", v2: "v (cm^3/s)" }}
                         isDark={isDark}
                     />
                 )}
