@@ -122,7 +122,7 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
 
   // --- Main Menu ---
   const mm: InjectionMainMenuDto | undefined = inj.mainMenu;
-  addHeaderRow(ws, "Hauptmenü");
+  addHeaderRow(ws, "Hauptseite");
   ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.sprayPressureLimit);
@@ -136,7 +136,7 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
 
   // --- Sub Menu (Injection Speed Scroll) ---
   const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
-  addHeaderRow(ws, "Untermenü - Einspritzgeschwindigkeit");
+  addHeaderRow(ws, "Sollwertgrafik - Einspritzgeschwindigkeit");
   addSubHeaderRow(ws, labelWithUnit("s", sub?.keyUnit), labelWithUnit("v", sub?.valueUnit));
 
   const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
@@ -149,11 +149,11 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
 
   // --- Switch Type ---
   const sw: InjectionSubMenuSwitchTypeDto | undefined = inj.switchType;
-  addHeaderRow(ws, "Umschalten");
+  addHeaderRow(ws, "Umschaltart");
   ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(sw?.transshipmentPosition);
-    ws.addRow(["", "Weg", val, unit]);
+    ws.addRow(["", "Volumen", val, unit]);
   }
   {
     const [val, unit] = vu(sw?.switchOverTime);
@@ -161,13 +161,13 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
   }
   {
     const [val, unit] = vu(sw?.switchingPressure);
-    ws.addRow(["", "Hydraulikdruck", val, unit]);
+    ws.addRow(["", "Einspritzdruck", val, unit]);
   }
 
   let activeMode = "";
-  if (sw?.switchOverWay) activeMode = "Weg";
+  if (sw?.switchOverWay) activeMode = "Volumen";
   else if (sw?.switchOverTimeActive) activeMode = "Zeit";
-  else if (sw?.switchOverHydraulic) activeMode = "Hydraulikdruck";
+  else if (sw?.switchOverHydraulic) activeMode = "Einspritzdruck";
   ws.addRow(["", "Aktive Umschaltart", activeMode]);
 
   formatNumericColumns(ws);
@@ -180,7 +180,7 @@ function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): E
 
   // --- Main Menu ---
   const mm: HoldingPressureMainMenuDto | undefined = hp.mainMenu;
-  addHeaderRow(ws, "Hauptmenü");
+  addHeaderRow(ws, "Hauptseite");
   ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.holdingTime);
@@ -198,7 +198,7 @@ function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): E
 
   // --- Sub Menu (Holding Pressure Scroll) ---
   const sub: HoldingPressureSubMenuScrollDto | undefined = hp.subMenusValues;
-  addHeaderRow(ws, "Untermenü - Nachdruck");
+  addHeaderRow(ws, "Sollwertgrafik - Spezifischer Nachdruck");
   addSubHeaderRow(ws, labelWithUnit("t", sub?.keyUnit), labelWithUnit("p", sub?.valueUnit));
 
   const subValues: HoldingPressureSubMenuValueDto[] = sub?.values ?? [];
@@ -218,11 +218,11 @@ function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
 
   // --- Main Menu ---
   const mm: DosingMainMenuDto | undefined = dos.mainMenu;
-  addHeaderRow(ws, "Hauptmenü");
+  addHeaderRow(ws, "Hauptseite");
   ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.dosingStroke);
-    ws.addRow(["", "Dosierweg", val, unit]);
+    ws.addRow(["", "Dosiervolumen", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dosingDelayTime);
@@ -230,25 +230,25 @@ function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
   }
   {
     const [val, unit] = vu(mm?.relieveDosing);
-    ws.addRow(["", "Entlasten Dosieren", val, unit]);
+    ws.addRow(["", "Entlastung vor Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.relieveAfterDosing);
-    ws.addRow(["", "Entlasten nach Dosieren", val, unit]);
+    ws.addRow(["", "Entlastung nach Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedBeforeDosing);
-    ws.addRow(["", "Dekompressionsgeschwindigkeit vor Dosieren", val, unit]);
+    ws.addRow(["", "Entlastungsgeschwindigkeit vor Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedAfterDosing);
-    ws.addRow(["", "Dekompressionsgeschwindigkeit nach Dosieren", val, unit]);
+    ws.addRow(["", "Entlastungsgeschwindigkeit nach Dosieren", val, unit]);
   }
   ws.addRow([]);
 
   // --- Dosing Speed ---
   const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
-  addHeaderRow(ws, "Untermenü - Dosiergeschwindigkeit");
+  addHeaderRow(ws, "Sollwertgrafik - Dosiergeschwindigkeit");
   addSubHeaderRow(ws, labelWithUnit("s", speed?.keyUnit), labelWithUnit("v", speed?.valueUnit));
 
   const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
@@ -261,7 +261,7 @@ function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
 
   // --- Dosing Pressure ---
   const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
-  addHeaderRow(ws, "Untermenü - Staudruck");
+  addHeaderRow(ws, "Sollwertgrafik - Spezifischer Staudruck");
   addSubHeaderRow(ws, labelWithUnit("s", pressure?.keyUnit), labelWithUnit("p", pressure?.valueUnit));
 
   const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
@@ -285,7 +285,7 @@ function buildCylinderHeatingSheet(wb: ExcelWorkbook, cyl: CylinderHeatingDto): 
     return ws;
   }
 
-  addHeaderRow(ws, "Hauptmenü");
+  addHeaderRow(ws, "Hauptseite");
   ws.addRow(["", "Parameter", "Wert"]);
   ws.addRow(["", "Sollwert 1", mm.setpoint1]);
   ws.addRow(["", "Sollwert 2", mm.setpoint2]);

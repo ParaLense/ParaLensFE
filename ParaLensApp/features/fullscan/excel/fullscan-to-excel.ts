@@ -115,12 +115,12 @@ export function buildFullScanExcelData(
 
   const injEndRow = 9 + injCount;
   setCell(2, 1, "Einspritzen");
-  setCell(2, 2, "Hauptmenü");
+  setCell(2, 2, "Hauptseite");
   setCell(2, 3, "Einspritzdruck");
   setCell(3, 2, null);
   setCell(3, 3, "IsIncreasedSpecificPressure");
 
-  setCell(4, 2, "Untermenü");
+  setCell(4, 2, "Sollwertgrafik");
   setCell(4, 3, "Einspritzgeschwindigkeit");
   const injUnits = getScrollUnits(
     injection?.subMenuValues || injection?.SubMenuValues,
@@ -129,23 +129,23 @@ export function buildFullScanExcelData(
   setCell(4, 5, labelWithUnit("v", injUnits.valueUnit));
   setCell(5, 3, "Istwert (Liste)");
 
-  setCell(6, 2, "Umschalten");
-  setCell(injWayRow, 3, "Weg");
+  setCell(6, 2, "Umschaltart");
+  setCell(injWayRow, 3, "Volumen");
   setCell(injTimeRow, 3, "Zeit");
-  setCell(injHydRow, 3, "Hydraulikdruck");
+  setCell(injHydRow, 3, "Einspritzdruck");
   setCell(injActiveModeRow, 3, "Aktive Umschaltart");
 
   const hpEndRow = 14 + injCount + hpCount;
   setCell(hpMainStartRow, 1, "Nachdruck");
-  setCell(hpMainStartRow, 2, "Hauptmenü");
+  setCell(hpMainStartRow, 2, "Hauptseite");
   setCell(hpMainStartRow, 3, "Nachdruckzeit");
   setCell(hpMainStartRow + 1, 2, null);
   setCell(hpMainStartRow + 1, 3, "Kühlzeit");
   setCell(hpMainStartRow + 2, 2, null);
   setCell(hpMainStartRow + 2, 3, "Schneckendurchmesser");
 
-  setCell(hpUndermenuStartRow, 2, "Untermenü");
-  setCell(hpUndermenuStartRow, 3, "Nachdruck");
+  setCell(hpUndermenuStartRow, 2, "Sollwertgrafik");
+  setCell(hpUndermenuStartRow, 3, "Spezifischer Nachdruck");
   const hpUnits = getScrollUnits(
     holdingPressure?.subMenusValues || holdingPressure?.SubMenusValues,
   );
@@ -158,20 +158,20 @@ export function buildFullScanExcelData(
   const dosingEndRow = dosingPressureEndRow;
 
   setCell(dosingMainStartRow, 1, "Dosieren");
-  setCell(dosingMainStartRow, 2, "Hauptmenü");
-  setCell(dosingMainStartRow, 3, "Dosierweg");
+  setCell(dosingMainStartRow, 2, "Hauptseite");
+  setCell(dosingMainStartRow, 3, "Dosiervolumen");
   setCell(dosingMainStartRow + 1, 2, null);
   setCell(dosingMainStartRow + 1, 3, "Dosierverzögerungszeit");
   setCell(dosingMainStartRow + 2, 2, null);
-  setCell(dosingMainStartRow + 2, 3, "Entlasten Dosieren");
+  setCell(dosingMainStartRow + 2, 3, "Entlastung vor Dosieren");
   setCell(dosingMainStartRow + 3, 2, null);
-  setCell(dosingMainStartRow + 3, 3, "Entlasten nach Dosieren");
+  setCell(dosingMainStartRow + 3, 3, "Entlastung nach Dosieren");
   setCell(dosingMainStartRow + 4, 2, null);
-  setCell(dosingMainStartRow + 4, 3, "Dekompressionsgeschwindigkeit vor Dosieren");
+  setCell(dosingMainStartRow + 4, 3, "Entlastungsgeschwindigkeit vor Dosieren");
   setCell(dosingMainStartRow + 5, 2, null);
-  setCell(dosingMainStartRow + 5, 3, "Dekompressionsgeschwindigkeit nach Dosieren");
+  setCell(dosingMainStartRow + 5, 3, "Entlastungsgeschwindigkeit nach Dosieren");
 
-  setCell(dosingUndermenuStartRow, 2, "Untermenü");
+  setCell(dosingUndermenuStartRow, 2, "Sollwertgrafik");
   setCell(dosingUndermenuStartRow, 3, "Dosiergeschwindigkeit");
   const dosingSpeedUnits = getScrollUnits(
     dosing?.dosingSpeedsValues || dosing?.DosingSpeedsValues,
@@ -184,7 +184,7 @@ export function buildFullScanExcelData(
     "Istwert (Liste)",
   );
 
-  setCell(dosingPressureHeaderRowAdjusted, 3, "Staudruck");
+  setCell(dosingPressureHeaderRowAdjusted, 3, "Spezifischer Staudruck");
   const dosingPressureUnits = getScrollUnits(
     dosing?.dosingPressuresValues || dosing?.DosingPressuresValues,
   );
@@ -196,7 +196,7 @@ export function buildFullScanExcelData(
   );
 
   setCell(cylStartRow, 1, "Zylinderheizung");
-  setCell(cylStartRow, 2, "Hauptmenü");
+  setCell(cylStartRow, 2, "Hauptseite");
   setCell(cylStartRow, 3, "Sollwert 1");
   setCell(cylStartRow + 1, 2, null);
   setCell(cylStartRow + 1, 3, "Sollwert 2");
@@ -264,7 +264,7 @@ export function buildFullScanExcelData(
       injSwitchType.switch_over_way?.value === "1" ||
       injSwitchType.switch_over_way?.value === true
     ) {
-      activeMode = "Weg";
+      activeMode = "Volumen";
     } else if (
       injSwitchType.switchOverTimeActive ||
       injSwitchType.switch_over_time?.value === "1" ||
@@ -276,7 +276,7 @@ export function buildFullScanExcelData(
       injSwitchType.switch_over_hydraulic?.value === "1" ||
       injSwitchType.switch_over_hydraulic?.value === true
     ) {
-      activeMode = "Hydraulikdruck";
+      activeMode = "Einspritzdruck";
     }
     setCell(injActiveModeRow, valuesStartCol, activeMode);
   }

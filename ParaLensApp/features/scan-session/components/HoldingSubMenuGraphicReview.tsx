@@ -28,7 +28,7 @@ export function HoldingSubMenuGraphicReview({
         size="sm"
         className={isDark ? "text-typography-50" : "text-typography-900"}
       >
-        {t("holdingPressure")} (Index, t, p)
+        {t("specificHoldingPressure")} (Index, t, p)
       </Heading>
       <DynamicValueList
         rows={values}
