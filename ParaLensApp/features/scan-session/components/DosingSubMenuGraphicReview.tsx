@@ -9,6 +9,7 @@ import { formatUnitLabel } from "@/features/scan-session/utils/scrollbar-utils";
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   speedValues: IndexValuePair[];
   setSpeedValues: (rows: IndexValuePair[]) => void;
   pressureValues: IndexValuePair[];
@@ -19,6 +20,7 @@ type Props = {
 
 export function DosingSubMenuGraphicReview({
   isDark,
+  t,
   speedValues,
   setSpeedValues,
   pressureValues,
@@ -33,14 +35,14 @@ export function DosingSubMenuGraphicReview({
           size="sm"
           className={isDark ? "text-typography-50" : "text-typography-900"}
         >
-          Dosing Speed (Index, v, v2)
+          {t("dosingSpeed")} (Index, s, v)
         </Heading>
         <DynamicValueList
           rows={speedValues}
           setRows={setSpeedValues}
           labels={{
-            v: formatUnitLabel("v", speedUnits.keyUnit),
-            v2: formatUnitLabel("v2", speedUnits.valueUnit),
+            v: formatUnitLabel("s", speedUnits.keyUnit),
+            v2: formatUnitLabel("v", speedUnits.valueUnit),
           }}
           units={{
             v: speedUnits.keyUnit,
@@ -54,14 +56,14 @@ export function DosingSubMenuGraphicReview({
           size="sm"
           className={isDark ? "text-typography-50" : "text-typography-900"}
         >
-          Dosing Pressure (Index, v, v2)
+          {t("dosingPressure")} (Index, s, p)
         </Heading>
         <DynamicValueList
           rows={pressureValues}
           setRows={setPressureValues}
           labels={{
-            v: formatUnitLabel("v", pressureUnits.keyUnit),
-            v2: formatUnitLabel("v2", pressureUnits.valueUnit),
+            v: formatUnitLabel("s", pressureUnits.keyUnit),
+            v2: formatUnitLabel("p", pressureUnits.valueUnit),
           }}
           units={{
             v: pressureUnits.keyUnit,

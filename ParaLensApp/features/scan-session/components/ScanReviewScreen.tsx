@@ -15,7 +15,6 @@ import {
   buildRowsFromScrollbar,
   extractNumberStrings,
   extractScrollbarUnits,
-  formatUnitLabel,
 } from "@/features/scan-session/utils/scrollbar-utils";
 import type {
   DosingMode,
@@ -97,12 +96,13 @@ export default function ScanReviewScreen() {
 
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
-    if (selectedMenu) parts.push(selectedMenu);
-    if (injectionMode) parts.push(injectionMode);
-    if (!injectionMode && holdingMode) parts.push(holdingMode);
-    if (!injectionMode && !holdingMode && dosingMode) parts.push(dosingMode);
+    if (selectedMenu) parts.push(t(selectedMenu));
+
+    const selectedMode = injectionMode ?? holdingMode ?? dosingMode;
+    if (selectedMode) parts.push(t(selectedMode));
+
     return parts.join(" · ");
-  }, [selectedMenu, injectionMode, holdingMode, dosingMode]);
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode, t]);
 
   const [injMainForm, setInjMainForm] = useState<InjectionMainFormState>({
     sprayPressureLimit: { value: "", unit: "" },
@@ -404,12 +404,13 @@ export default function ScanReviewScreen() {
         size="lg"
         className={`mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}
       >
-        Review · {headerLabel}
+        {t("review")} · {headerLabel}
       </Heading>
 
       {selectedMenu === "injection" && injectionMode === "mainMenu" && (
         <InjectionMainMenuReview
           isDark={isDark}
+          t={t}
           injMainForm={injMainForm}
           setInjMainForm={setInjMainForm}
         />
@@ -418,6 +419,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "injection" && injectionMode === "subMenuGraphic" && (
         <InjectionSubMenuGraphicReview
           isDark={isDark}
+          t={t}
           values={injGraphicValues}
           setValues={setInjGraphicValues}
           units={injGraphicUnits}
@@ -427,6 +429,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "injection" && injectionMode === "switchType" && (
         <InjectionSwitchTypeReview
           isDark={isDark}
+          t={t}
           injSwitchForm={injSwitchForm}
           setInjSwitchForm={setInjSwitchForm}
         />
@@ -435,6 +438,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "holdingPressure" && holdingMode === "mainMenu" && (
         <HoldingMainMenuReview
           isDark={isDark}
+          t={t}
           holdMainForm={holdMainForm}
           setHoldMainForm={setHoldMainForm}
         />
@@ -443,6 +447,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "holdingPressure" && holdingMode === "subMenuGraphic" && (
         <HoldingSubMenuGraphicReview
           isDark={isDark}
+          t={t}
           values={holdGraphicValues}
           setValues={setHoldGraphicValues}
           units={holdGraphicUnits}
@@ -452,6 +457,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "dosing" && dosingMode === "mainMenu" && (
         <DosingMainMenuReview
           isDark={isDark}
+          t={t}
           doseMainForm={doseMainForm}
           setDoseMainForm={setDoseMainForm}
         />
@@ -460,6 +466,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "dosing" && dosingMode === "subMenuGraphic" && (
         <DosingSubMenuGraphicReview
           isDark={isDark}
+          t={t}
           speedValues={doseSpeedValues}
           setSpeedValues={setDoseSpeedValues}
           pressureValues={dosePressureValues}
@@ -472,6 +479,7 @@ export default function ScanReviewScreen() {
       {selectedMenu === "cylinderHeating" && (
         <CylinderHeatingReview
           isDark={isDark}
+          t={t}
           cylinderForm={cylinderForm}
           setCylinderForm={setCylinderForm}
         />

@@ -8,6 +8,7 @@ import type { InjectionSwitchTypeFormState } from "@/features/scan-session/types
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   injSwitchForm: InjectionSwitchTypeFormState;
   setInjSwitchForm: React.Dispatch<
     React.SetStateAction<InjectionSwitchTypeFormState>
@@ -16,6 +17,7 @@ type Props = {
 
 export function InjectionSwitchTypeReview({
   isDark,
+  t,
   injSwitchForm,
   setInjSwitchForm,
 }: Props) {
@@ -24,7 +26,7 @@ export function InjectionSwitchTypeReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Transshipment Position"
+          placeholder={t("transshipmentPosition")}
           value={injSwitchForm.transshipmentPosition.value}
           onChangeText={(t) =>
             setInjSwitchForm((prev) => ({
@@ -41,7 +43,7 @@ export function InjectionSwitchTypeReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Switch Over Time"
+          placeholder={t("switchOverTime")}
           value={injSwitchForm.switchOverTime.value}
           onChangeText={(t) =>
             setInjSwitchForm((prev) => ({
@@ -58,7 +60,7 @@ export function InjectionSwitchTypeReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Switching Pressure"
+          placeholder={t("switchingPressure")}
           value={injSwitchForm.switchingPressure.value}
           onChangeText={(t) =>
             setInjSwitchForm((prev) => ({
@@ -78,7 +80,7 @@ export function InjectionSwitchTypeReview({
           size="sm"
           className={isDark ? "text-typography-50" : "text-typography-900"}
         >
-          Active Switch Over Mode
+          {t("activeSwitchOverMode")}
         </Heading>
         <HStack className="gap-2 flex-wrap">
           <Button
@@ -94,7 +96,7 @@ export function InjectionSwitchTypeReview({
               }))
             }
           >
-            <ButtonText>Way</ButtonText>
+            <ButtonText>{t("switchOverWay")}</ButtonText>
           </Button>
           <Button
             size="sm"
@@ -109,7 +111,7 @@ export function InjectionSwitchTypeReview({
               }))
             }
           >
-            <ButtonText>Time</ButtonText>
+            <ButtonText>{t("switchOverTimeActive")}</ButtonText>
           </Button>
           <Button
             size="sm"
@@ -130,7 +132,7 @@ export function InjectionSwitchTypeReview({
               }))
             }
           >
-            <ButtonText>Hydraulic</ButtonText>
+            <ButtonText>{t("switchOverHydraulic")}</ButtonText>
           </Button>
         </HStack>
       </VStack>

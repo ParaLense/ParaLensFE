@@ -65,10 +65,23 @@ const COL_WIDTHS_DEFAULT = [
   { width: 14 }, { width: 16 },
 ];
 
+const NUMBER_FORMAT = "0.00";
+
+function labelWithUnit(label: string, unit?: string | null) {
+  return unit ? `${label} [${unit}]` : label;
+}
+
+function numericCell(value: number | string | undefined | null): number | string {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number") return Number(value.toFixed(2));
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : value;
+}
+
 /** Extract value + unit from a ValueUnit field into two cell entries */
 function vu(field: ValueUnit | undefined): [value: number | string, unit: string] {
   if (!field) return ["", ""];
-  return [field.value ?? "", field.unit ?? ""];
+  return [numericCell(field.value), field.unit ?? ""];
 }
 
 function addHeaderRow(ws: ExcelWorksheet, label: string) {
@@ -83,184 +96,204 @@ function addSubHeaderRow(ws: ExcelWorksheet, col1: string, col2: string) {
   r.font = { bold: true };
 }
 
+function addScrollValueRow(ws: ExcelWorksheet, key: number | string, value: number | string) {
+  const row = ws.addRow(["", numericCell(key), numericCell(value)]);
+  row.getCell(2).numFmt = NUMBER_FORMAT;
+  row.getCell(3).numFmt = NUMBER_FORMAT;
+}
+
+function formatNumericColumns(ws: ExcelWorksheet) {
+  ws.eachRow((row) => {
+    row.eachCell((cell) => {
+      if (typeof cell.value === "number") {
+        cell.numFmt = NUMBER_FORMAT;
+      }
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Build worksheets – fully typed, no `as any`
 // ---------------------------------------------------------------------------
 
 function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Injection");
+  const ws = wb.addWorksheet("Einspritzen");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: InjectionMainMenuDto | undefined = inj.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptmenü");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.sprayPressureLimit);
-    ws.addRow(["", "Spray Pressure Limit", val, unit]);
+    ws.addRow(["", "Spritzdruckgrenze", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.increasedSpecificPointPrinter);
-    ws.addRow(["", "Increased Specific Point Printer", val, unit]);
+    ws.addRow(["", "Erhöhter spezifischer Druck", val, unit]);
   }
   ws.addRow([]);
 
   // --- Sub Menu (Injection Speed Scroll) ---
   const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
-  addHeaderRow(ws, "Sub Menu – Injection Speed");
-  addSubHeaderRow(ws, sub?.keyUnit ?? "v", sub?.valueUnit ?? "v2");
+  addHeaderRow(ws, "Untermenü - Einspritzgeschwindigkeit");
+  addSubHeaderRow(ws, labelWithUnit("s", sub?.keyUnit), labelWithUnit("v", sub?.valueUnit));
 
   const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
   ws.addRow([]);
 
   // --- Switch Type ---
   const sw: InjectionSubMenuSwitchTypeDto | undefined = inj.switchType;
-  addHeaderRow(ws, "Switch Over");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Umschalten");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(sw?.transshipmentPosition);
-    ws.addRow(["", "Way (Transshipment Position)", val, unit]);
+    ws.addRow(["", "Weg", val, unit]);
   }
   {
     const [val, unit] = vu(sw?.switchOverTime);
-    ws.addRow(["", "Time", val, unit]);
+    ws.addRow(["", "Zeit", val, unit]);
   }
   {
     const [val, unit] = vu(sw?.switchingPressure);
-    ws.addRow(["", "Hydraulic Pressure", val, unit]);
+    ws.addRow(["", "Hydraulikdruck", val, unit]);
   }
 
   let activeMode = "";
-  if (sw?.switchOverWay) activeMode = "Way";
-  else if (sw?.switchOverTimeActive) activeMode = "Time";
-  else if (sw?.switchOverHydraulic) activeMode = "Hydraulic Pressure";
-  ws.addRow(["", "Active Switch Over Mode", activeMode]);
+  if (sw?.switchOverWay) activeMode = "Weg";
+  else if (sw?.switchOverTimeActive) activeMode = "Zeit";
+  else if (sw?.switchOverHydraulic) activeMode = "Hydraulikdruck";
+  ws.addRow(["", "Aktive Umschaltart", activeMode]);
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Holding Pressure");
+  const ws = wb.addWorksheet("Nachdruck");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: HoldingPressureMainMenuDto | undefined = hp.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptmenü");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.holdingTime);
-    ws.addRow(["", "Holding Time", val, unit]);
+    ws.addRow(["", "Nachdruckzeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.coolTime);
-    ws.addRow(["", "Cool Time", val, unit]);
+    ws.addRow(["", "Kühlzeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.screwDiameter);
-    ws.addRow(["", "Screw Diameter", val, unit]);
+    ws.addRow(["", "Schneckendurchmesser", val, unit]);
   }
   ws.addRow([]);
 
   // --- Sub Menu (Holding Pressure Scroll) ---
   const sub: HoldingPressureSubMenuScrollDto | undefined = hp.subMenusValues;
-  addHeaderRow(ws, "Sub Menu – Holding Pressure");
-  addSubHeaderRow(ws, sub?.keyUnit ?? "t", sub?.valueUnit ?? "p");
+  addHeaderRow(ws, "Untermenü - Nachdruck");
+  addSubHeaderRow(ws, labelWithUnit("t", sub?.keyUnit), labelWithUnit("p", sub?.valueUnit));
 
   const subValues: HoldingPressureSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.t, val.p]);
+      addScrollValueRow(ws, val.t, val.p);
     });
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Dosing");
+  const ws = wb.addWorksheet("Dosieren");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: DosingMainMenuDto | undefined = dos.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptmenü");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.dosingStroke);
-    ws.addRow(["", "Dosing Stroke", val, unit]);
+    ws.addRow(["", "Dosierweg", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dosingDelayTime);
-    ws.addRow(["", "Dosing Delay Time", val, unit]);
+    ws.addRow(["", "Dosierverzögerungszeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.relieveDosing);
-    ws.addRow(["", "Relieve Dosing", val, unit]);
+    ws.addRow(["", "Entlasten Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.relieveAfterDosing);
-    ws.addRow(["", "Relieve After Dosing", val, unit]);
+    ws.addRow(["", "Entlasten nach Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedBeforeDosing);
-    ws.addRow(["", "Discharge Speed Before Dosing", val, unit]);
+    ws.addRow(["", "Dekompressionsgeschwindigkeit vor Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedAfterDosing);
-    ws.addRow(["", "Discharge Speed After Dosing", val, unit]);
+    ws.addRow(["", "Dekompressionsgeschwindigkeit nach Dosieren", val, unit]);
   }
   ws.addRow([]);
 
   // --- Dosing Speed ---
   const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
-  addHeaderRow(ws, "Sub Menu – Dosing Speed");
-  addSubHeaderRow(ws, speed?.keyUnit ?? "v", speed?.valueUnit ?? "v2");
+  addHeaderRow(ws, "Untermenü - Dosiergeschwindigkeit");
+  addSubHeaderRow(ws, labelWithUnit("s", speed?.keyUnit), labelWithUnit("v", speed?.valueUnit));
 
   const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
   [...speedValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
   ws.addRow([]);
 
   // --- Dosing Pressure ---
   const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
-  addHeaderRow(ws, "Sub Menu – Dosing Pressure");
-  addSubHeaderRow(ws, pressure?.keyUnit ?? "v", pressure?.valueUnit ?? "p");
+  addHeaderRow(ws, "Untermenü - Staudruck");
+  addSubHeaderRow(ws, labelWithUnit("s", pressure?.keyUnit), labelWithUnit("p", pressure?.valueUnit));
 
   const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
   [...pressureValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildCylinderHeatingSheet(wb: ExcelWorkbook, cyl: CylinderHeatingDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Cylinder Heating");
+  const ws = wb.addWorksheet("Zylinderheizung");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   const mm: CylinderHeatingMainMenuDto | undefined = cyl.mainMenu;
   if (!mm) {
-    ws.addRow(["No cylinder heating data"]);
+    ws.addRow(["Keine Daten zur Zylinderheizung vorhanden"]);
     return ws;
   }
 
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value"]);
-  ws.addRow(["", "Setpoint 1", mm.setpoint1]);
-  ws.addRow(["", "Setpoint 2", mm.setpoint2]);
-  ws.addRow(["", "Setpoint 3", mm.setpoint3]);
-  ws.addRow(["", "Setpoint 4", mm.setpoint4]);
-  ws.addRow(["", "Setpoint 5", mm.setpoint5]);
+  addHeaderRow(ws, "Hauptmenü");
+  ws.addRow(["", "Parameter", "Wert"]);
+  ws.addRow(["", "Sollwert 1", mm.setpoint1]);
+  ws.addRow(["", "Sollwert 2", mm.setpoint2]);
+  ws.addRow(["", "Sollwert 3", mm.setpoint3]);
+  ws.addRow(["", "Sollwert 4", mm.setpoint4]);
+  ws.addRow(["", "Sollwert 5", mm.setpoint5]);
 
+  formatNumericColumns(ws);
   return ws;
 }
 
