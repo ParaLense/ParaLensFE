@@ -1043,7 +1043,7 @@ function SectionDetails({
                         title={t("subMenuValues")}
                         entries={data.subMenuValues.values}
                         columns={["index", "v", "v2"]}
-                        columnLabels={{ v: "s", v2: "v" }}
+                        columnLabels={{ v: "V", v2: "v" }}
                         unitLabels={{
                           v: data?.subMenuValues?.keyUnit,
                           v2: data?.subMenuValues?.valueUnit,
@@ -1091,7 +1091,7 @@ function SectionDetails({
                       title={t("speeds")}
                       entries={data.dosingSpeedsValues.values}
                       columns={["index", "v", "v2"]}
-                      columnLabels={{ v: "s", v2: "v" }}
+                      columnLabels={{ v: "V", v2: "v" }}
                       unitLabels={{
                         v: data?.dosingSpeedsValues?.keyUnit,
                         v2: data?.dosingSpeedsValues?.valueUnit,
@@ -1104,7 +1104,7 @@ function SectionDetails({
                         title={t("pressures")}
                         entries={data.dosingPressuresValues.values}
                         columns={["index", "v", "v2"]}
-                        columnLabels={{ v: "s", v2: "p" }}
+                        columnLabels={{ v: "V", v2: "P" }}
                         unitLabels={{
                           v: data?.dosingPressuresValues?.keyUnit,
                           v2: data?.dosingPressuresValues?.valueUnit,

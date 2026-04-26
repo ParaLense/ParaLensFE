@@ -35,13 +35,13 @@ export function DosingSubMenuGraphicReview({
           size="sm"
           className={isDark ? "text-typography-50" : "text-typography-900"}
         >
-          {t("dosingSpeed")} (Index, s, v)
+          {t("dosingSpeed")} (Index, V, v)
         </Heading>
         <DynamicValueList
           rows={speedValues}
           setRows={setSpeedValues}
           labels={{
-            v: formatUnitLabel("s", speedUnits.keyUnit),
+            v: formatUnitLabel("V", speedUnits.keyUnit),
             v2: formatUnitLabel("v", speedUnits.valueUnit),
           }}
           units={{
@@ -56,14 +56,14 @@ export function DosingSubMenuGraphicReview({
           size="sm"
           className={isDark ? "text-typography-50" : "text-typography-900"}
         >
-          {t("dosingPressure")} (Index, s, p)
+          {t("dosingPressure")} (Index, V, P)
         </Heading>
         <DynamicValueList
           rows={pressureValues}
           setRows={setPressureValues}
           labels={{
-            v: formatUnitLabel("s", pressureUnits.keyUnit),
-            v2: formatUnitLabel("p", pressureUnits.valueUnit),
+            v: formatUnitLabel("V", pressureUnits.keyUnit),
+            v2: formatUnitLabel("P", pressureUnits.valueUnit),
           }}
           units={{
             v: pressureUnits.keyUnit,

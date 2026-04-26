@@ -125,7 +125,7 @@ export function buildFullScanExcelData(
   const injUnits = getScrollUnits(
     injection?.subMenuValues || injection?.SubMenuValues,
   );
-  setCell(4, 4, labelWithUnit("s", injUnits.keyUnit));
+  setCell(4, 4, labelWithUnit("V", injUnits.keyUnit));
   setCell(4, 5, labelWithUnit("v", injUnits.valueUnit));
   setCell(5, 3, "Istwert (Liste)");
 
@@ -176,7 +176,7 @@ export function buildFullScanExcelData(
   const dosingSpeedUnits = getScrollUnits(
     dosing?.dosingSpeedsValues || dosing?.DosingSpeedsValues,
   );
-  setCell(dosingUndermenuStartRow, 4, labelWithUnit("s", dosingSpeedUnits.keyUnit));
+  setCell(dosingUndermenuStartRow, 4, labelWithUnit("V", dosingSpeedUnits.keyUnit));
   setCell(dosingUndermenuStartRow, 5, labelWithUnit("v", dosingSpeedUnits.valueUnit));
   setCell(
     dosingSpeedHeaderRow + injCount + hpCount,
@@ -188,11 +188,11 @@ export function buildFullScanExcelData(
   const dosingPressureUnits = getScrollUnits(
     dosing?.dosingPressuresValues || dosing?.DosingPressuresValues,
   );
-  setCell(dosingPressureHeaderRowAdjusted, 4, labelWithUnit("s", dosingPressureUnits.keyUnit));
+  setCell(dosingPressureHeaderRowAdjusted, 4, labelWithUnit("V", dosingPressureUnits.keyUnit));
   setCell(
     dosingPressureHeaderRowAdjusted,
     5,
-    labelWithUnit("p", dosingPressureUnits.valueUnit),
+    labelWithUnit("P", dosingPressureUnits.valueUnit),
   );
 
   setCell(cylStartRow, 1, "Zylinderheizung");

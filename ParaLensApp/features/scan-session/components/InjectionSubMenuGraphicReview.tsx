@@ -28,13 +28,13 @@ export function InjectionSubMenuGraphicReview({
         size="sm"
         className={isDark ? "text-typography-50" : "text-typography-900"}
       >
-        {t("injectionSpeed")} (Index, s, v)
+        {t("injectionSpeed")} (Index, V, v)
       </Heading>
       <DynamicValueList
         rows={values}
         setRows={setValues}
         labels={{
-          v: formatUnitLabel("s", units.keyUnit),
+          v: formatUnitLabel("V", units.keyUnit),
           v2: formatUnitLabel("v", units.valueUnit),
         }}
         units={{

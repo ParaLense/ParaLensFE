@@ -137,7 +137,7 @@ function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorkshe
   // --- Sub Menu (Injection Speed Scroll) ---
   const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
   addHeaderRow(ws, "Sollwertgrafik - Einspritzgeschwindigkeit");
-  addSubHeaderRow(ws, labelWithUnit("s", sub?.keyUnit), labelWithUnit("v", sub?.valueUnit));
+  addSubHeaderRow(ws, labelWithUnit("V", sub?.keyUnit), labelWithUnit("v", sub?.valueUnit));
 
   const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]
@@ -249,7 +249,7 @@ function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
   // --- Dosing Speed ---
   const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
   addHeaderRow(ws, "Sollwertgrafik - Dosiergeschwindigkeit");
-  addSubHeaderRow(ws, labelWithUnit("s", speed?.keyUnit), labelWithUnit("v", speed?.valueUnit));
+  addSubHeaderRow(ws, labelWithUnit("V", speed?.keyUnit), labelWithUnit("v", speed?.valueUnit));
 
   const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
   [...speedValues]
@@ -262,7 +262,7 @@ function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
   // --- Dosing Pressure ---
   const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
   addHeaderRow(ws, "Sollwertgrafik - Spezifischer Staudruck");
-  addSubHeaderRow(ws, labelWithUnit("s", pressure?.keyUnit), labelWithUnit("p", pressure?.valueUnit));
+  addSubHeaderRow(ws, labelWithUnit("V", pressure?.keyUnit), labelWithUnit("P", pressure?.valueUnit));
 
   const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
   [...pressureValues]
