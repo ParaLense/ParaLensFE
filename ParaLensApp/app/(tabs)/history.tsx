@@ -328,13 +328,19 @@ export default function HistoryScreen() {
     };
 
     const handleDownloadExcelFromLocal = async (scanId: number) => {
-        if (!selected) return;
-        await handleLocalExcelDownload(scanId, fullScans ?? []);
+        setIsDownloading(true);
+        setDownloadProgress(0);
+        try {
+            await handleLocalExcelDownload(scanId, fullScans ?? []);
+        } catch {
+            Alert.alert(t("downloadFailed"), t("downloadUnexpectedError"));
+        } finally {
+            setIsDownloading(false);
+            setDownloadProgress(0);
+        }
     };
 
     const handleDownloadExcel = async (scanId: number) => {
-        if (!selected) return;
-
         Alert.alert(
             t("downloadExcel"),
             t("downloadSourcePrompt"),

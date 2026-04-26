@@ -352,6 +352,10 @@ function getScreenshotsForSection(
   return result;
 }
 
+function toRNFSPath(pathOrUri: string): string {
+  return pathOrUri.startsWith("file://") ? pathOrUri.replace("file://", "") : pathOrUri;
+}
+
 // ---------------------------------------------------------------------------
 // Main export function
 // ---------------------------------------------------------------------------
@@ -485,9 +489,10 @@ export const handleLocalExcelDownload = async (
                 }
 
                 const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+                const sourcePath = toRNFSPath(fileUri);
 
                 try {
-                  const sourceExists = await RNFS.exists(fileUri);
+                  const sourceExists = await RNFS.exists(sourcePath);
                   if (!sourceExists) {
                     Alert.alert(
                       "Error",
@@ -496,7 +501,7 @@ export const handleLocalExcelDownload = async (
                     return;
                   }
 
-                  const fileContent = await RNFS.readFile(fileUri, "base64");
+                  const fileContent = await RNFS.readFile(sourcePath, "base64");
                   await RNFS.writeFile(downloadPath, fileContent, "base64");
 
                   const fileExists = await RNFS.exists(downloadPath);
@@ -509,7 +514,7 @@ export const handleLocalExcelDownload = async (
                   }
                 } catch (writeError: any) {
                   console.warn("Direct write failed, trying copy:", writeError);
-                  const sourceExists = await RNFS.exists(fileUri);
+                  const sourceExists = await RNFS.exists(sourcePath);
                   if (!sourceExists) {
                     Alert.alert(
                       "Error",
@@ -517,7 +522,7 @@ export const handleLocalExcelDownload = async (
                     );
                     return;
                   }
-                  await RNFS.copyFile(fileUri, downloadPath);
+                  await RNFS.copyFile(sourcePath, downloadPath);
                 }
 
                 try {
