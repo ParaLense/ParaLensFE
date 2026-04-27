@@ -99,9 +99,9 @@ export default function ScanReviewScreen() {
     if (selectedMenu) parts.push(t(selectedMenu));
 
     const selectedMode = injectionMode ?? holdingMode ?? dosingMode;
-    if (selectedMode) parts.push(t(selectedMode));
+    if (selectedMode && selectedMode !== "mainMenu") parts.push(t(selectedMode));
 
-    return parts.join(" · ");
+    return parts.join(" - ");
   }, [selectedMenu, injectionMode, holdingMode, dosingMode, t]);
 
   const [injMainForm, setInjMainForm] = useState<InjectionMainFormState>({
@@ -404,7 +404,7 @@ export default function ScanReviewScreen() {
         size="lg"
         className={`mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}
       >
-        {t("review")} · {headerLabel}
+        {t("review")} - {headerLabel}
       </Heading>
 
       {selectedMenu === "injection" && injectionMode === "mainMenu" && (

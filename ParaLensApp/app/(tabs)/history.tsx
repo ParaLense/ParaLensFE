@@ -1195,11 +1195,17 @@ function DataBlock({
                 className="gap-2"
             >
                 {visibleEntries.map(([label, value]) => (
-                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "center" }}>
-                        <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
+                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                        <Text
+                            className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}
+                            style={{ flex: 1, flexShrink: 1 }}
+                        >
                             {formatLabel(label)}
                         </Text>
-                        <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
+                        <Text
+                            className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}
+                            style={{ flexShrink: 0, maxWidth: "40%", textAlign: "right" }}
+                        >
                             {typeof value === 'object' && value !== null && 'value' in value ? `${(value as any).value} ${(value as any).unit || ''}`.trim() : String(value)}
                         </Text>
                     </HStack>

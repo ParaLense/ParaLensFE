@@ -63,9 +63,9 @@ export default function CameraScreen() {
     if (selectedMenu) parts.push(t(selectedMenu));
 
     const selectedMode = injectionMode ?? holdingMode ?? dosingMode;
-    if (selectedMode) parts.push(t(selectedMode));
+    if (selectedMode && selectedMode !== "mainMenu") parts.push(t(selectedMode));
 
-    return parts.join(" · ");
+    return parts.join(" - ");
   }, [selectedMenu, injectionMode, holdingMode, dosingMode, t]);
 
   const selectedLabel = useMemo(() => {
@@ -243,7 +243,7 @@ export default function CameraScreen() {
         >
           <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
             {scanHeaderLabel
-              ? `${scanHeaderLabel} · ${t("change")}`
+              ? `${scanHeaderLabel} - ${t("change")}`
               : t("change")}
           </Text>
         </Button>

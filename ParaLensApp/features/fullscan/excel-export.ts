@@ -356,6 +356,78 @@ function toRNFSPath(pathOrUri: string): string {
   return pathOrUri.startsWith("file://") ? pathOrUri.replace("file://", "") : pathOrUri;
 }
 
+async function shareExcelFile(fileUri: string) {
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      UTI: "com.microsoft.excel.xlsx",
+    });
+    return;
+  }
+
+  Alert.alert("Share Unavailable", "Sharing is not available on this device.");
+}
+
+async function saveExcelFile(fileUri: string, fileName: string) {
+  if (Platform.OS !== "android") {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        UTI: "com.microsoft.excel.xlsx",
+      });
+    } else {
+      Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
+    }
+    return;
+  }
+
+  const androidVersion = Number(Platform.Version);
+  if (androidVersion < 33) {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      {
+        title: "Storage Permission",
+        message: "This app needs access to storage to save the file.",
+        buttonNeutral: "Ask Me Later",
+        buttonNegative: "Cancel",
+        buttonPositive: "OK",
+      },
+    );
+
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+      Alert.alert(
+        "Permission Denied",
+        "Storage permission is required to save the file.",
+      );
+      return;
+    }
+  }
+
+  const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+  const sourcePath = toRNFSPath(fileUri);
+
+  const sourceExists = await RNFS.exists(sourcePath);
+  if (!sourceExists) throw new Error("Source file was not created.");
+
+  const fileContent = await RNFS.readFile(sourcePath, "base64");
+  await RNFS.writeFile(downloadPath, fileContent, "base64");
+
+  const fileExists = await RNFS.exists(downloadPath);
+  if (!fileExists) {
+    throw new Error("The file could not be found after saving.");
+  }
+
+  try {
+    await RNFS.scanFile(downloadPath);
+  } catch (scanError) {
+    console.warn("Failed to scan file:", scanError);
+  }
+
+  Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
+}
+
 // ---------------------------------------------------------------------------
 // Main export function
 // ---------------------------------------------------------------------------
@@ -427,7 +499,6 @@ export const handleLocalExcelDownload = async (
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // Ask user what they want to do with the file
     Alert.alert(
       "Excel File Ready",
       "What would you like to do with the file?",
@@ -436,18 +507,7 @@ export const handleLocalExcelDownload = async (
           text: "Share",
           onPress: async () => {
             try {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                  mimeType:
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                  UTI: "com.microsoft.excel.xlsx",
-                });
-              } else {
-                Alert.alert(
-                  "Share Unavailable",
-                  "Sharing is not available on this device.",
-                );
-              }
+              await shareExcelFile(fileUri);
             } catch (shareError: any) {
               Alert.alert(
                 "Share failed",
@@ -457,101 +517,14 @@ export const handleLocalExcelDownload = async (
           },
         },
         {
-          text: "Save to Downloads",
+          text: "Save only",
           onPress: async () => {
             try {
-              if (Platform.OS === "android") {
-                const androidVersion = Platform.Version as number;
-                let hasPermission = true;
-
-                if (androidVersion < 33) {
-                  const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                    {
-                      title: "Storage Permission",
-                      message:
-                        "This app needs access to storage to save the file.",
-                      buttonNeutral: "Ask Me Later",
-                      buttonNegative: "Cancel",
-                      buttonPositive: "OK",
-                    },
-                  );
-                  hasPermission =
-                    granted === PermissionsAndroid.RESULTS.GRANTED;
-                }
-
-                if (!hasPermission) {
-                  Alert.alert(
-                    "Permission Denied",
-                    "Storage permission is required to save the file.",
-                  );
-                  return;
-                }
-
-                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-                const sourcePath = toRNFSPath(fileUri);
-
-                try {
-                  const sourceExists = await RNFS.exists(sourcePath);
-                  if (!sourceExists) {
-                    Alert.alert(
-                      "Error",
-                      "Source file not found. Please try again.",
-                    );
-                    return;
-                  }
-
-                  const fileContent = await RNFS.readFile(sourcePath, "base64");
-                  await RNFS.writeFile(downloadPath, fileContent, "base64");
-
-                  const fileExists = await RNFS.exists(downloadPath);
-                  if (!fileExists) {
-                    Alert.alert(
-                      "Error",
-                      "Failed to save file. Please check storage permissions.",
-                    );
-                    return;
-                  }
-                } catch (writeError: any) {
-                  console.warn("Direct write failed, trying copy:", writeError);
-                  const sourceExists = await RNFS.exists(sourcePath);
-                  if (!sourceExists) {
-                    Alert.alert(
-                      "Error",
-                      "Source file not found. Please try again.",
-                    );
-                    return;
-                  }
-                  await RNFS.copyFile(sourcePath, downloadPath);
-                }
-
-                try {
-                  await RNFS.scanFile(downloadPath);
-                } catch (scanError) {
-                  console.warn("Failed to scan file:", scanError);
-                }
-
-                Alert.alert(
-                  "File Saved",
-                  `Excel file saved to Downloads:\n${downloadPath}`,
-                );
-              } else {
-                // iOS – just share (save to Files via share sheet)
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType:
-                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    UTI: "com.microsoft.excel.xlsx",
-                  });
-                } else {
-                  Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
-                }
-              }
+              await saveExcelFile(fileUri, fileName);
             } catch (saveError: any) {
               Alert.alert(
                 "Save failed",
-                saveError?.message ||
-                  "Could not save the file to downloads.",
+                saveError?.message || "Could not save the file to downloads.",
               );
             }
           },
@@ -563,6 +536,7 @@ export const handleLocalExcelDownload = async (
       ],
       { cancelable: true },
     );
+
   } catch (e: any) {
     Alert.alert("Export failed", e?.message ?? String(e));
   }

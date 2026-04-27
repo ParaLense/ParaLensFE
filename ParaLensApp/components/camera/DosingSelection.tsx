@@ -23,7 +23,7 @@ const DosingSelection: React.FC<Props> = ({
   return (
     <Box style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: isDark ? "#121212" : "#ffffff" }}>
       <Heading size="lg" className="mb-6" style={{ color: isDark ? "#ffffff" : "#000000" }}>
-        {t("dosingSelect") ?? "Dosing · Auswahl"}
+        {t("dosingSelect") ?? "Plasticizing"}
       </Heading>
       <VStack className="w-5/6 gap-4">
         <Button onPress={onPickMain} style={{ backgroundColor: isDark ? "#ffffff" : "#000000" }}>
