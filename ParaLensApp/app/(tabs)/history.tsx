@@ -29,6 +29,7 @@ import { useSettings } from "@/features/settings/settings-context";
 // Optionally available API context (adjust path if needed)
 import { useApiContext } from "@/features/api/api-context";
 import { handleLocalExcelDownload } from "@/features/fullscan/excel-export";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 
 // --- Optional native modules (guarded) ---
 let FileViewer: any = null;
@@ -385,11 +386,13 @@ export default function HistoryScreen() {
             { cancelable: true }
         );
     };
+    const insets = useSafeAreaInsets();
 
     return (
         <Box
             style={{
                 flex: 1,
+                paddingTop: insets.top,
                 backgroundColor: isDark ? '#0f172a' : '#f8fafc'
             }}
         >

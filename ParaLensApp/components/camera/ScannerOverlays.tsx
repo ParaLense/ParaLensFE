@@ -4,6 +4,7 @@ import { Box } from "@/components/ui/box";
 import { Heading } from "@/components/ui/heading";
 import { Text as GluestackText } from "@/components/ui/text";
 import TemplateOverlay from "@/components/TemplateOverlay";
+import OcrFieldDisplay from "@/components/camera/OcrFieldDisplay";
 import { TemplateLayout } from "@/features/templates/use-template-layout";
 
 type RectLike = { x: any; y: any; w: any; h: any };
@@ -73,7 +74,6 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
   const renderTemplateOverlays = () => {
     if (templateViewport) {
       return (
-        <>
           <TemplateOverlay
             layout={currentLayout}
             isActive
@@ -83,21 +83,10 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
             offsetX={templateViewport.offsetX}
             offsetY={templateViewport.offsetY}
           />
-          <TemplateOverlay
-            layout={TemplateLayout.ScreenDetection}
-            isActive
-            color="#FF0000"
-            viewportWidth={templateViewport.width}
-            viewportHeight={templateViewport.height}
-            offsetX={templateViewport.offsetX}
-            offsetY={templateViewport.offsetY}
-          />
-        </>
       );
     }
 
     return (
-      <>
         <TemplateOverlay
           layout={currentLayout}
           isActive
@@ -107,18 +96,35 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
           containerWidth={cameraLayoutSize?.width}
           containerHeight={cameraLayoutSize?.height}
         />
-        <TemplateOverlay
-          layout={TemplateLayout.ScreenDetection}
-          isActive
-          color="#FF0000"
-          widthPercent={widthPercent}
-          aspectRatio={aspectRatio}
-          containerWidth={cameraLayoutSize?.width}
-          containerHeight={cameraLayoutSize?.height}
-        />
-      </>
     );
   };
+    const renderScreenOverlays = () => {
+        if (templateViewport) {
+            return (
+                <TemplateOverlay
+                    layout={TemplateLayout.ScreenDetection}
+                    isActive
+                    color="#FF0000"
+                    viewportWidth={templateViewport.width}
+                    viewportHeight={templateViewport.height}
+                    offsetX={templateViewport.offsetX}
+                    offsetY={templateViewport.offsetY}
+                />
+            );
+        }
+
+        return (
+            <TemplateOverlay
+                layout={TemplateLayout.ScreenDetection}
+                isActive
+                color="#FF0000"
+                widthPercent={widthPercent}
+                aspectRatio={aspectRatio}
+                containerWidth={cameraLayoutSize?.width}
+                containerHeight={cameraLayoutSize?.height}
+            />
+        );
+    };
 
   const roiOverlay = (
     <TemplateOverlay
@@ -292,60 +298,22 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
       },
     ) ?? null;
 
-  const ocrValueLabels = ocrLayoutBoxes.map((box) => {
-    const filteredValue = ocrHistory.getFilteredValue(box.id);
-    const rawValue = ocrMap[box.id];
-    const displayValue = filteredValue || rawValue;
-    if (!displayValue) return null;
-
-    const labelTop = box.y + box.height - 24;
-    return (
-      <Box
-        key={box.id}
-        style={{
-          position: "absolute",
-          left: box.x,
-          top: labelTop + 30,
-          alignItems: "center",
-          zIndex: 200,
-        }}
-      >
-        <Box
-          style={{
-            backgroundColor: "rgba(0,0,0,0.7)",
-            borderRadius: 8,
-            paddingVertical: 4,
-            paddingHorizontal: 8,
-            minWidth: 40,
-            maxWidth: Math.max(box.width * 1.5, 120),
-          }}
-        >
-          <GluestackText
-            className={`text-sm text-center ${
-              filteredValue ? "text-green-400" : "text-yellow-400"
-            }`}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {displayValue}
-            {filteredValue && rawValue !== filteredValue && (
-              <GluestackText className="text-xs text-gray-400">
-                {" "}
-                (filtered)
-              </GluestackText>
-            )}
-          </GluestackText>
-        </Box>
-      </Box>
-    );
-  });
+  const ocrValueLabels = ocrLayoutBoxes.map((box) => (
+    <OcrFieldDisplay
+      key={box.id}
+      fieldId={box.id}
+      box={box}
+      ocrHistory={ocrHistory}
+    />
+  ));
 
   return (
     <>
-      {renderTemplateOverlays()}
+      {/*renderTemplateOverlays()*/}
+      {renderScreenOverlays()}
       {roiOverlay}
-      {screenDebug}
-      {ocrDebug}
+      {/*screenDebug*/}
+      {/*ocrDebug*/}
       {matchedBoxes}
       {allDetectedRects}
       {ocrValueLabels}

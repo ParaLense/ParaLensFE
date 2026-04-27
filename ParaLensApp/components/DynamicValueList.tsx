@@ -7,7 +7,7 @@ import {Input, InputField} from "@/components/ui/input";
 import {Pressable} from "@/components/ui/pressable";
 import {Text} from "@/components/ui/text";
 
-export interface IndexValuePair { index: string; v?: string; v2?: string; t?: string; p?: string; }
+export interface IndexValuePair { index: string; v?: string; v2?: string; t?: string; p?: string; state?: 'filtered' | 'multiple' | 'raw'; }
 
 interface Props {
   rows: IndexValuePair[];

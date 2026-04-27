@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
 import { useI18n } from "@/features/settings/i18n";
 import { useSettings } from "@/features/settings/settings-context";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 
 const LANG_OPTIONS = [
   { value: "de", label: "Deutsch" },
@@ -27,11 +28,12 @@ export default function SettingsScreen() {
       LANG_OPTIONS.find((opt) => opt.value === language)?.label ?? language,
     [language]
   );
+  const insets = useSafeAreaInsets();
 
   return (
     <Box
       style={{ 
-        flex: 1, 
+        flex: 1, paddingTop: insets.top,
         padding: 24,
         backgroundColor: isDark ? '#121212' : '#ffffff'
       }}

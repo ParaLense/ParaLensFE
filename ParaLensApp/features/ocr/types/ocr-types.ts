@@ -4,6 +4,7 @@
  */
 
 export type OcrFieldType = 'scrollbar' | 'value' | 'checkbox';
+export type ScrollbarRowState = 'filtered' | 'multiple' | 'raw';
 
 export type UnitSystem = 'iso' | 'imperial';
 export type ValueMode = 'absolute' | 'relative';
@@ -28,6 +29,8 @@ type ParsedScrollbarSegments = Record<
   {
     key: number[];   // all filtered "key"/start values (e.g. 0.0000, 0.0000, ...)
     value: number[]; // all filtered "value"/end values  (e.g. 8.0001, 8.0001, ...)
+    pairs?: Array<{ key: number; value: number }>;
+    state?: ScrollbarRowState;
   }
 >;
 

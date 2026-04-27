@@ -214,6 +214,11 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
       segment.value.push(valueNum);
     }
 
+    if (keyNum != null && valueNum != null && Number.isFinite(keyNum) && Number.isFinite(valueNum)) {
+      segment.pairs = segment.pairs ?? [];
+      segment.pairs.push({ key: keyNum, value: valueNum });
+    }
+
     // Nur speichern, wenn mindestens eine Seite etwas bekommen hat
     if (segment.key.length > 0 || segment.value.length > 0) {
       parsed[pairIndex] = segment;

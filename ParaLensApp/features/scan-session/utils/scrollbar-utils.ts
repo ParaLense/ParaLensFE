@@ -21,7 +21,7 @@ export const buildRowsFromScrollbar = (
 
   return indices.map((idx) => {
     const seg = scrollbar[idx];
-    const row: IndexValuePair = { index: String(idx + 1) };
+    const row: IndexValuePair = { index: String(idx + 1), state: seg?.state };
     const key = seg?.key?.[0];
     const val = seg?.value?.[0];
     if (typeof key === "number" && Number.isFinite(key)) {

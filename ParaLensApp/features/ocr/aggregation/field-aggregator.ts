@@ -23,9 +23,14 @@ export const mergeParsedScrollbar = (
     const current = (result[idx] ?? { key: [], value: [] }) as {
       key: number[];
       value: number[];
+      pairs?: Array<{ key: number; value: number }>;
     };
     if (Array.isArray((segment as any).key)) current.key.push(...(segment as any).key);
     if (Array.isArray((segment as any).value)) current.value.push(...(segment as any).value);
+    if (Array.isArray((segment as any).pairs)) {
+      current.pairs = current.pairs ?? [];
+      current.pairs.push(...(segment as any).pairs);
+    }
     result[idx] = current;
   }
 
@@ -93,25 +98,64 @@ export const computeBestScrollbar = (
   for (const idx of indices) {
     const segment = agg[idx];
     if (!segment) continue;
-    const bestKey = pickMajorityValue(segment.key, minOccurrences);
-    const bestValue = pickMajorityValue(segment.value, minOccurrences);
+
+    let bestKey: number | null = null;
+    let bestValue: number | null = null;
+    let bestCount = 0;
+    let uniquePairs = 0;
+
+    if (Array.isArray(segment.pairs) && segment.pairs.length > 0) {
+      const counts = new Map<string, { key: number; value: number; count: number }>();
+      for (const pair of segment.pairs) {
+        const key = `${pair.key}|${pair.value}`;
+        const existing = counts.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          counts.set(key, { key: pair.key, value: pair.value, count: 1 });
+        }
+      }
+      uniquePairs = counts.size;
+      for (const entry of counts.values()) {
+        if (entry.count > bestCount) {
+          bestCount = entry.count;
+          bestKey = entry.key;
+          bestValue = entry.value;
+        }
+      }
+    } else {
+      const fallbackKey = pickMajorityValue(segment.key, 1);
+      const fallbackValue = pickMajorityValue(segment.value, 1);
+      bestKey = fallbackKey ?? null;
+      bestValue = fallbackValue ?? null;
+      bestCount = 0;
+      uniquePairs = 0;
+    }
+
     if (bestKey == null || bestValue == null) continue;
+
+    const state = bestCount >= minOccurrences ? 'filtered' : uniquePairs > 1 ? 'multiple' : 'raw';
 
     bestParsed[idx] = {
       key: [bestKey],
       value: [bestValue],
+      state,
     };
-    // Format with four decimal places and append units (once per side)
-    const keySuffix = keyUnit ? ` ${keyUnit}` : '';
-    const valueSuffix = valueUnit ? ` ${valueUnit}` : '';
-    parts.push(
-      `${idx}: (${bestKey.toFixed(SCROLLBAR_DECIMALS)}${keySuffix},${bestValue.toFixed(
-        SCROLLBAR_DECIMALS
-      )}${valueSuffix})`
-    );
+
+    if (state === 'filtered') {
+      const keySuffix = keyUnit ? ` ${keyUnit}` : '';
+      const valueSuffix = valueUnit ? ` ${valueUnit}` : '';
+      parts.push(
+        `${idx}: (${bestKey.toFixed(SCROLLBAR_DECIMALS)}${keySuffix},${bestValue.toFixed(
+          SCROLLBAR_DECIMALS
+        )}${valueSuffix})`
+      );
+    }
   }
 
-  if (parts.length === 0) return null;
+  if (parts.length === 0) {
+    if (Object.keys(bestParsed).length === 0) return null;
+  }
 
   // Store units in result
   if (keyUnit) bestParsed.keyUnit = keyUnit;
