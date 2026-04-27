@@ -9,6 +9,16 @@ export type FullScanExcelData = {
   maxRow: number;
 };
 
+const toExcelNumber = (value: any): number | string | null => {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number") return Number(value.toFixed(2));
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : value;
+};
+
+const labelWithUnit = (label: string, unit?: string | null): string =>
+  unit ? `${label} [${unit}]` : label;
+
 export function buildFullScanExcelData(
   scan: FullScanDto,
   XLSX: any,
@@ -64,12 +74,12 @@ export function buildFullScanExcelData(
     data: { value: any; unit?: string } | any,
   ) => {
     if (typeof data === "object" && data !== null && "value" in data) {
-      setCell(row, col, data.value);
+      setCell(row, col, toExcelNumber(data.value));
       if (data.unit) {
         setCell(row, col - 2, data.unit);
       }
     } else {
-      setCell(row, col, data);
+      setCell(row, col, toExcelNumber(data));
     }
   };
 
@@ -104,98 +114,98 @@ export function buildFullScanExcelData(
   const cylEndRow = cylStartRow + 4;
 
   const injEndRow = 9 + injCount;
-  setCell(2, 1, "Injection");
-  setCell(2, 2, "Mainpage");
-  setCell(2, 3, "Injection Pressure");
+  setCell(2, 1, "Einspritzen");
+  setCell(2, 2, "Hauptseite");
+  setCell(2, 3, "Einspritzdruck");
   setCell(3, 2, null);
   setCell(3, 3, "IsIncreasedSpecificPressure");
 
-  setCell(4, 2, "Undermenu");
-  setCell(4, 3, "Injection Speed");
+  setCell(4, 2, "Sollwertgrafik");
+  setCell(4, 3, "Einspritzgeschwindigkeit");
   const injUnits = getScrollUnits(
     injection?.subMenuValues || injection?.SubMenuValues,
   );
-  setCell(4, 4, injUnits.keyUnit || "v");
-  setCell(4, 5, injUnits.valueUnit || "v2");
-  setCell(5, 3, "Actual Value (List)");
+  setCell(4, 4, labelWithUnit("V", injUnits.keyUnit));
+  setCell(4, 5, labelWithUnit("v", injUnits.valueUnit));
+  setCell(5, 3, "Istwert (Liste)");
 
-  setCell(6, 2, "Switch Over");
-  setCell(injWayRow, 3, "Way");
-  setCell(injTimeRow, 3, "Time");
-  setCell(injHydRow, 3, "Hydraulic Pressure");
-  setCell(injActiveModeRow, 3, "Active Switch Over Mode");
+  setCell(6, 2, "Umschaltart");
+  setCell(injWayRow, 3, "Volumen");
+  setCell(injTimeRow, 3, "Zeit");
+  setCell(injHydRow, 3, "Einspritzdruck");
+  setCell(injActiveModeRow, 3, "Aktive Umschaltart");
 
   const hpEndRow = 14 + injCount + hpCount;
-  setCell(hpMainStartRow, 1, "Holding Pressure");
-  setCell(hpMainStartRow, 2, "Mainpage");
-  setCell(hpMainStartRow, 3, "ReprintTime");
+  setCell(hpMainStartRow, 1, "Nachdruck");
+  setCell(hpMainStartRow, 2, "Hauptseite");
+  setCell(hpMainStartRow, 3, "Nachdruckzeit");
   setCell(hpMainStartRow + 1, 2, null);
-  setCell(hpMainStartRow + 1, 3, "CoolTime");
+  setCell(hpMainStartRow + 1, 3, "Kühlzeit");
   setCell(hpMainStartRow + 2, 2, null);
-  setCell(hpMainStartRow + 2, 3, "ScrewDiameter");
+  setCell(hpMainStartRow + 2, 3, "Schneckendurchmesser");
 
-  setCell(hpUndermenuStartRow, 2, "Undermenu");
-  setCell(hpUndermenuStartRow, 3, "Holding Pressure");
+  setCell(hpUndermenuStartRow, 2, "Sollwertgrafik");
+  setCell(hpUndermenuStartRow, 3, "Spezifischer Nachdruck");
   const hpUnits = getScrollUnits(
     holdingPressure?.subMenusValues || holdingPressure?.SubMenusValues,
   );
-  setCell(hpUndermenuStartRow, 4, hpUnits.keyUnit || "t");
-  setCell(hpUndermenuStartRow, 5, hpUnits.valueUnit || "p");
-  setCell(hpHeaderRowAfter, 3, "Actual Value (List)");
+  setCell(hpUndermenuStartRow, 4, labelWithUnit("t", hpUnits.keyUnit));
+  setCell(hpUndermenuStartRow, 5, labelWithUnit("p", hpUnits.valueUnit));
+  setCell(hpHeaderRowAfter, 3, "Istwert (Liste)");
 
   const dosingPressureEndRow =
     dosingPressureHeaderRowAdjusted + dosingPressureCount;
   const dosingEndRow = dosingPressureEndRow;
 
-  setCell(dosingMainStartRow, 1, "Dosing");
-  setCell(dosingMainStartRow, 2, "Mainpage");
-  setCell(dosingMainStartRow, 3, "DosingStroke");
+  setCell(dosingMainStartRow, 1, "Dosieren");
+  setCell(dosingMainStartRow, 2, "Hauptseite");
+  setCell(dosingMainStartRow, 3, "Dosiervolumen");
   setCell(dosingMainStartRow + 1, 2, null);
-  setCell(dosingMainStartRow + 1, 3, "DosingDelayTime");
+  setCell(dosingMainStartRow + 1, 3, "Dosierverzögerungszeit");
   setCell(dosingMainStartRow + 2, 2, null);
-  setCell(dosingMainStartRow + 2, 3, "RelieveDosing");
+  setCell(dosingMainStartRow + 2, 3, "Entlastung vor Dosieren");
   setCell(dosingMainStartRow + 3, 2, null);
-  setCell(dosingMainStartRow + 3, 3, "RelieveAfterDosing");
+  setCell(dosingMainStartRow + 3, 3, "Entlastung nach Dosieren");
   setCell(dosingMainStartRow + 4, 2, null);
-  setCell(dosingMainStartRow + 4, 3, "DischargeSpeedBeforeDosing");
+  setCell(dosingMainStartRow + 4, 3, "Entlastungsgeschwindigkeit vor Dosieren");
   setCell(dosingMainStartRow + 5, 2, null);
-  setCell(dosingMainStartRow + 5, 3, "DischargeSpeedAfterDosing");
+  setCell(dosingMainStartRow + 5, 3, "Entlastungsgeschwindigkeit nach Dosieren");
 
-  setCell(dosingUndermenuStartRow, 2, "Undermenu");
-  setCell(dosingUndermenuStartRow, 3, "DosingSpeed");
+  setCell(dosingUndermenuStartRow, 2, "Sollwertgrafik");
+  setCell(dosingUndermenuStartRow, 3, "Dosiergeschwindigkeit");
   const dosingSpeedUnits = getScrollUnits(
     dosing?.dosingSpeedsValues || dosing?.DosingSpeedsValues,
   );
-  setCell(dosingUndermenuStartRow, 4, dosingSpeedUnits.keyUnit || "v");
-  setCell(dosingUndermenuStartRow, 5, dosingSpeedUnits.valueUnit || "v2");
+  setCell(dosingUndermenuStartRow, 4, labelWithUnit("V", dosingSpeedUnits.keyUnit));
+  setCell(dosingUndermenuStartRow, 5, labelWithUnit("v", dosingSpeedUnits.valueUnit));
   setCell(
     dosingSpeedHeaderRow + injCount + hpCount,
     3,
-    "Actual Value (List)",
+    "Istwert (Liste)",
   );
 
-  setCell(dosingPressureHeaderRowAdjusted, 3, "DosingPressure");
+  setCell(dosingPressureHeaderRowAdjusted, 3, "Spezifischer Staudruck");
   const dosingPressureUnits = getScrollUnits(
     dosing?.dosingPressuresValues || dosing?.DosingPressuresValues,
   );
-  setCell(dosingPressureHeaderRowAdjusted, 4, dosingPressureUnits.keyUnit || "v");
+  setCell(dosingPressureHeaderRowAdjusted, 4, labelWithUnit("V", dosingPressureUnits.keyUnit));
   setCell(
     dosingPressureHeaderRowAdjusted,
     5,
-    dosingPressureUnits.valueUnit || "p",
+    labelWithUnit("P", dosingPressureUnits.valueUnit),
   );
 
-  setCell(cylStartRow, 1, "Cylinder Heating");
-  setCell(cylStartRow, 2, "Mainpage");
-  setCell(cylStartRow, 3, "Sollwert1");
+  setCell(cylStartRow, 1, "Zylinderheizung");
+  setCell(cylStartRow, 2, "Hauptseite");
+  setCell(cylStartRow, 3, "Sollwert 1");
   setCell(cylStartRow + 1, 2, null);
-  setCell(cylStartRow + 1, 3, "Sollwert2");
+  setCell(cylStartRow + 1, 3, "Sollwert 2");
   setCell(cylStartRow + 2, 2, null);
-  setCell(cylStartRow + 2, 3, "Sollwert3");
+  setCell(cylStartRow + 2, 3, "Sollwert 3");
   setCell(cylStartRow + 3, 2, null);
-  setCell(cylStartRow + 3, 3, "Sollwert4");
+  setCell(cylStartRow + 3, 3, "Sollwert 4");
   setCell(cylStartRow + 4, 2, null);
-  setCell(cylStartRow + 4, 3, "Sollwert5");
+  setCell(cylStartRow + 4, 3, "Sollwert 5");
 
   const injMainMenu = injection?.mainMenu || injection?.MainMenu;
   const injSwitchType = injection?.switchType || injection?.SwitchType;
@@ -254,19 +264,19 @@ export function buildFullScanExcelData(
       injSwitchType.switch_over_way?.value === "1" ||
       injSwitchType.switch_over_way?.value === true
     ) {
-      activeMode = "Way";
+      activeMode = "Volumen";
     } else if (
       injSwitchType.switchOverTimeActive ||
       injSwitchType.switch_over_time?.value === "1" ||
       injSwitchType.switch_over_time?.value === true
     ) {
-      activeMode = "Time";
+      activeMode = "Zeit";
     } else if (
       injSwitchType.switchOverHydraulic ||
       injSwitchType.switch_over_hydraulic?.value === "1" ||
       injSwitchType.switch_over_hydraulic?.value === true
     ) {
-      activeMode = "Hydraulic Pressure";
+      activeMode = "Einspritzdruck";
     }
     setCell(injActiveModeRow, valuesStartCol, activeMode);
   }
@@ -380,8 +390,8 @@ export function buildFullScanExcelData(
           (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0),
       )
       .forEach((v: any) => {
-        setCell(r, 4, v.v ?? v.V ?? null);
-        setCell(r, 5, v.v2 ?? v.V2 ?? null);
+        setCell(r, 4, toExcelNumber(v.v ?? v.V ?? null));
+        setCell(r, 5, toExcelNumber(v.v2 ?? v.V2 ?? null));
         r++;
       });
   }
@@ -398,8 +408,8 @@ export function buildFullScanExcelData(
           (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0),
       )
       .forEach((v: any) => {
-        setCell(r, 4, v.t ?? v.T ?? null);
-        setCell(r, 5, v.p ?? v.P ?? null);
+        setCell(r, 4, toExcelNumber(v.t ?? v.T ?? null));
+        setCell(r, 5, toExcelNumber(v.p ?? v.P ?? null));
         r++;
       });
   }
@@ -416,8 +426,8 @@ export function buildFullScanExcelData(
           (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0),
       )
       .forEach((v: any) => {
-        setCell(r, 4, v.v ?? v.V ?? null);
-        setCell(r, 5, v.v2 ?? v.V2 ?? null);
+        setCell(r, 4, toExcelNumber(v.v ?? v.V ?? null));
+        setCell(r, 5, toExcelNumber(v.v2 ?? v.V2 ?? null));
         r++;
       });
   }
@@ -434,8 +444,8 @@ export function buildFullScanExcelData(
           (a.index ?? a.Index ?? 0) - (b.index ?? b.Index ?? 0),
       )
       .forEach((v: any) => {
-        setCell(r, 4, v.v ?? v.V ?? null);
-        setCell(r, 5, v.p ?? v.P ?? null);
+        setCell(r, 4, toExcelNumber(v.v ?? v.V ?? null));
+        setCell(r, 5, toExcelNumber(v.p ?? v.P ?? v.v2 ?? v.V2 ?? null));
         r++;
       });
   }

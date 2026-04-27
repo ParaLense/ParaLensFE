@@ -9,6 +9,7 @@ import { formatUnitLabel } from "@/features/scan-session/utils/scrollbar-utils";
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   values: IndexValuePair[];
   setValues: (rows: IndexValuePair[]) => void;
   units: ScrollbarUnits;
@@ -16,6 +17,7 @@ type Props = {
 
 export function InjectionSubMenuGraphicReview({
   isDark,
+  t,
   values,
   setValues,
   units,
@@ -26,14 +28,14 @@ export function InjectionSubMenuGraphicReview({
         size="sm"
         className={isDark ? "text-typography-50" : "text-typography-900"}
       >
-        Werte (Index, v, v2)
+        {t("injectionSpeed")} (Index, V, v)
       </Heading>
       <DynamicValueList
         rows={values}
         setRows={setValues}
         labels={{
-          v: formatUnitLabel("v", units.keyUnit),
-          v2: formatUnitLabel("v2", units.valueUnit),
+          v: formatUnitLabel("V", units.keyUnit),
+          v2: formatUnitLabel("v", units.valueUnit),
         }}
         units={{
           v: units.keyUnit,

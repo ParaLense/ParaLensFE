@@ -86,7 +86,7 @@ const RootSelection: React.FC<Props> = ({
                 textTransform: "capitalize",
               }}
             >
-              {menu}
+              {t(menu)}
             </Text>
           </Button>
         ))}

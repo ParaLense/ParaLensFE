@@ -57,6 +57,9 @@ export function buildWorksheetFromRows(XLSX: any, rows: ExcelRows) {
     const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
     if (!ws[cellAddr]) ws[cellAddr] = { v: null, t: "s" };
     ws[cellAddr].s = style;
+    if (typeof ws[cellAddr].v === "number") {
+      ws[cellAddr].z = "0.00";
+    }
   };
 
   for (let r = 0; r < maxRow; r++) {
