@@ -65,10 +65,23 @@ const COL_WIDTHS_DEFAULT = [
   { width: 14 }, { width: 16 },
 ];
 
+const NUMBER_FORMAT = "0.00";
+
+function labelWithUnit(label: string, unit?: string | null) {
+  return unit ? `${label} [${unit}]` : label;
+}
+
+function numericCell(value: number | string | undefined | null): number | string {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number") return Number(value.toFixed(2));
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : value;
+}
+
 /** Extract value + unit from a ValueUnit field into two cell entries */
 function vu(field: ValueUnit | undefined): [value: number | string, unit: string] {
   if (!field) return ["", ""];
-  return [field.value ?? "", field.unit ?? ""];
+  return [numericCell(field.value), field.unit ?? ""];
 }
 
 function addHeaderRow(ws: ExcelWorksheet, label: string) {
@@ -83,184 +96,204 @@ function addSubHeaderRow(ws: ExcelWorksheet, col1: string, col2: string) {
   r.font = { bold: true };
 }
 
+function addScrollValueRow(ws: ExcelWorksheet, key: number | string, value: number | string) {
+  const row = ws.addRow(["", numericCell(key), numericCell(value)]);
+  row.getCell(2).numFmt = NUMBER_FORMAT;
+  row.getCell(3).numFmt = NUMBER_FORMAT;
+}
+
+function formatNumericColumns(ws: ExcelWorksheet) {
+  ws.eachRow((row) => {
+    row.eachCell((cell) => {
+      if (typeof cell.value === "number") {
+        cell.numFmt = NUMBER_FORMAT;
+      }
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Build worksheets – fully typed, no `as any`
 // ---------------------------------------------------------------------------
 
 function buildInjectionSheet(wb: ExcelWorkbook, inj: InjectionDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Injection");
+  const ws = wb.addWorksheet("Einspritzen");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: InjectionMainMenuDto | undefined = inj.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptseite");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.sprayPressureLimit);
-    ws.addRow(["", "Spray Pressure Limit", val, unit]);
+    ws.addRow(["", "Spritzdruckgrenze", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.increasedSpecificPointPrinter);
-    ws.addRow(["", "Increased Specific Point Printer", val, unit]);
+    ws.addRow(["", "Erhöhter spezifischer Druck", val, unit]);
   }
   ws.addRow([]);
 
   // --- Sub Menu (Injection Speed Scroll) ---
   const sub: InjectionSubMenuScrollDto | undefined = inj.subMenuValues;
-  addHeaderRow(ws, "Sub Menu – Injection Speed");
-  addSubHeaderRow(ws, sub?.keyUnit ?? "v", sub?.valueUnit ?? "v2");
+  addHeaderRow(ws, "Sollwertgrafik - Einspritzgeschwindigkeit");
+  addSubHeaderRow(ws, "V (cm^3)", "v (cm^3/s)");
 
   const subValues: InjectionSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
   ws.addRow([]);
 
   // --- Switch Type ---
   const sw: InjectionSubMenuSwitchTypeDto | undefined = inj.switchType;
-  addHeaderRow(ws, "Switch Over");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Umschaltart");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(sw?.transshipmentPosition);
-    ws.addRow(["", "Way (Transshipment Position)", val, unit]);
+    ws.addRow(["", "Volumen", val, unit]);
   }
   {
     const [val, unit] = vu(sw?.switchOverTime);
-    ws.addRow(["", "Time", val, unit]);
+    ws.addRow(["", "Zeit", val, unit]);
   }
   {
     const [val, unit] = vu(sw?.switchingPressure);
-    ws.addRow(["", "Hydraulic Pressure", val, unit]);
+    ws.addRow(["", "Einspritzdruck", val, unit]);
   }
 
   let activeMode = "";
-  if (sw?.switchOverWay) activeMode = "Way";
-  else if (sw?.switchOverTimeActive) activeMode = "Time";
-  else if (sw?.switchOverHydraulic) activeMode = "Hydraulic Pressure";
-  ws.addRow(["", "Active Switch Over Mode", activeMode]);
+  if (sw?.switchOverWay) activeMode = "Volumen";
+  else if (sw?.switchOverTimeActive) activeMode = "Zeit";
+  else if (sw?.switchOverHydraulic) activeMode = "Einspritzdruck";
+  ws.addRow(["", "Aktive Umschaltart", activeMode]);
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildHoldingPressureSheet(wb: ExcelWorkbook, hp: HoldingPressureDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Holding Pressure");
+  const ws = wb.addWorksheet("Nachdruck");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: HoldingPressureMainMenuDto | undefined = hp.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptseite");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.holdingTime);
-    ws.addRow(["", "Holding Time", val, unit]);
+    ws.addRow(["", "Nachdruckzeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.coolTime);
-    ws.addRow(["", "Cool Time", val, unit]);
+    ws.addRow(["", "Kühlzeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.screwDiameter);
-    ws.addRow(["", "Screw Diameter", val, unit]);
+    ws.addRow(["", "Schneckendurchmesser", val, unit]);
   }
   ws.addRow([]);
 
   // --- Sub Menu (Holding Pressure Scroll) ---
   const sub: HoldingPressureSubMenuScrollDto | undefined = hp.subMenusValues;
-  addHeaderRow(ws, "Sub Menu – Holding Pressure");
-  addSubHeaderRow(ws, sub?.keyUnit ?? "t", sub?.valueUnit ?? "p");
+  addHeaderRow(ws, "Sollwertgrafik - Spezifischer Nachdruck");
+  addSubHeaderRow(ws, labelWithUnit("t", sub?.keyUnit), labelWithUnit("p", sub?.valueUnit));
 
   const subValues: HoldingPressureSubMenuValueDto[] = sub?.values ?? [];
   [...subValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.t, val.p]);
+      addScrollValueRow(ws, val.t, val.p);
     });
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildDosingSheet(wb: ExcelWorkbook, dos: DosingDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Dosing");
+  const ws = wb.addWorksheet("Dosieren");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   // --- Main Menu ---
   const mm: DosingMainMenuDto | undefined = dos.mainMenu;
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value", "Unit"]);
+  addHeaderRow(ws, "Hauptseite");
+  ws.addRow(["", "Parameter", "Wert", "Einheit"]);
   {
     const [val, unit] = vu(mm?.dosingStroke);
-    ws.addRow(["", "Dosing Stroke", val, unit]);
+    ws.addRow(["", "Dosiervolumen", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dosingDelayTime);
-    ws.addRow(["", "Dosing Delay Time", val, unit]);
+    ws.addRow(["", "Dosierverzögerungszeit", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.relieveDosing);
-    ws.addRow(["", "Relieve Dosing", val, unit]);
+    ws.addRow(["", "Entlastung vor Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.relieveAfterDosing);
-    ws.addRow(["", "Relieve After Dosing", val, unit]);
+    ws.addRow(["", "Entlastung nach Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedBeforeDosing);
-    ws.addRow(["", "Discharge Speed Before Dosing", val, unit]);
+    ws.addRow(["", "Entlastungsgeschwindigkeit vor Dosieren", val, unit]);
   }
   {
     const [val, unit] = vu(mm?.dischargeSpeedAfterDosing);
-    ws.addRow(["", "Discharge Speed After Dosing", val, unit]);
+    ws.addRow(["", "Entlastungsgeschwindigkeit nach Dosieren", val, unit]);
   }
   ws.addRow([]);
 
   // --- Dosing Speed ---
   const speed: DosingSubMenuDosingSpeedScrollDto | undefined = dos.dosingSpeedsValues;
-  addHeaderRow(ws, "Sub Menu – Dosing Speed");
-  addSubHeaderRow(ws, speed?.keyUnit ?? "v", speed?.valueUnit ?? "v2");
+  addHeaderRow(ws, "Sollwertgrafik - Dosiergeschwindigkeit");
+  addSubHeaderRow(ws, labelWithUnit("V", speed?.keyUnit), labelWithUnit("v", speed?.valueUnit));
 
   const speedValues: DosingSubMenuDosingSpeedValueDto[] = speed?.values ?? [];
   [...speedValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
   ws.addRow([]);
 
   // --- Dosing Pressure ---
   const pressure: DosingSubMenuDosingPressureScrollDto | undefined = dos.dosingPressuresValues;
-  addHeaderRow(ws, "Sub Menu – Dosing Pressure");
-  addSubHeaderRow(ws, pressure?.keyUnit ?? "v", pressure?.valueUnit ?? "p");
+  addHeaderRow(ws, "Sollwertgrafik - Spezifischer Staudruck");
+  addSubHeaderRow(ws, labelWithUnit("V", pressure?.keyUnit), labelWithUnit("P", pressure?.valueUnit));
 
   const pressureValues: DosingSubMenuDosingPressureValueDto[] = pressure?.values ?? [];
   [...pressureValues]
     .sort((a, b) => a.index - b.index)
     .forEach((val) => {
-      ws.addRow(["", val.v, val.v2]);
+      addScrollValueRow(ws, val.v, val.v2);
     });
 
+  formatNumericColumns(ws);
   return ws;
 }
 
 function buildCylinderHeatingSheet(wb: ExcelWorkbook, cyl: CylinderHeatingDto): ExcelWorksheet {
-  const ws = wb.addWorksheet("Cylinder Heating");
+  const ws = wb.addWorksheet("Zylinderheizung");
   ws.columns = COL_WIDTHS_DEFAULT;
 
   const mm: CylinderHeatingMainMenuDto | undefined = cyl.mainMenu;
   if (!mm) {
-    ws.addRow(["No cylinder heating data"]);
+    ws.addRow(["Keine Daten zur Zylinderheizung vorhanden"]);
     return ws;
   }
 
-  addHeaderRow(ws, "Main Menu");
-  ws.addRow(["", "Parameter", "Value"]);
-  ws.addRow(["", "Setpoint 1", mm.setpoint1]);
-  ws.addRow(["", "Setpoint 2", mm.setpoint2]);
-  ws.addRow(["", "Setpoint 3", mm.setpoint3]);
-  ws.addRow(["", "Setpoint 4", mm.setpoint4]);
-  ws.addRow(["", "Setpoint 5", mm.setpoint5]);
+  addHeaderRow(ws, "Hauptseite");
+  ws.addRow(["", "Parameter", "Wert"]);
+  ws.addRow(["", "Sollwert 1", mm.setpoint1]);
+  ws.addRow(["", "Sollwert 2", mm.setpoint2]);
+  ws.addRow(["", "Sollwert 3", mm.setpoint3]);
+  ws.addRow(["", "Sollwert 4", mm.setpoint4]);
+  ws.addRow(["", "Sollwert 5", mm.setpoint5]);
 
+  formatNumericColumns(ws);
   return ws;
 }
 
@@ -319,6 +352,141 @@ function getScreenshotsForSection(
   return result;
 }
 
+function toRNFSPath(pathOrUri: string): string {
+  return pathOrUri.startsWith("file://") ? pathOrUri.replace("file://", "") : pathOrUri;
+}
+
+type ExcelExportLabels = {
+  fileReady: string;
+  fileReadyMessage: string;
+  share: string;
+  saveOnly: string;
+  cancel: string;
+  fileSaved: string;
+  fileSavedTo: string;
+  fileSavedToDownloads: string;
+  shareUnavailable: string;
+  sharingUnavailableMessage: string;
+  shareFailed: string;
+  shareFailedMessage: string;
+  saveFailed: string;
+  saveFailedMessage: string;
+  permissionDenied: string;
+  storagePermissionRequired: string;
+  storagePermissionTitle: string;
+  storagePermissionMessage: string;
+  askMeLater: string;
+  ok: string;
+  exportFailed: string;
+  scanNotFound: string;
+  cacheUnavailable: string;
+};
+
+const DEFAULT_EXCEL_EXPORT_LABELS: ExcelExportLabels = {
+  fileReady: "Excel File Ready",
+  fileReadyMessage: "What would you like to do with the file?",
+  share: "Share",
+  saveOnly: "Save only",
+  cancel: "Cancel",
+  fileSaved: "File Saved",
+  fileSavedTo: "Excel file saved to:",
+  fileSavedToDownloads: "Excel file saved to Downloads:",
+  shareUnavailable: "Share Unavailable",
+  sharingUnavailableMessage: "Sharing is not available on this device.",
+  shareFailed: "Share failed",
+  shareFailedMessage: "Could not share the file.",
+  saveFailed: "Save failed",
+  saveFailedMessage: "Could not save the file to downloads.",
+  permissionDenied: "Permission Denied",
+  storagePermissionRequired: "Storage permission is required to save the file.",
+  storagePermissionTitle: "Storage Permission",
+  storagePermissionMessage: "This app needs access to storage to save the file.",
+  askMeLater: "Ask Me Later",
+  ok: "OK",
+  exportFailed: "Export failed",
+  scanNotFound: "Scan not found!",
+  cacheUnavailable: "Cache directory is not available",
+};
+
+async function shareExcelFile(fileUri: string, labels: ExcelExportLabels) {
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      UTI: "com.microsoft.excel.xlsx",
+    });
+    return;
+  }
+
+  Alert.alert(labels.shareUnavailable, labels.sharingUnavailableMessage);
+}
+
+async function saveExcelFile(
+  fileUri: string,
+  fileName: string,
+  labels: ExcelExportLabels,
+) {
+  if (Platform.OS !== "android") {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        UTI: "com.microsoft.excel.xlsx",
+      });
+    } else {
+      Alert.alert(labels.fileSaved, `${labels.fileSavedTo}\n${fileUri}`);
+    }
+    return;
+  }
+
+  const androidVersion = Number(Platform.Version);
+  if (androidVersion < 33) {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      {
+        title: labels.storagePermissionTitle,
+        message: labels.storagePermissionMessage,
+        buttonNeutral: labels.askMeLater,
+        buttonNegative: labels.cancel,
+        buttonPositive: labels.ok,
+      },
+    );
+
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+      Alert.alert(
+        labels.permissionDenied,
+        labels.storagePermissionRequired,
+      );
+      return;
+    }
+  }
+
+  const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+  const sourcePath = toRNFSPath(fileUri);
+
+  const sourceExists = await RNFS.exists(sourcePath);
+  if (!sourceExists) throw new Error("Source file was not created.");
+
+  const fileContent = await RNFS.readFile(sourcePath, "base64");
+  await RNFS.writeFile(downloadPath, fileContent, "base64");
+
+  const fileExists = await RNFS.exists(downloadPath);
+  if (!fileExists) {
+    throw new Error("The file could not be found after saving.");
+  }
+
+  try {
+    await RNFS.scanFile(downloadPath);
+  } catch (scanError) {
+    console.warn("Failed to scan file:", scanError);
+  }
+
+  Alert.alert(
+    labels.fileSaved,
+    `${labels.fileSavedToDownloads}\n${downloadPath}`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main export function
 // ---------------------------------------------------------------------------
@@ -326,11 +494,13 @@ function getScreenshotsForSection(
 export const handleLocalExcelDownload = async (
   scanId: number,
   fullScans: FullScanDto[],
+  exportLabels?: Partial<ExcelExportLabels>,
 ) => {
+  const labels = { ...DEFAULT_EXCEL_EXPORT_LABELS, ...exportLabels };
   try {
     const scan = fullScans?.find((fs) => fs.id === scanId);
     if (!scan) {
-      Alert.alert("Excel (local)", "Scan not found!");
+      Alert.alert("Excel (local)", labels.scanNotFound);
       return;
     }
 
@@ -380,7 +550,7 @@ export const handleLocalExcelDownload = async (
 
     const cacheDir = FileSystem.cacheDirectory;
     if (!cacheDir) {
-      Alert.alert("Export failed", "Cache directory is not available");
+      Alert.alert(labels.exportFailed, labels.cacheUnavailable);
       return;
     }
 
@@ -390,142 +560,45 @@ export const handleLocalExcelDownload = async (
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // Ask user what they want to do with the file
     Alert.alert(
-      "Excel File Ready",
-      "What would you like to do with the file?",
+      labels.fileReady,
+      labels.fileReadyMessage,
       [
         {
-          text: "Share",
+          text: labels.share,
           onPress: async () => {
             try {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                  mimeType:
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                  UTI: "com.microsoft.excel.xlsx",
-                });
-              } else {
-                Alert.alert(
-                  "Share Unavailable",
-                  "Sharing is not available on this device.",
-                );
-              }
+              await shareExcelFile(fileUri, labels);
             } catch (shareError: any) {
               Alert.alert(
-                "Share failed",
-                shareError?.message || "Could not share the file.",
+                labels.shareFailed,
+                shareError?.message || labels.shareFailedMessage,
               );
             }
           },
         },
         {
-          text: "Save to Downloads",
+          text: labels.saveOnly,
           onPress: async () => {
             try {
-              if (Platform.OS === "android") {
-                const androidVersion = Platform.Version as number;
-                let hasPermission = true;
-
-                if (androidVersion < 33) {
-                  const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                    {
-                      title: "Storage Permission",
-                      message:
-                        "This app needs access to storage to save the file.",
-                      buttonNeutral: "Ask Me Later",
-                      buttonNegative: "Cancel",
-                      buttonPositive: "OK",
-                    },
-                  );
-                  hasPermission =
-                    granted === PermissionsAndroid.RESULTS.GRANTED;
-                }
-
-                if (!hasPermission) {
-                  Alert.alert(
-                    "Permission Denied",
-                    "Storage permission is required to save the file.",
-                  );
-                  return;
-                }
-
-                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-
-                try {
-                  const sourceExists = await RNFS.exists(fileUri);
-                  if (!sourceExists) {
-                    Alert.alert(
-                      "Error",
-                      "Source file not found. Please try again.",
-                    );
-                    return;
-                  }
-
-                  const fileContent = await RNFS.readFile(fileUri, "base64");
-                  await RNFS.writeFile(downloadPath, fileContent, "base64");
-
-                  const fileExists = await RNFS.exists(downloadPath);
-                  if (!fileExists) {
-                    Alert.alert(
-                      "Error",
-                      "Failed to save file. Please check storage permissions.",
-                    );
-                    return;
-                  }
-                } catch (writeError: any) {
-                  console.warn("Direct write failed, trying copy:", writeError);
-                  const sourceExists = await RNFS.exists(fileUri);
-                  if (!sourceExists) {
-                    Alert.alert(
-                      "Error",
-                      "Source file not found. Please try again.",
-                    );
-                    return;
-                  }
-                  await RNFS.copyFile(fileUri, downloadPath);
-                }
-
-                try {
-                  await RNFS.scanFile(downloadPath);
-                } catch (scanError) {
-                  console.warn("Failed to scan file:", scanError);
-                }
-
-                Alert.alert(
-                  "File Saved",
-                  `Excel file saved to Downloads:\n${downloadPath}`,
-                );
-              } else {
-                // iOS – just share (save to Files via share sheet)
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType:
-                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    UTI: "com.microsoft.excel.xlsx",
-                  });
-                } else {
-                  Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
-                }
-              }
+              await saveExcelFile(fileUri, fileName, labels);
             } catch (saveError: any) {
               Alert.alert(
-                "Save failed",
-                saveError?.message ||
-                  "Could not save the file to downloads.",
+                labels.saveFailed,
+                saveError?.message || labels.saveFailedMessage,
               );
             }
           },
         },
         {
-          text: "Cancel",
+          text: labels.cancel,
           style: "cancel",
         },
       ],
       { cancelable: true },
     );
+
   } catch (e: any) {
-    Alert.alert("Export failed", e?.message ?? String(e));
+    Alert.alert(labels.exportFailed, e?.message ?? String(e));
   }
 };

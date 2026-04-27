@@ -92,6 +92,18 @@ export default function HistoryScreen() {
         [fullScans, selectedId],
     );
 
+    const sortedFullScans = useMemo(
+        () =>
+            [...(fullScans ?? [])].sort((a: any, b: any) => {
+                const dateA = Date.parse(a?.date);
+                const dateB = Date.parse(b?.date);
+                const timeA = Number.isFinite(dateA) ? dateA : 0;
+                const timeB = Number.isFinite(dateB) ? dateB : 0;
+                return timeB - timeA || (b?.id ?? 0) - (a?.id ?? 0);
+            }),
+        [fullScans],
+    );
+
     const getStatusConfig = (status: UploadStatus) => {
         switch (status) {
             case "uploaded":
@@ -99,7 +111,7 @@ export default function HistoryScreen() {
                     icon: "check-circle" as const,
                     color: isDark ? "#10b981" : "#059669",
                     bgColor: isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(5, 150, 105, 0.1)",
-                    text: "Uploaded",
+                    text: t("uploaded"),
                     badgeAction: "success" as const,
                 };
             case "needs_update":
@@ -107,7 +119,7 @@ export default function HistoryScreen() {
                     icon: "alert-circle" as const,
                     color: isDark ? "#f59e0b" : "#d97706",
                     bgColor: isDark ? "rgba(245, 158, 11, 0.15)" : "rgba(217, 119, 6, 0.1)",
-                    text: "Needs Update",
+                    text: t("needsUpdate"),
                     badgeAction: "warning" as const,
                 };
             case "uploading":
@@ -115,7 +127,7 @@ export default function HistoryScreen() {
                     icon: "loader" as const,
                     color: isDark ? "#3b82f6" : "#2563eb",
                     bgColor: isDark ? "rgba(59, 130, 246, 0.15)" : "rgba(37, 99, 235, 0.1)",
-                    text: "Uploading...",
+                    text: t("uploading"),
                     badgeAction: "info" as const,
                 };
             case "error":
@@ -123,7 +135,7 @@ export default function HistoryScreen() {
                     icon: "x-circle" as const,
                     color: isDark ? "#ef4444" : "#dc2626",
                     bgColor: isDark ? "rgba(239, 68, 68, 0.15)" : "rgba(220, 38, 38, 0.1)",
-                    text: "Upload Failed",
+                    text: t("uploadFailed"),
                     badgeAction: "error" as const,
                 };
             case "not_uploaded":
@@ -131,7 +143,7 @@ export default function HistoryScreen() {
                     icon: "circle" as const,
                     color: isDark ? "#6b7280" : "#9ca3af",
                     bgColor: isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(156, 163, 175, 0.1)",
-                    text: "Not Uploaded",
+                    text: t("notUploaded"),
                     badgeAction: "muted" as const,
                 };
             default:
@@ -139,7 +151,7 @@ export default function HistoryScreen() {
                     icon: "help-circle" as const,
                     color: isDark ? "#6b7280" : "#9ca3af",
                     bgColor: isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(156, 163, 175, 0.1)",
-                    text: "Unknown",
+                    text: t("unknown"),
                     badgeAction: "muted" as const,
                 };
         }
@@ -191,19 +203,19 @@ export default function HistoryScreen() {
         try {
             if (ConnectivityTest?.testConnection) {
                 const r = await ConnectivityTest.testConnection();
-                if (r?.success) Alert.alert("Connection Test", "✅ Backend connection successful!");
-                else Alert.alert("Connection Test Failed", r?.error || "Unknown error");
+                if (r?.success) Alert.alert(t("connectionTest"), t("backendConnectionSuccessful"));
+                else Alert.alert(t("connectionTestFailed"), r?.error || t("unknown"));
                 return;
             }
             // Fallback: try excelService.ping() if exposed
             if (excelService?.ping) {
                 await excelService.ping();
-                Alert.alert("Connection Test", "✅ Backend connection successful!");
+                Alert.alert(t("connectionTest"), t("backendConnectionSuccessful"));
                 return;
             }
-            Alert.alert("Connection Test", "No connectivity test available in this build.");
+            Alert.alert(t("connectionTest"), t("noConnectivityTest"));
         } catch {
-            Alert.alert("Connection Test Failed", "An unexpected error occurred");
+            Alert.alert(t("connectionTestFailed"), t("unexpectedError"));
         }
     };
 
@@ -211,9 +223,9 @@ export default function HistoryScreen() {
         if (!uploadScan) return;
         try {
             const r = await uploadScan(scanId);
-            if (!r?.success) Alert.alert("Upload Failed", r?.error || "Unknown error occurred");
+            if (!r?.success) Alert.alert(t("uploadFailed"), r?.error || t("unexpectedError"));
         } catch {
-            Alert.alert("Upload Failed", "An unexpected error occurred");
+            Alert.alert(t("uploadFailed"), t("unexpectedError"));
         }
     };
 
@@ -221,9 +233,9 @@ export default function HistoryScreen() {
         if (!updateScan) return;
         try {
             const r = await updateScan(scanId);
-            if (!r?.success) Alert.alert("Update Failed", r?.error || "Unknown error occurred");
+            if (!r?.success) Alert.alert(t("needsUpdate"), r?.error || t("unexpectedError"));
         } catch {
-            Alert.alert("Update Failed", "An unexpected error occurred");
+            Alert.alert(t("needsUpdate"), t("unexpectedError"));
         }
     };
 
@@ -233,14 +245,14 @@ export default function HistoryScreen() {
         const status: UploadStatus = getUploadStatus?.(scanId) ?? "unknown";
         if (status !== "uploaded") {
             Alert.alert(
-                "Scan Not Uploaded",
-                "Upload the scan to the server before downloading the Excel file.",
+                t("scanNotUploaded"),
+                t("uploadBeforeDownload"),
             );
             return;
         }
 
         if (!excelService?.downloadExcel) {
-            Alert.alert("Download Unavailable", "excelService.downloadExcel is not wired in this build.");
+            Alert.alert(t("downloadUnavailable"), t("excelServiceUnavailable"));
             return;
         }
 
@@ -272,12 +284,12 @@ export default function HistoryScreen() {
 
                 if (FileViewer && filePath) {
                     actions.push({
-                        text: "Open",
+                        text: t("open"),
                         onPress: async () => {
                             try {
                                 await FileViewer.open(filePath, { showOpenWithDialog: true });
                             } catch {
-                                Alert.alert("Open Failed", "Could not open the file on this device.");
+                                Alert.alert(t("openFailed"), t("openFileFailed"));
                             }
                         },
                     });
@@ -285,7 +297,7 @@ export default function HistoryScreen() {
 
                 if (ShareRN && filePath) {
                     actions.push({
-                        text: "Share",
+                        text: t("share"),
                         onPress: async () => {
                             try {
                                 await ShareRN.open({
@@ -300,14 +312,14 @@ export default function HistoryScreen() {
                     });
                 }
 
-                actions.push({ text: "OK" });
+                actions.push({ text: t("ok") });
 
-                Alert.alert("Download Complete", "Excel file downloaded. Open it or share it now.", actions);
+                Alert.alert(t("downloadComplete"), t("downloadCompleteMessage"), actions);
             } else {
-                Alert.alert("Download Failed", result?.error || "Failed to download Excel file");
+                Alert.alert(t("downloadFailed"), result?.error || t("downloadFailedMessage"));
             }
         } catch {
-            Alert.alert("Download Failed", "An unexpected error occurred while downloading the file");
+            Alert.alert(t("downloadFailed"), t("downloadUnexpectedError"));
         } finally {
             setIsDownloading(false);
             setDownloadProgress(0);
@@ -315,32 +327,58 @@ export default function HistoryScreen() {
         }
     };
 
-    const handleDownloadExcelFromLocal = async (scanId: number, includeImages: boolean = false) => {
-        if (!selected) return;
-        await handleLocalExcelDownload(scanId, fullScans ?? [], includeImages);
+    const handleDownloadExcelFromLocal = async (scanId: number) => {
+        setIsDownloading(true);
+        setDownloadProgress(0);
+        try {
+            await handleLocalExcelDownload(scanId, fullScans ?? [], {
+                fileReady: t("excelFileReady"),
+                fileReadyMessage: t("excelFileReadyMessage"),
+                share: t("share"),
+                saveOnly: t("saveOnly"),
+                cancel: t("cancel"),
+                fileSaved: t("fileSaved"),
+                fileSavedTo: t("fileSavedTo"),
+                fileSavedToDownloads: t("fileSavedToDownloads"),
+                shareUnavailable: t("shareUnavailable"),
+                sharingUnavailableMessage: t("sharingUnavailableMessage"),
+                shareFailed: t("shareFailed"),
+                shareFailedMessage: t("shareFailedMessage"),
+                saveFailed: t("saveFailed"),
+                saveFailedMessage: t("saveFailedMessage"),
+                permissionDenied: t("permissionDenied"),
+                storagePermissionRequired: t("storagePermissionRequired"),
+                storagePermissionTitle: t("storagePermissionTitle"),
+                storagePermissionMessage: t("storagePermissionMessage"),
+                askMeLater: t("askMeLater"),
+                ok: t("ok"),
+                exportFailed: t("exportFailed"),
+                scanNotFound: t("scanNotFoundLocal"),
+                cacheUnavailable: t("cacheUnavailable"),
+            });
+        } catch {
+            Alert.alert(t("downloadFailed"), t("downloadUnexpectedError"));
+        } finally {
+            setIsDownloading(false);
+            setDownloadProgress(0);
+        }
     };
 
     const handleDownloadExcel = async (scanId: number) => {
-        if (!selected) return;
-
         Alert.alert(
-            "Download Excel",
-            "Choose download source:",
+            t("downloadExcel"),
+            t("downloadSourcePrompt"),
             [
                 {
-                    text: "Server",
+                    text: t("server"),
                     onPress: () => handleDownloadExcelFromServer(scanId),
                 },
                 {
-                    text: "Local (ohne Bilder)",
-                    onPress: () => handleDownloadExcelFromLocal(scanId, false),
+                    text: t("local"),
+                    onPress: () => handleDownloadExcelFromLocal(scanId),
                 },
                 {
-                    text: "Local (mit Bildern)",
-                    onPress: () => handleDownloadExcelFromLocal(scanId, true),
-                },
-                {
-                    text: "Cancel",
+                    text: t("cancel"),
                     style: "cancel",
                 },
             ],
@@ -369,10 +407,10 @@ export default function HistoryScreen() {
                 <HStack style={{ alignItems: "center", justifyContent: "space-between" }}>
                     <VStack>
                         <Heading size="xl" className={isDark ? "text-typography-50" : "text-typography-900"}>
-                            Full Scans
+                            {t("fullScans")}
                         </Heading>
                         <Text className={`mt-1 ${isDark ? "text-typography-400" : "text-typography-600"}`} style={{ fontSize: 12 }}>
-                            {fullScans?.length || 0} {fullScans?.length === 1 ? "scan" : "scans"}
+                            {fullScans?.length || 0} {fullScans?.length === 1 ? t("scanSingular") : t("scanPlural")}
                         </Text>
                     </VStack>
 
@@ -393,7 +431,7 @@ export default function HistoryScreen() {
                                     color={isDark ? '#cbd5e1' : '#64748b'}
                                 />
                                 <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                    Test
+                                    {t("connectionTest")}
                                 </Text>
                             </HStack>
                         </Button>
@@ -402,7 +440,7 @@ export default function HistoryScreen() {
             </Box>
 
             <FlatList
-                data={fullScans}
+                data={sortedFullScans}
                 keyExtractor={(item: any) => String(item.id)}
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -433,10 +471,10 @@ export default function HistoryScreen() {
                             />
                         </Box>
                         <Text className={`text-lg font-semibold mb-2 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
-                            {t("noFullScans") ?? "Keine Full Scans vorhanden"}
+                            {t("noFullScans")}
                         </Text>
                         <Text className={`text-sm text-center ${isDark ? "text-typography-400" : "text-typography-500"}`}>
-                            Start a new scan to see it here
+                            {t("emptyHistoryHint")}
                         </Text>
                     </VStack>
                 )}
@@ -480,7 +518,7 @@ export default function HistoryScreen() {
                                                 color={isDark ? '#cbd5e1' : '#64748b'}
                                             />
                                             <Text className={`font-semibold ${isDark ? "text-typography-50" : "text-typography-900"}`}>
-                                                {item.author || t("unknown") || "Unbekannt"}
+                                                {item.author || t("unknown")}
                                             </Text>
                                         </HStack>
 
@@ -580,7 +618,7 @@ export default function HistoryScreen() {
                                                     fontWeight: '500',
                                                     textTransform: 'capitalize',
                                                 }}>
-                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                    {t(key)}
                                                 </Text>
                                             </HStack>
                                         );
@@ -610,7 +648,7 @@ export default function HistoryScreen() {
                                                 color={isDark ? '#cbd5e1' : '#64748b'}
                                             />
                                             <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                                {t("details") ?? "Details"}
+                                                {t("details")}
                                             </Text>
                                         </HStack>
                                     </Button>
@@ -635,7 +673,7 @@ export default function HistoryScreen() {
                                                             <Feather name="upload" size={14} color="#ffffff" />
                                                         )}
                                                         <Text style={{ color: '#ffffff', fontWeight: '600' }}>
-                                                            {isUploading ? "Uploading..." : "Upload"}
+                                                            {isUploading ? t("uploading") : t("upload")}
                                                         </Text>
                                                     </HStack>
                                                 </Button>
@@ -658,7 +696,7 @@ export default function HistoryScreen() {
                                                             <Feather name="refresh-cw" size={14} color="#ffffff" />
                                                         )}
                                                         <Text style={{ color: '#ffffff', fontWeight: '600' }}>
-                                                            {isUploading ? "Updating..." : "Update"}
+                                                            {isUploading ? t("updating") : t("update")}
                                                         </Text>
                                                     </HStack>
                                                 </Button>
@@ -682,7 +720,7 @@ export default function HistoryScreen() {
                                                             <Feather name="refresh-cw" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
                                                         )}
                                                         <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                                            {isUploading ? "Updating..." : "Re-upload"}
+                                                            {isUploading ? t("updating") : t("reUpload")}
                                                         </Text>
                                                     </HStack>
                                                 </Button>
@@ -745,7 +783,7 @@ export default function HistoryScreen() {
                         >
                             <HStack style={{ alignItems: "center", justifyContent: "space-between" }}>
                                 <Heading size="lg" className={isDark ? "text-typography-50" : "text-typography-900"}>
-                                    {t("fullScanDetails") ?? "Full Scan Details"}
+                                    {t("fullScanDetails")}
                                 </Heading>
                                 <Pressable
                                     onPress={() => setIsDetailsOpen(false)}
@@ -800,7 +838,7 @@ export default function HistoryScreen() {
                                                     </Text>
                                                 </HStack>
                                                 <Text className={`font-semibold ${isDark ? "text-typography-50" : "text-typography-900"}`}>
-                                                    {selected.author || "Unbekannt"}
+                                                    {selected.author || t("unknown")}
                                                 </Text>
                                             </VStack>
                                             <VStack style={{ alignItems: "flex-end" }} className="gap-1">
@@ -827,7 +865,7 @@ export default function HistoryScreen() {
                                                     color={isDark ? "#94a3b8" : "#64748b"}
                                                 />
                                                 <Text className={`text-xs ${isDark ? "text-typography-400" : "text-typography-600"}`}>
-                                                    Server ID: {selected.serverId}
+                                                    {t("serverId")}: {selected.serverId}
                                                 </Text>
                                             </HStack>
                                         )}
@@ -835,7 +873,7 @@ export default function HistoryScreen() {
 
                                     {/* Sections */}
                                     <Heading size="md" className={isDark ? "text-typography-50" : "text-typography-900"}>
-                                        {t("savedSections") ?? "Gespeicherte Bereiche"}
+                                        {t("savedSections")}
                                     </Heading>
 
                                     {(["injection", "dosing", "holdingPressure", "cylinderHeating"] as const).map((key) => (
@@ -864,23 +902,23 @@ export default function HistoryScreen() {
                                                     }}
                                                 />
                                                 <Text className={`font-semibold capitalize ${isDark ? "text-typography-50" : "text-typography-900"}`}>
-                                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                    {t(key)}
                                                 </Text>
                                             </HStack>
 
                                             {!selected[key] ? (
                                                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                                                    {t("notAvailable") ?? "Nicht vorhanden"}
+                                                    {t("notAvailable")}
                                                 </Text>
                                             ) : (
-                                                <SectionDetails sectionKey={key} data={(selected as any)[key]} isDark={isDark} />
+                                                <SectionDetails sectionKey={key} data={(selected as any)[key]} isDark={isDark} t={t} />
                                             )}
                                         </VStack>
                                     ))}
                                 </VStack>
                             ) : (
                                 <Text className={isDark ? "text-typography-400" : "text-typography-600"}>
-                                    {t("noSelection") ?? "Keine Auswahl"}
+                                    {t("noSelection")}
                                 </Text>
                             )}
                         </ScrollView>
@@ -898,7 +936,7 @@ export default function HistoryScreen() {
                                 <VStack className="mb-4 gap-2">
                                     <HStack style={{ justifyContent: "space-between", alignItems: "center" }}>
                                         <Text className={`text-sm ${isDark ? "text-typography-300" : "text-typography-600"}`}>
-                                            Download Progress
+                                            {t("downloadProgress")}
                                         </Text>
                                         <Text className={`text-sm font-semibold ${isDark ? "text-typography-200" : "text-typography-700"}`}>
                                             {Math.round(downloadProgress * 100)}%
@@ -945,7 +983,7 @@ export default function HistoryScreen() {
                                     <HStack style={{ alignItems: "center", gap: 6 }}>
                                         <Feather name="download" size={16} color="#ffffff" />
                                         <Text style={{ color: '#ffffff', fontWeight: '600' }}>
-                                            Download Excel
+                                            {t("downloadExcel")}
                                         </Text>
                                     </HStack>
                                 </Button>
@@ -959,7 +997,7 @@ export default function HistoryScreen() {
                                     }}
                                 >
                                     <Text className={isDark ? "text-typography-200" : "text-typography-700"}>
-                                        {t("close") ?? "Schließen"}
+                                        {t("close")}
                                     </Text>
                                 </Button>
                             </HStack>
@@ -975,15 +1013,17 @@ function SectionDetails({
                             sectionKey,
                             data,
                             isDark,
+                            t,
                         }: {
     sectionKey: "injection" | "holdingPressure" | "dosing" | "cylinderHeating";
     data: any;
     isDark: boolean;
+    t: (key: string) => string;
 }) {
     if (!data) {
         return (
             <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                No data available
+                {t("noDataAvailable")}
             </Text>
         );
     }
@@ -1008,13 +1048,14 @@ function SectionDetails({
         return (
             <VStack className="gap-2">
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                    Data structure not recognized
+                    {t("dataStructureNotRecognized")}
                 </Text>
                 {data && typeof data === 'object' && (
                     <DataBlock
-                        title="Raw Data"
+                        title={t("rawData")}
                         entries={Object.entries(data)}
                         isDark={isDark}
+                        t={t}
                     />
                 )}
             </VStack>
@@ -1025,22 +1066,19 @@ function SectionDetails({
         return (
             <VStack className="gap-3">
                 {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                    <DataBlock title={t("mainMenu")} entries={Object.entries(data.mainMenu)} isDark={isDark} t={t} />
                 )}
                 {Array.isArray(data?.subMenuValues?.values) && data.subMenuValues.values.length > 0 && (
                     <ArrayBlock
-                        title="Sub Menu · Werte"
+                        title={t("subMenuValues")}
                         entries={data.subMenuValues.values}
                         columns={["index", "v", "v2"]}
-                        unitLabels={{
-                          v: data?.subMenuValues?.keyUnit,
-                          v2: data?.subMenuValues?.valueUnit,
-                        }}
+                        columnLabels={{ v: "V (cm^3)", v2: "v (cm^3/s)" }}
                         isDark={isDark}
                     />
                 )}
                 {data?.switchType && Object.keys(data.switchType).length > 0 && (
-                    <DataBlock title="Switch Type" entries={Object.entries(data.switchType)} isDark={isDark} />
+                    <DataBlock title={t("switchType")} entries={Object.entries(data.switchType)} isDark={isDark} t={t} />
                 )}
             </VStack>
         );
@@ -1050,11 +1088,11 @@ function SectionDetails({
         return (
             <VStack className="gap-3">
                 {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                    <DataBlock title={t("mainMenu")} entries={Object.entries(data.mainMenu)} isDark={isDark} t={t} />
                 )}
                 {Array.isArray(data?.subMenusValues?.values) && data.subMenusValues.values.length > 0 && (
                     <ArrayBlock
-                        title="Sub Menu · Werte"
+                        title={t("subMenuValues")}
                         entries={data.subMenusValues.values}
                         columns={["index", "t", "p"]}
                         unitLabels={{
@@ -1072,13 +1110,14 @@ function SectionDetails({
         return (
             <VStack className="gap-3">
                 {data?.mainMenu && Object.keys(data.mainMenu).length > 0 && (
-                    <DataBlock title="Main Menu" entries={Object.entries(data.mainMenu)} isDark={isDark} />
+                    <DataBlock title={t("mainMenu")} entries={Object.entries(data.mainMenu)} isDark={isDark} t={t} />
                 )}
                 {Array.isArray(data?.dosingSpeedsValues?.values) && data.dosingSpeedsValues.values.length > 0 && (
                     <ArrayBlock
-                      title="Speeds"
+                      title={t("speeds")}
                       entries={data.dosingSpeedsValues.values}
                       columns={["index", "v", "v2"]}
+                      columnLabels={{ v: "V", v2: "v" }}
                       unitLabels={{
                         v: data?.dosingSpeedsValues?.keyUnit,
                         v2: data?.dosingSpeedsValues?.valueUnit,
@@ -1088,9 +1127,10 @@ function SectionDetails({
                 )}
                 {Array.isArray(data?.dosingPressuresValues?.values) && data.dosingPressuresValues.values.length > 0 && (
                     <ArrayBlock
-                        title="Pressures"
+                        title={t("pressures")}
                         entries={data.dosingPressuresValues.values}
                         columns={["index", "v", "v2"]}
+                        columnLabels={{ v: "V", v2: "P" }}
                         unitLabels={{
                           v: data?.dosingPressuresValues?.keyUnit,
                           v2: data?.dosingPressuresValues?.valueUnit,
@@ -1107,7 +1147,7 @@ function SectionDetails({
         if (!mainMenu || typeof mainMenu !== 'object') {
             return (
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                    No data available
+                    {t("noDataAvailable")}
                 </Text>
             );
         }
@@ -1117,7 +1157,7 @@ function SectionDetails({
         if (entries.length === 0) {
             return (
                 <Text className={isDark ? "text-typography-400" : "text-typography-500"}>
-                    No data available
+                    {t("noDataAvailable")}
                 </Text>
             );
         }
@@ -1134,10 +1174,10 @@ function SectionDetails({
                 {entries.map(([label, value]) => (
                     <HStack key={label} style={{ justifyContent: "space-between", alignItems: "center" }}>
                         <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
-                            {label}
+                            {t(label)}
                         </Text>
                         <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
-                            {typeof value === 'object' && value !== null && 'value' in value ? `${value.value} ${value.unit || ''}`.trim() : String(value)}
+                            {typeof value === 'object' && value !== null && 'value' in value ? `${(value as any).value} ${(value as any).unit || ''}`.trim() : String(value)}
                         </Text>
                     </HStack>
                 ))}
@@ -1152,11 +1192,19 @@ function DataBlock({
                        title,
                        entries,
                        isDark,
+                       t,
                    }: {
     title: string;
     entries: [string, unknown][];
     isDark: boolean;
+    t: (key: string) => string;
 }) {
+    const visibleEntries = entries.filter(([label]) => label !== "id" && !label.endsWith("Id"));
+    const formatLabel = (label: string) => {
+        const translated = t(label);
+        return translated === label ? label : translated;
+    };
+
     return (
         <VStack className="gap-2">
             <Text className={`text-sm font-semibold mb-1 ${isDark ? "text-typography-200" : "text-typography-700"}`}>
@@ -1170,13 +1218,19 @@ function DataBlock({
                 }}
                 className="gap-2"
             >
-                {entries.map(([label, value]) => (
-                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "center" }}>
-                        <Text className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}>
-                            {label}
+                {visibleEntries.map(([label, value]) => (
+                    <HStack key={label} style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                        <Text
+                            className={`text-sm ${isDark ? "text-typography-400" : "text-typography-600"}`}
+                            style={{ flex: 1, flexShrink: 1 }}
+                        >
+                            {formatLabel(label)}
                         </Text>
-                        <Text className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}>
-                            {typeof value === 'object' && value !== null && 'value' in value ? `${value.value} ${value.unit || ''}`.trim() : String(value)}
+                        <Text
+                            className={`text-sm font-medium ${isDark ? "text-typography-100" : "text-typography-900"}`}
+                            style={{ flexShrink: 0, maxWidth: "40%", textAlign: "right" }}
+                        >
+                            {typeof value === 'object' && value !== null && 'value' in value ? `${(value as any).value} ${(value as any).unit || ''}`.trim() : String(value)}
                         </Text>
                     </HStack>
                 ))}
@@ -1186,21 +1240,24 @@ function DataBlock({
 }
 
 function ArrayBlock({
-                        title,
-                        entries,
-                        columns,
-                        unitLabels,
-                        isDark,
-                    }: {
+    title,
+    entries,
+    columns,
+    columnLabels,
+    unitLabels,
+    isDark,
+}: {
     title: string;
     entries: any[];
     columns: string[];
+    columnLabels?: Record<string, string>;
     unitLabels?: Record<string, string | null | undefined>;
     isDark: boolean;
 }) {
     const formatColumnLabel = (col: string) => {
+        const label = columnLabels?.[col] ?? col;
         const unit = unitLabels?.[col];
-        return unit ? `${col} (${unit})` : col;
+        return unit ? `${label} [${unit}]` : label;
     };
 
     return (
@@ -1259,3 +1316,5 @@ function ArrayBlock({
         </VStack>
     );
 }
+
+

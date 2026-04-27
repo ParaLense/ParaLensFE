@@ -44,7 +44,6 @@ export default function CameraScreen() {
     holdingMode,
     dosingMode,
     ocrSnapshot,
-    headerLabel,
     currentLayout,
     setSelectedMenu,
     setInjectionMode,
@@ -58,6 +57,16 @@ export default function CameraScreen() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [authorInput, setAuthorInput] = useState("");
   const [latestScreenshot, setLatestScreenshot] = useState<string | null>(null);
+
+  const scanHeaderLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (selectedMenu) parts.push(t(selectedMenu));
+
+    const selectedMode = injectionMode ?? holdingMode ?? dosingMode;
+    if (selectedMode && selectedMode !== "mainMenu") parts.push(t(selectedMode));
+
+    return parts.join(" - ");
+  }, [selectedMenu, injectionMode, holdingMode, dosingMode, t]);
 
   const selectedLabel = useMemo(() => {
     if (!selectedFullScanId) {
@@ -233,9 +242,9 @@ export default function CameraScreen() {
           style={{ backgroundColor: isDark ? '#ffffff' : '#000000' }}
         >
           <Text style={{ color: isDark ? '#000000' : '#ffffff' }}>
-            {headerLabel
-              ? `${headerLabel} · ${t("change") ?? "Ändern"}`
-              : t("change") ?? "Ändern"}
+            {scanHeaderLabel
+              ? `${scanHeaderLabel} - ${t("change")}`
+              : t("change")}
           </Text>
         </Button>
       </Box>

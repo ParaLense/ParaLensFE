@@ -5,24 +5,23 @@ import type { InjectionMainFormState } from "@/features/scan-session/types/scan-
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   injMainForm: InjectionMainFormState;
   setInjMainForm: React.Dispatch<React.SetStateAction<InjectionMainFormState>>;
 };
 
 export function InjectionMainMenuReview({
   isDark,
+  t,
   injMainForm,
   setInjMainForm,
 }: Props) {
-  const sprayUnit = injMainForm.sprayPressureLimit.unit || "";
-  const printerUnit = injMainForm.increasedSpecificPointPrinter.unit || "";
-
   return (
     <VStack className="gap-4">
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Spray Pressure Limit"
+          placeholder={t("sprayPressureLimit")}
           value={injMainForm.sprayPressureLimit.value}
           onChangeText={(t) =>
             setInjMainForm((prev) => ({
@@ -40,7 +39,7 @@ export function InjectionMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Increased Specific Point Printer"
+          placeholder={t("increasedSpecificPointPrinter")}
           value={injMainForm.increasedSpecificPointPrinter.value}
           onChangeText={(t) =>
             setInjMainForm((prev) => ({

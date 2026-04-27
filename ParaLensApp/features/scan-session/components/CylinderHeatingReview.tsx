@@ -5,12 +5,14 @@ import type { CylinderHeatingFormState } from "@/features/scan-session/types/sca
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   cylinderForm: CylinderHeatingFormState;
   setCylinderForm: React.Dispatch<React.SetStateAction<CylinderHeatingFormState>>;
 };
 
 export function CylinderHeatingReview({
   isDark,
+  t,
   cylinderForm,
   setCylinderForm,
 }: Props) {
@@ -19,7 +21,7 @@ export function CylinderHeatingReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Setpoint 1"
+          placeholder={t("setpoint1")}
           value={cylinderForm.setpoint1.value}
           onChangeText={(t) =>
             setCylinderForm((prev) => ({
@@ -33,7 +35,7 @@ export function CylinderHeatingReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Setpoint 2"
+          placeholder={t("setpoint2")}
           value={cylinderForm.setpoint2.value}
           onChangeText={(t) =>
             setCylinderForm((prev) => ({
@@ -47,7 +49,7 @@ export function CylinderHeatingReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Setpoint 3"
+          placeholder={t("setpoint3")}
           value={cylinderForm.setpoint3.value}
           onChangeText={(t) =>
             setCylinderForm((prev) => ({
@@ -61,7 +63,7 @@ export function CylinderHeatingReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Setpoint 4"
+          placeholder={t("setpoint4")}
           value={cylinderForm.setpoint4.value}
           onChangeText={(t) =>
             setCylinderForm((prev) => ({
@@ -75,7 +77,7 @@ export function CylinderHeatingReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Setpoint 5"
+          placeholder={t("setpoint5")}
           value={cylinderForm.setpoint5.value}
           onChangeText={(t) =>
             setCylinderForm((prev) => ({

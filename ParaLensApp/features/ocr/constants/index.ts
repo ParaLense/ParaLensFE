@@ -1,4 +1,2 @@
-/**
- * OCR Constants Barrel Export
- */
-export * from './ocr-constants';
+export * from "./box-id-constants";
+export * from "./ocr-constants";

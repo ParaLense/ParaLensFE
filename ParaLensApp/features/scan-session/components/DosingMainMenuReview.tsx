@@ -5,12 +5,14 @@ import type { DosingMainFormState } from "@/features/scan-session/types/scan-ses
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   doseMainForm: DosingMainFormState;
   setDoseMainForm: React.Dispatch<React.SetStateAction<DosingMainFormState>>;
 };
 
 export function DosingMainMenuReview({
   isDark,
+  t,
   doseMainForm,
   setDoseMainForm,
 }: Props) {
@@ -19,7 +21,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Dosing Stroke"
+          placeholder={t("dosingStroke")}
           value={doseMainForm.dosingStroke.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({
@@ -33,7 +35,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Dosing Delay Time"
+          placeholder={t("dosingDelayTime")}
           value={doseMainForm.dosingDelayTime.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({
@@ -47,7 +49,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Relieve Dosing"
+          placeholder={t("relieveDosing")}
           value={doseMainForm.relieveDosing.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({
@@ -61,7 +63,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Relieve After Dosing"
+          placeholder={t("relieveAfterDosing")}
           value={doseMainForm.relieveAfterDosing.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({
@@ -75,7 +77,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Discharge Speed Before"
+          placeholder={t("dischargeSpeedBeforeDosing")}
           value={doseMainForm.dischargeSpeedBeforeDosing.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({
@@ -92,7 +94,7 @@ export function DosingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Discharge Speed After"
+          placeholder={t("dischargeSpeedAfterDosing")}
           value={doseMainForm.dischargeSpeedAfterDosing.value}
           onChangeText={(t) =>
             setDoseMainForm((prev) => ({

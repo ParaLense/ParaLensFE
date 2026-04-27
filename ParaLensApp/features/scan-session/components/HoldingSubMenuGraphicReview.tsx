@@ -9,6 +9,7 @@ import { formatUnitLabel } from "@/features/scan-session/utils/scrollbar-utils";
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   values: IndexValuePair[];
   setValues: (rows: IndexValuePair[]) => void;
   units: ScrollbarUnits;
@@ -16,6 +17,7 @@ type Props = {
 
 export function HoldingSubMenuGraphicReview({
   isDark,
+  t,
   values,
   setValues,
   units,
@@ -26,7 +28,7 @@ export function HoldingSubMenuGraphicReview({
         size="sm"
         className={isDark ? "text-typography-50" : "text-typography-900"}
       >
-        Werte (Index, t, p)
+        {t("specificHoldingPressure")} (Index, t, p)
       </Heading>
       <DynamicValueList
         rows={values}

@@ -5,12 +5,14 @@ import type { HoldingMainFormState } from "@/features/scan-session/types/scan-se
 
 type Props = {
   isDark: boolean;
+  t: (key: string) => string;
   holdMainForm: HoldingMainFormState;
   setHoldMainForm: React.Dispatch<React.SetStateAction<HoldingMainFormState>>;
 };
 
 export function HoldingMainMenuReview({
   isDark,
+  t,
   holdMainForm,
   setHoldMainForm,
 }: Props) {
@@ -19,7 +21,7 @@ export function HoldingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Holding Time"
+          placeholder={t("holdingTime")}
           value={holdMainForm.holdingTime.value}
           onChangeText={(t) =>
             setHoldMainForm((prev) => ({
@@ -33,7 +35,7 @@ export function HoldingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Cool Time"
+          placeholder={t("coolTime")}
           value={holdMainForm.coolTime.value}
           onChangeText={(t) =>
             setHoldMainForm((prev) => ({
@@ -47,7 +49,7 @@ export function HoldingMainMenuReview({
       <Input>
         <InputField
           keyboardType="numeric"
-          placeholder="Screw Diameter"
+          placeholder={t("screwDiameter")}
           value={holdMainForm.screwDiameter.value}
           onChangeText={(t) =>
             setHoldMainForm((prev) => ({

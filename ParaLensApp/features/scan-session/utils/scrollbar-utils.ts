@@ -2,6 +2,11 @@ import type { ParsedScrollbarValue } from "@/features/ocr";
 import type { IndexValuePair } from "@/components/DynamicValueList";
 import { isValidNumericToken, normalizeNumber } from "@/features/ocr";
 
+export const SCROLLBAR_DISPLAY_DECIMALS = 2;
+
+export const formatScrollbarNumber = (value: number): string =>
+  value.toFixed(SCROLLBAR_DISPLAY_DECIMALS);
+
 export const buildRowsFromScrollbar = (
   scrollbar: ParsedScrollbarValue | undefined,
 ): IndexValuePair[] => {
@@ -20,10 +25,10 @@ export const buildRowsFromScrollbar = (
     const key = seg?.key?.[0];
     const val = seg?.value?.[0];
     if (typeof key === "number" && Number.isFinite(key)) {
-      row.v = key.toFixed(4);
+      row.v = formatScrollbarNumber(key);
     }
     if (typeof val === "number" && Number.isFinite(val)) {
-      row.v2 = val.toFixed(4);
+      row.v2 = formatScrollbarNumber(val);
     }
     return row;
   });
@@ -37,7 +42,7 @@ export const extractScrollbarUnits = (
 });
 
 export const formatUnitLabel = (label: string, unit?: string): string =>
-  unit ? `${label} (${unit})` : label;
+  unit ? `${label} [${unit}]` : label;
 
 export const extractNumberStrings = (
   raw: string | undefined | null,
