@@ -356,7 +356,59 @@ function toRNFSPath(pathOrUri: string): string {
   return pathOrUri.startsWith("file://") ? pathOrUri.replace("file://", "") : pathOrUri;
 }
 
-async function shareExcelFile(fileUri: string) {
+type ExcelExportLabels = {
+  fileReady: string;
+  fileReadyMessage: string;
+  share: string;
+  saveOnly: string;
+  cancel: string;
+  fileSaved: string;
+  fileSavedTo: string;
+  fileSavedToDownloads: string;
+  shareUnavailable: string;
+  sharingUnavailableMessage: string;
+  shareFailed: string;
+  shareFailedMessage: string;
+  saveFailed: string;
+  saveFailedMessage: string;
+  permissionDenied: string;
+  storagePermissionRequired: string;
+  storagePermissionTitle: string;
+  storagePermissionMessage: string;
+  askMeLater: string;
+  ok: string;
+  exportFailed: string;
+  scanNotFound: string;
+  cacheUnavailable: string;
+};
+
+const DEFAULT_EXCEL_EXPORT_LABELS: ExcelExportLabels = {
+  fileReady: "Excel File Ready",
+  fileReadyMessage: "What would you like to do with the file?",
+  share: "Share",
+  saveOnly: "Save only",
+  cancel: "Cancel",
+  fileSaved: "File Saved",
+  fileSavedTo: "Excel file saved to:",
+  fileSavedToDownloads: "Excel file saved to Downloads:",
+  shareUnavailable: "Share Unavailable",
+  sharingUnavailableMessage: "Sharing is not available on this device.",
+  shareFailed: "Share failed",
+  shareFailedMessage: "Could not share the file.",
+  saveFailed: "Save failed",
+  saveFailedMessage: "Could not save the file to downloads.",
+  permissionDenied: "Permission Denied",
+  storagePermissionRequired: "Storage permission is required to save the file.",
+  storagePermissionTitle: "Storage Permission",
+  storagePermissionMessage: "This app needs access to storage to save the file.",
+  askMeLater: "Ask Me Later",
+  ok: "OK",
+  exportFailed: "Export failed",
+  scanNotFound: "Scan not found!",
+  cacheUnavailable: "Cache directory is not available",
+};
+
+async function shareExcelFile(fileUri: string, labels: ExcelExportLabels) {
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(fileUri, {
       mimeType:
@@ -366,10 +418,14 @@ async function shareExcelFile(fileUri: string) {
     return;
   }
 
-  Alert.alert("Share Unavailable", "Sharing is not available on this device.");
+  Alert.alert(labels.shareUnavailable, labels.sharingUnavailableMessage);
 }
 
-async function saveExcelFile(fileUri: string, fileName: string) {
+async function saveExcelFile(
+  fileUri: string,
+  fileName: string,
+  labels: ExcelExportLabels,
+) {
   if (Platform.OS !== "android") {
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(fileUri, {
@@ -378,7 +434,7 @@ async function saveExcelFile(fileUri: string, fileName: string) {
         UTI: "com.microsoft.excel.xlsx",
       });
     } else {
-      Alert.alert("File Saved", `Excel file saved to:\n${fileUri}`);
+      Alert.alert(labels.fileSaved, `${labels.fileSavedTo}\n${fileUri}`);
     }
     return;
   }
@@ -388,18 +444,18 @@ async function saveExcelFile(fileUri: string, fileName: string) {
     const granted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
       {
-        title: "Storage Permission",
-        message: "This app needs access to storage to save the file.",
-        buttonNeutral: "Ask Me Later",
-        buttonNegative: "Cancel",
-        buttonPositive: "OK",
+        title: labels.storagePermissionTitle,
+        message: labels.storagePermissionMessage,
+        buttonNeutral: labels.askMeLater,
+        buttonNegative: labels.cancel,
+        buttonPositive: labels.ok,
       },
     );
 
     if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
       Alert.alert(
-        "Permission Denied",
-        "Storage permission is required to save the file.",
+        labels.permissionDenied,
+        labels.storagePermissionRequired,
       );
       return;
     }
@@ -425,7 +481,10 @@ async function saveExcelFile(fileUri: string, fileName: string) {
     console.warn("Failed to scan file:", scanError);
   }
 
-  Alert.alert("File Saved", `Excel file saved to Downloads:\n${downloadPath}`);
+  Alert.alert(
+    labels.fileSaved,
+    `${labels.fileSavedToDownloads}\n${downloadPath}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -435,11 +494,13 @@ async function saveExcelFile(fileUri: string, fileName: string) {
 export const handleLocalExcelDownload = async (
   scanId: number,
   fullScans: FullScanDto[],
+  exportLabels?: Partial<ExcelExportLabels>,
 ) => {
+  const labels = { ...DEFAULT_EXCEL_EXPORT_LABELS, ...exportLabels };
   try {
     const scan = fullScans?.find((fs) => fs.id === scanId);
     if (!scan) {
-      Alert.alert("Excel (local)", "Scan not found!");
+      Alert.alert("Excel (local)", labels.scanNotFound);
       return;
     }
 
@@ -489,7 +550,7 @@ export const handleLocalExcelDownload = async (
 
     const cacheDir = FileSystem.cacheDirectory;
     if (!cacheDir) {
-      Alert.alert("Export failed", "Cache directory is not available");
+      Alert.alert(labels.exportFailed, labels.cacheUnavailable);
       return;
     }
 
@@ -500,37 +561,37 @@ export const handleLocalExcelDownload = async (
     });
 
     Alert.alert(
-      "Excel File Ready",
-      "What would you like to do with the file?",
+      labels.fileReady,
+      labels.fileReadyMessage,
       [
         {
-          text: "Share",
+          text: labels.share,
           onPress: async () => {
             try {
-              await shareExcelFile(fileUri);
+              await shareExcelFile(fileUri, labels);
             } catch (shareError: any) {
               Alert.alert(
-                "Share failed",
-                shareError?.message || "Could not share the file.",
+                labels.shareFailed,
+                shareError?.message || labels.shareFailedMessage,
               );
             }
           },
         },
         {
-          text: "Save only",
+          text: labels.saveOnly,
           onPress: async () => {
             try {
-              await saveExcelFile(fileUri, fileName);
+              await saveExcelFile(fileUri, fileName, labels);
             } catch (saveError: any) {
               Alert.alert(
-                "Save failed",
-                saveError?.message || "Could not save the file to downloads.",
+                labels.saveFailed,
+                saveError?.message || labels.saveFailedMessage,
               );
             }
           },
         },
         {
-          text: "Cancel",
+          text: labels.cancel,
           style: "cancel",
         },
       ],
@@ -538,6 +599,6 @@ export const handleLocalExcelDownload = async (
     );
 
   } catch (e: any) {
-    Alert.alert("Export failed", e?.message ?? String(e));
+    Alert.alert(labels.exportFailed, e?.message ?? String(e));
   }
 };

@@ -331,7 +331,31 @@ export default function HistoryScreen() {
         setIsDownloading(true);
         setDownloadProgress(0);
         try {
-            await handleLocalExcelDownload(scanId, fullScans ?? []);
+            await handleLocalExcelDownload(scanId, fullScans ?? [], {
+                fileReady: t("excelFileReady"),
+                fileReadyMessage: t("excelFileReadyMessage"),
+                share: t("share"),
+                saveOnly: t("saveOnly"),
+                cancel: t("cancel"),
+                fileSaved: t("fileSaved"),
+                fileSavedTo: t("fileSavedTo"),
+                fileSavedToDownloads: t("fileSavedToDownloads"),
+                shareUnavailable: t("shareUnavailable"),
+                sharingUnavailableMessage: t("sharingUnavailableMessage"),
+                shareFailed: t("shareFailed"),
+                shareFailedMessage: t("shareFailedMessage"),
+                saveFailed: t("saveFailed"),
+                saveFailedMessage: t("saveFailedMessage"),
+                permissionDenied: t("permissionDenied"),
+                storagePermissionRequired: t("storagePermissionRequired"),
+                storagePermissionTitle: t("storagePermissionTitle"),
+                storagePermissionMessage: t("storagePermissionMessage"),
+                askMeLater: t("askMeLater"),
+                ok: t("ok"),
+                exportFailed: t("exportFailed"),
+                scanNotFound: t("scanNotFoundLocal"),
+                cacheUnavailable: t("cacheUnavailable"),
+            });
         } catch {
             Alert.alert(t("downloadFailed"), t("downloadUnexpectedError"));
         } finally {
