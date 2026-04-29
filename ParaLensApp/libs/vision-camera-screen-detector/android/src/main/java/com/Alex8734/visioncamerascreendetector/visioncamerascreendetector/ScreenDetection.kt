@@ -114,6 +114,10 @@ object ScreenDetection {
     /**
      * Match template boxes with detected contours (legacy method)
      */
+     @Deprecated(
+         message = "Use matchTemplateBoxesInWarped for better accuracy",
+         replaceWith = ReplaceWith("matchTemplateBoxesInWarped(...)")
+     )
     fun matchTemplateBoxes(
         templateBoxes: List<Box>,
         H: Mat,

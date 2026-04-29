@@ -3,9 +3,9 @@
  * Handles parsing and normalization of scrollbar OCR data
  */
 
-import { OcrBox, ParsedScrollbarValue, ScrollbarUnits, ExpectedUnitConfig } from '../types/ocr-types';
-import { START_KEYWORDS, END_KEYWORDS } from '../constants/ocr-constants';
-import { isValidNumericToken, normalizeNumber, detectMatchingUnit } from '../utils/numeric-utils';
+import type { OcrBox, ParsedScrollbarValue, ScrollbarUnits, ExpectedUnitConfig } from '../types';
+import { START_KEYWORDS, END_KEYWORDS } from '../constants';
+import { isValidNumericToken, normalizeNumber, detectMatchingUnit } from '../utils';
 
 const extractExpectedUnitKeywords = (
   raw?: string[] | ExpectedUnitConfig
@@ -212,6 +212,11 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
     }
     if (valueNum != null && Number.isFinite(valueNum)) {
       segment.value.push(valueNum);
+    }
+
+    if (keyNum != null && valueNum != null && Number.isFinite(keyNum) && Number.isFinite(valueNum)) {
+      segment.pairs = segment.pairs ?? [];
+      segment.pairs.push({ key: keyNum, value: valueNum });
     }
 
     // Nur speichern, wenn mindestens eine Seite etwas bekommen hat

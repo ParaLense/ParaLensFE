@@ -4,30 +4,34 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import {
+// Use internal barrel imports (not the public @/features/ocr) to avoid circular dependency
+import type {
   OcrScanResult,
   OcrFieldResult,
   OcrFieldType,
+  ParsedScrollbarValue,
   FieldAggregation,
   UseOcrHistoryConfig,
   ExpectedUnitConfig,
   UnitSystem,
   ValueMode,
-} from '@/features/ocr';
+} from '../types';
 import {
   DEFAULT_MAX_HISTORY_PER_FIELD,
   DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY,
   START_KEYWORDS,
   END_KEYWORDS,
-} from '@/features/ocr';
-import { parseScrollbarFromScan } from '@/features/ocr';
-import { parseValueFromScan } from '@/features/ocr';
-import { parseCheckboxFromScan } from '@/features/ocr';
+} from '../constants';
+import {
+  parseScrollbarFromScan,
+  parseValueFromScan,
+  parseCheckboxFromScan,
+} from '../parsers';
 import {
   mergeParsedScrollbar,
   computeMajorityString,
   computeBestScrollbar,
-} from '@/features/ocr';
+} from '../aggregation';
 
 type UnitConfig = {
   system?: UnitSystem;
@@ -210,12 +214,14 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
           totalScans: 0,
           uniqueValues: 0,
           typeBreakdown: { value: 0, checkbox: 0, scrollbar: 0 },
+          rawValues: [],
         };
       }
       return {
         totalScans: agg.totalScans,
         uniqueValues: agg.uniqueValues,
         typeBreakdown: { ...agg.typeBreakdown },
+        rawValues: agg.rawValues ?? [],
       };
     },
     [fieldAggregations]
@@ -249,6 +255,17 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
       }
 
       return unit ? `${best.value} ${unit}` : best.value;
+    },
+    [fieldAggregations, minOccurrencesForMajority]
+  );
+
+  const getScrollbarValue = useCallback(
+    (fieldId: string): ParsedScrollbarValue | undefined => {
+      const agg = fieldAggregations[fieldId];
+      if (!agg?.scrollbar) return undefined;
+
+      const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
+      return best?.parsed;
     },
     [fieldAggregations, minOccurrencesForMajority]
   );
@@ -388,6 +405,7 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
     addScanResult,
     getFieldStats,
     getFilteredValue,
+    getScrollbarValue,
     getBestFields,
     // also export the keyword lists in case callers want to re-use them
     START_KEYWORDS,

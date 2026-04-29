@@ -70,6 +70,7 @@ import {
   BOX_ID_TRANSSHIPMENT_POSITION,
   BOX_ID_TRANSSHIPMENT_POSITION_CHECKBOX,
 } from "@/features/ocr/constants/box-id-constants";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 
 export default function ScanReviewScreen() {
   const params = useLocalSearchParams<{
@@ -394,10 +395,11 @@ export default function ScanReviewScreen() {
 
   const onBack = () => router.back();
   const onSave = () => router.back();
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
-      style={{ backgroundColor: isDark ? "#000" : "#fff" }}
+      style={{ backgroundColor: isDark ? "#000" : "#fff", paddingTop: insets.top  }}
       contentContainerStyle={{ padding: 20 }}
     >
       <Heading

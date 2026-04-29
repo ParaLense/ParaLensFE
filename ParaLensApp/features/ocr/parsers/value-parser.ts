@@ -3,8 +3,9 @@
  * Handles parsing of simple numeric value boxes
  */
 
-import { OcrBox, ExpectedUnitConfig } from '@/features/ocr';
-import { isValidNumericToken, normalizeNumber, detectMatchingUnit } from '@/features/ocr';
+import type { OcrBox, ExpectedUnitConfig } from '../types';
+import { isValidNumericToken, normalizeNumber, detectMatchingUnit } from '../utils';
+
 
 const extractExpectedUnitKeywords = (
   raw?: string[] | ExpectedUnitConfig

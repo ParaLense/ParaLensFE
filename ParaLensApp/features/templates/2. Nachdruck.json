@@ -34,8 +34,8 @@
     "label": "Screw Diameter",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "mm" },
-      "imperial": { "absolute": "in" }
+      "iso": { "absolute": "mm", "relative": "mm" },
+      "imperial": { "absolute": "in", "relative": "in" }
     }
   }
 ]

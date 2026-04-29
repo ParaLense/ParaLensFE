@@ -18,6 +18,8 @@ export type OcrSnapshot = {
     system?: UnitSystem;
     mode?: ValueMode;
   };
+  /** Base64-encoded JPEG screenshot of the screen at scan time */
+  screenshotBase64?: string;
 } | null;
 
 export type ScrollbarUnits = { keyUnit?: string; valueUnit?: string };

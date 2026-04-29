@@ -47,6 +47,20 @@ const SCREEN_ASPECT_W = 3;
 const SCREEN_ASPECT_H = 4;
 const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 
+// Centralized scan constants to keep detector behavior aligned with overlay geometry.
+const SCAN_TEMPLATE_TARGET_W = 1200;
+const SCAN_TEMPLATE_TARGET_H = 1600;
+const SCAN_ACCURACY_THRESHOLD = 0.4;
+const SCAN_IMAGE_QUALITY = 80;
+const SCAN_ROTATE_90_CW = true;
+
+const SCAN_ROI_OUTER = { x: 0.025, y: 0.05, width: 0.95, height: 0.9 } as const;
+// Keep these values identical to ScannerOverlays inner ROI visualization.
+const SCAN_ROI_INNER = { x: 0.3, y: 0.225, width: 0.5, height: 0.6 } as const;
+
+const SCAN_MIN_ASPECT_W = SCREEN_ASPECT_W;
+const SCAN_MIN_ASPECT_H = SCREEN_ASPECT_H;
+
 interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
   currentLayout: TemplateLayout;
   /**
@@ -251,17 +265,16 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         screenTemplate,
         ocrTemplate,
         runOcr: true,
-        templateTargetW: 1200,
-        templateTargetH: 1600,
+        templateTargetW: SCAN_TEMPLATE_TARGET_W,
+        templateTargetH: SCAN_TEMPLATE_TARGET_H,
         returnWarpedImage: true,
-        accuracyThreshold: 0.40,
-        // ROI in normalized coordinates (defaults equivalent to main2.py)
-        roiOuter: { x: 0.10, y: 0.05, width: 0.80, height: 0.90 },
-        roiInner: { x: 0.30, y: 0.20, width: 0.45, height: 0.60 },
-        minAspectW: 3,
-        minAspectH: 4,
-        imageQuality: 80,
-        rotate90CW: true,
+        accuracyThreshold: SCAN_ACCURACY_THRESHOLD,
+        roiOuter: SCAN_ROI_OUTER,
+        roiInner: SCAN_ROI_INNER,
+        minAspectW: SCAN_MIN_ASPECT_W,
+        minAspectH: SCAN_MIN_ASPECT_H,
+        imageQuality: SCAN_IMAGE_QUALITY,
+        rotate90CW: SCAN_ROTATE_90_CW,
       });
 
       if (scan?.screen) {

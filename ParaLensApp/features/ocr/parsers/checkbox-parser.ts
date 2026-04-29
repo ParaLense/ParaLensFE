@@ -3,7 +3,7 @@
  * Handles parsing of checkbox state boxes
  */
 
-import { OcrBox } from '../types/ocr-types';
+import type { OcrBox } from '../types';
 
 /**
  * Parse checkbox state into a stable string value

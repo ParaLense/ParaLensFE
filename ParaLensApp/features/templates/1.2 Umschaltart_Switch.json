@@ -22,8 +22,13 @@
     "label": "Transshipment Position",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "cm^3" },
-      "imperial": { "absolute": "in^3" }
+      "iso": {
+        "absolute": "cm^3",
+        "relative": "mm"
+      },
+      "imperial": {
+        "absolute": "in^3"
+      }
     }
   },
   {

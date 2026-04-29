@@ -70,7 +70,6 @@ export const  detectMatchingUnit = (raw: string, keywords: readonly string[]): s
 
   // Pre-process raw string to handle common OCR substitutions
   let cleaned = raw.toLowerCase().trim();
-  keywords.includes("in");
   // Common OCR fixes
   cleaned = cleaned.replace('cn', 'cm'); // cn -> cm
   cleaned = cleaned.replace('°', '%');   // ° -> % (often confused in OCR if % is expected)
@@ -89,9 +88,9 @@ export const  detectMatchingUnit = (raw: string, keywords: readonly string[]): s
   const simplified = cleaned.replace(/[^a-z0-9%/^³²]/g, '');
 
   if (!simplified) return null;
-  if(simplified == "cin"){
+  /*if(simplified == "cin"){
     console.log("cin -> cm or cm^3, but not in!") // testing down with startsWith instead of includes
-  }
+  }*/
   for (const kw of keywords) {
     const kwClean = kw.toLowerCase();
 
