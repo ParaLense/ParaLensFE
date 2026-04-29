@@ -1,7 +1,6 @@
 import React from "react";
 import { StyleProp, ViewStyle } from "react-native";
 import { Box } from "@/components/ui/box";
-import { Heading } from "@/components/ui/heading";
 import { Text as GluestackText } from "@/components/ui/text";
 import TemplateOverlay from "@/components/TemplateOverlay";
 import OcrFieldDisplay from "@/components/camera/OcrFieldDisplay";
