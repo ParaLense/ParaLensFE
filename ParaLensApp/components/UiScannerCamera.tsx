@@ -40,7 +40,7 @@ import {
   toNumber,
 } from "@/features/camera/camera-geometry";
 
-const TARGET_FPS = 10;
+const TARGET_FPS = 2;
 const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 const SCREEN_WIDTH_RATIO = 0.8;
 const SCREEN_ASPECT_W = 3;
@@ -74,6 +74,7 @@ interface UiScannerCameraProps extends React.ComponentProps<typeof Camera> {
       system?: import('@/features/ocr').UnitSystem;
       mode?: import('@/features/ocr').ValueMode;
     };
+    isReady?: boolean;
   }) => void;
   onScanComplete?: (payload: any) => void;
   /** Callback to expose the latest warped base64 screenshot to parent */
@@ -122,6 +123,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         system?: import('@/features/ocr').UnitSystem;
         mode?: import('@/features/ocr').ValueMode;
       };
+      isReady?: boolean;
     }) => {
       onOcrUpdateRef.current?.(payload);
     },
@@ -132,6 +134,10 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   onScreenshotUpdateRef.current = onScreenshotUpdate;
 
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
+  const templateFieldIds = useMemo(
+    () => ocrTemplate.map((entry) => entry?.id).filter(Boolean) as string[],
+    [ocrTemplate]
+  );
 
   // OCR History Hook for filtering and storing recognized values
   const ocrHistory = useOcrHistory({
@@ -165,8 +171,21 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     if (!onOcrUpdateRef.current) return;
     const bestFields = ocrHistory.getBestFields();
     if (!bestFields || bestFields.length === 0) return;
-    onOcrUpdateJS({ bestFields, ocrMap, unitConfig: ocrHistory.unitConfig });
-  }, [ocrHistory.fieldAggregations, ocrHistory.unitConfig, ocrMap, onOcrUpdateJS]);
+    const readyStatus = ocrHistory.getReadyStatus(templateFieldIds);
+    onOcrUpdateJS({
+      bestFields,
+      ocrMap,
+      unitConfig: ocrHistory.unitConfig,
+      isReady: readyStatus.isReady,
+    });
+  }, [
+    ocrHistory.fieldAggregations,
+    ocrHistory.unitConfig,
+    ocrMap,
+    onOcrUpdateJS,
+    templateFieldIds,
+    ocrHistory,
+  ]);
 
   // Forward the latest warped base64 screenshot to parent
   useEffect(() => {
@@ -259,8 +278,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       if (now - lastFrameTime.value < FRAME_INTERVAL_MS) {
         return;
       }
-      lastFrameTime.value = now;
-
+       lastFrameTime.value = now;
       const scan = performScan(frame, {
         screenTemplate,
         ocrTemplate,
@@ -290,7 +308,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           // All heavy filtering/majority logic now lives in useOcrHistory.
           for (const b of scan.ocr.boxes) {
             if (!b || !b.id) continue;
-
+            console.log(b)
             if (b.type === 'value') {
               map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
             } else if (b.type === 'checkbox') {

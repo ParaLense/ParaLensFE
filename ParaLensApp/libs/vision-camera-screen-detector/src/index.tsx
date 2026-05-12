@@ -242,7 +242,7 @@ export function performScan(
           })),
         }
       : {}),
-    ...(opts.runOcr != null ? { runOcr: !!opts.runOcr } : {}),
+    ...(opts.runOcr != null ? { runOcr: opts.runOcr } : {}),
     ...(opts.screenWidthRatio != null
       ? { screenWidthRatio: +opts.screenWidthRatio }
       : {}),

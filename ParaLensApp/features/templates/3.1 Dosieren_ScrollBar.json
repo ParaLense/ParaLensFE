@@ -17,18 +17,18 @@
     "type": "scrollbar",
     "expectedUnits": {
       "iso": {
-        "absolute": "cm^3/s",
-        "relative": "m/s"
+        "absolute": "m/s",
+        "relative": "%"
       },
       "imperial": {
-        "absolute": "in^3/s",
+        "absolute": "in/s",
         "relative": "ft/s"
       }
     },
     "expectedKeyUnits": {
       "iso": {
         "absolute": "cm^3",
-        "relative": "cm^3"
+        "relative": "mm"
       },
       "imperial": {
         "absolute": "in^3",
@@ -93,23 +93,5 @@
         "height": 6.0
       }
     }
-  },
-  {
-    "id": "dosing_speed_end",
-    "x": 87.28,
-    "y": 62.62,
-    "width": 5.71,
-    "height": 6.53,
-    "label": "Dosing Speed End",
-    "type": "value"
-  },
-  {
-    "id": "specific_back_pressure_end",
-    "x": 87.21,
-    "y": 71.96,
-    "width": 5.58,
-    "height": 7.14,
-    "label": "Specific Back Pressure End",
-    "type": "value"
   }
 ]

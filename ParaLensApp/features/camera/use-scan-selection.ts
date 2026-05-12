@@ -16,6 +16,7 @@ type OcrSnapshot = {
   };
   /** Base64-encoded JPEG screenshot of the screen at scan time */
   screenshotBase64?: string;
+  isReady?: boolean;
 } | null;
 
 type ScanSelectionState = {
