@@ -27,7 +27,8 @@
         "relative": "mm"
       },
       "imperial": {
-        "absolute": "in^3"
+        "absolute": "in^3",
+        "relative": "in"
       }
     }
   },
@@ -54,8 +55,16 @@
     "label": "Switch Over Time",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "s" },
-      "imperial": { "absolute": "s" }
+      "iso":
+      {
+        "absolute": "s",
+        "relative": "s"
+      },
+      "imperial":
+      {
+        "absolute": "s",
+        "relative": "s"
+      }
     }
   },
   {
@@ -81,8 +90,8 @@
     "label": "Switching Pressure",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "bar" },
-      "imperial": { "absolute": "psi" }
+      "iso": { "absolute": "bar", "relative": "bar" },
+      "imperial": { "absolute": "psi", "relative": "psi" }
     }
   }
 ]

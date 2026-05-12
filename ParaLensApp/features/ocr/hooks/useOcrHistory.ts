@@ -20,7 +20,7 @@ import {
   DEFAULT_MAX_HISTORY_PER_FIELD,
   DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY,
   START_KEYWORDS,
-  END_KEYWORDS,
+  END_KEYWORDS, MIN_SCANS_FOR_READY,
 } from '../constants';
 import {
   parseScrollbarFromScan,
@@ -33,7 +33,6 @@ import {
   computeBestScrollbar,
 } from '../aggregation';
 
-const MIN_SCANS_FOR_READY = 25;
 
 const isScrollbarFullyFiltered = (scrollbar: ParsedScrollbarValue | undefined): boolean => {
   console.log("isScrollbarFullyFiltered", scrollbar);

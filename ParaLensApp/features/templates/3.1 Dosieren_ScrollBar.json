@@ -18,7 +18,7 @@
     "expectedUnits": {
       "iso": {
         "absolute": "m/s",
-        "relative": "%"
+        "relative": "m/s"
       },
       "imperial": {
         "absolute": "in/s",
@@ -28,7 +28,7 @@
     "expectedKeyUnits": {
       "iso": {
         "absolute": "cm^3",
-        "relative": "mm"
+        "relative": "cm^3"
       },
       "imperial": {
         "absolute": "in^3",
@@ -66,7 +66,7 @@
     "expectedUnits": {
       "iso": {
         "absolute": "bar",
-        "relative": "%"
+        "relative": "bar"
       },
       "imperial": {
         "absolute": "psi",
@@ -76,11 +76,11 @@
     "expectedKeyUnits": {
       "iso": {
         "absolute": "cm^3",
-        "relative": "mm"
+        "relative": "cm^3"
       },
       "imperial": {
         "absolute": "in^3",
-        "relative": "in"
+        "relative": "in^3"
       }
     },
     "options": {

@@ -308,7 +308,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           // All heavy filtering/majority logic now lives in useOcrHistory.
           for (const b of scan.ocr.boxes) {
             if (!b || !b.id) continue;
-            console.log(b)
             if (b.type === 'value') {
               map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
             } else if (b.type === 'checkbox') {

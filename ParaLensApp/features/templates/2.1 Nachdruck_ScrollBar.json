@@ -28,10 +28,12 @@
     },
     "expectedKeyUnits": {
       "iso": {
-        "absolute": "s"
+        "absolute": "s",
+        "relative": "s"
       },
       "imperial": {
-        "absolute": "s"
+        "absolute": "s",
+        "relative": "s"
       }
     },
     "options": {
@@ -44,14 +46,5 @@
         "height": 6.0
       }
     }
-  },
-  {
-    "id": "specific_back_pressure_end",
-    "x": 87.54,
-    "y": 72.43,
-    "width": 4.99,
-    "height": 6.97,
-    "label": "Specific Back Pressure End",
-    "type": "value"
   }
 ]

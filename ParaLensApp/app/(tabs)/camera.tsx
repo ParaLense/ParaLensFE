@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
-import { useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { FlatList, Pressable, Modal as RNModal } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
 import UiScannerCamera from "@/components/UiScannerCamera";
 import RootSelection from "@/components/camera/RootSelection";
@@ -13,6 +14,7 @@ import { HStack } from "@/components/ui/hstack";
 import { Input, InputField } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
+import { Spinner } from "@/components/ui/spinner";
 import { useFullScan } from "@/features/fullscan/fullscan-context";
 import { TemplateLayout } from "@/features/templates/use-template-layout";
 import { useI18n } from "@/features/settings/i18n";
@@ -31,6 +33,7 @@ export default function CameraScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ reset?: string }>();
 
   const devices = useCameraDevices();
   const device = useCameraDevice("back");
@@ -57,6 +60,17 @@ export default function CameraScreen() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [authorInput, setAuthorInput] = useState("");
   const [latestScreenshot, setLatestScreenshot] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsNavigating(false);
+      if (params.reset) {
+        resetToRootMenu();
+        router.setParams({ reset: undefined });
+      }
+    }, [params.reset, resetToRootMenu, router]),
+  );
 
   const isReadyToContinue = !!ocrSnapshot?.isReady;
 
@@ -85,6 +99,8 @@ export default function CameraScreen() {
   }, [fullScans, selectedFullScanId, t]);
 
   const goReview = () => {
+    if (isNavigating) return;
+    setIsNavigating(true);
     const params: Record<string, string> = {
       selectedMenu: selectedMenu ?? "",
       injectionMode: injectionMode ?? "",
@@ -258,20 +274,37 @@ export default function CameraScreen() {
             <Button
               variant={isReadyToContinue ? "solid" : "outline"}
               action={isReadyToContinue ? "primary" : "secondary"}
-              onPress={goReview}
+              onPress={() => {
+                if (!isReadyToContinue || isNavigating) return;
+                goReview();
+              }}
+              disabled={!isReadyToContinue || isNavigating}
               style={
                 isReadyToContinue
                   ? { backgroundColor: "#3B82F6", borderColor: "#3B82F6" }
                   : undefined
               }
             >
-              <Text style={isReadyToContinue ? { color: "#ffffff" } : undefined}>
-                {t("continue") ?? "Continue"}
-              </Text>
+              {isNavigating ? (
+                <Spinner color={isReadyToContinue ? "#ffffff" : undefined} />
+              ) : (
+                <Text style={isReadyToContinue ? { color: "#ffffff" } : undefined}>
+                  {t("continue") ?? "Continue"}
+                </Text>
+              )}
             </Button>
           </HStack>
         </Box>
       )}
+
+      <RNModal transparent visible={isNavigating} animationType="fade">
+        <Box
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          className={isDark ? "bg-black/60" : "bg-black/40"}
+        >
+          <Spinner color="#ffffff" />
+        </Box>
+      </RNModal>
     </Box>
   );
 }

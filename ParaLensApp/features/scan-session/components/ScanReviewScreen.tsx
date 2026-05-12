@@ -7,6 +7,8 @@ import { useFullScan } from "@/features/fullscan/fullscan-context";
 import { useSettings } from "@/features/settings/settings-context";
 import { useI18n } from "@/features/settings/i18n";
 import { VStack } from "@/components/ui/vstack";
+import { Box } from "@/components/ui/box";
+import { Spinner } from "@/components/ui/spinner";
 import { Heading } from "@/components/ui/heading";
 import { Button, ButtonText } from "@/components/ui/button";
 import { HStack } from "@/components/ui/hstack";
@@ -70,7 +72,7 @@ import {
   BOX_ID_TRANSSHIPMENT_POSITION,
   BOX_ID_TRANSSHIPMENT_POSITION_CHECKBOX,
 } from "@/features/ocr/constants/box-id-constants";
-import {useSafeAreaInsets} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ScanReviewScreen() {
   const params = useLocalSearchParams<{
@@ -94,6 +96,7 @@ export default function ScanReviewScreen() {
   const [ocrSnapshot, setOcrSnapshot] = useState<OcrSnapshot>(null);
   const [ocrApplied, setOcrApplied] = useState(false);
   const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
+  const [isScreenLoading, setIsScreenLoading] = useState(true);
 
   const headerLabel = useMemo(() => {
     const parts: string[] = [];
@@ -167,6 +170,20 @@ export default function ScanReviewScreen() {
     setpoint4: { value: "", unit: "" },
     setpoint5: { value: "", unit: "" },
   });
+
+  useEffect(() => {
+    if (!params.ocrData) {
+      const timer = setTimeout(() => setIsScreenLoading(false), 300);
+      return () => clearTimeout(timer);
+    }
+    if (ocrApplied) setIsScreenLoading(false);
+  }, [params.ocrData, ocrApplied]);
+
+  useEffect(() => {
+    if (!params.ocrData) return;
+    const timer = setTimeout(() => setIsScreenLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, [params.ocrData]);
 
   // Parse OCR data once on mount (if provided via navigation)
   useEffect(() => {
@@ -394,171 +411,205 @@ export default function ScanReviewScreen() {
   ]);
 
   const onBack = () => router.back();
-  const onSave = () => router.back();
+  const onSave = () =>
+    router.replace({
+      pathname: "/camera",
+      params: { reset: "1" },
+    });
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView
-      style={{ backgroundColor: isDark ? "#000" : "#fff", paddingTop: insets.top  }}
-      contentContainerStyle={{ padding: 20 }}
-    >
-      <Heading
-        size="lg"
-        className={`mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}
+    <Box style={{ flex: 1, backgroundColor: isDark ? "#000" : "#fff" }}>
+      <ScrollView
+        style={{ paddingTop: insets.top }}
+        contentContainerStyle={{ padding: 20 }}
       >
-        {t("review")} - {headerLabel}
-      </Heading>
-
-      {selectedMenu === "injection" && injectionMode === "mainMenu" && (
-        <InjectionMainMenuReview
-          isDark={isDark}
-          t={t}
-          injMainForm={injMainForm}
-          setInjMainForm={setInjMainForm}
-        />
-      )}
-
-      {selectedMenu === "injection" && injectionMode === "subMenuGraphic" && (
-        <InjectionSubMenuGraphicReview
-          isDark={isDark}
-          t={t}
-          values={injGraphicValues}
-          setValues={setInjGraphicValues}
-          units={injGraphicUnits}
-        />
-      )}
-
-      {selectedMenu === "injection" && injectionMode === "switchType" && (
-        <InjectionSwitchTypeReview
-          isDark={isDark}
-          t={t}
-          injSwitchForm={injSwitchForm}
-          setInjSwitchForm={setInjSwitchForm}
-        />
-      )}
-
-      {selectedMenu === "holdingPressure" && holdingMode === "mainMenu" && (
-        <HoldingMainMenuReview
-          isDark={isDark}
-          t={t}
-          holdMainForm={holdMainForm}
-          setHoldMainForm={setHoldMainForm}
-        />
-      )}
-
-      {selectedMenu === "holdingPressure" && holdingMode === "subMenuGraphic" && (
-        <HoldingSubMenuGraphicReview
-          isDark={isDark}
-          t={t}
-          values={holdGraphicValues}
-          setValues={setHoldGraphicValues}
-          units={holdGraphicUnits}
-        />
-      )}
-
-      {selectedMenu === "dosing" && dosingMode === "mainMenu" && (
-        <DosingMainMenuReview
-          isDark={isDark}
-          t={t}
-          doseMainForm={doseMainForm}
-          setDoseMainForm={setDoseMainForm}
-        />
-      )}
-
-      {selectedMenu === "dosing" && dosingMode === "subMenuGraphic" && (
-        <DosingSubMenuGraphicReview
-          isDark={isDark}
-          t={t}
-          speedValues={doseSpeedValues}
-          setSpeedValues={setDoseSpeedValues}
-          pressureValues={dosePressureValues}
-          setPressureValues={setDosePressureValues}
-          speedUnits={doseSpeedUnits}
-          pressureUnits={dosePressureUnits}
-        />
-      )}
-
-      {selectedMenu === "cylinderHeating" && (
-        <CylinderHeatingReview
-          isDark={isDark}
-          t={t}
-          cylinderForm={cylinderForm}
-          setCylinderForm={setCylinderForm}
-        />
-      )}
-
-      <HStack className="gap-4 mt-6 items-center justify-between">
-        <Button variant="outline" action="secondary" onPress={onBack}>
-          <ButtonText>{t("cancel")}</ButtonText>
-        </Button>
-        <Button
-          action="primary"
-          variant="solid"
-          onPress={() => {
-            if (!selectedMenu || !selectedFullScanId) {
-              onSave();
-              return;
-            }
-            let payload: any = {};
-            if (selectedMenu === "injection") {
-              if (injectionMode === "mainMenu")
-                payload = mapInjectionMainMenu(injMainForm);
-              if (injectionMode === "subMenuGraphic")
-                payload = {
-                  subMenuValues: {
-                    values: injGraphicValues,
-                    keyUnit: injGraphicUnits.keyUnit,
-                    valueUnit: injGraphicUnits.valueUnit,
-                  },
-                };
-              if (injectionMode === "switchType")
-                payload = mapInjectionSwitchType(injSwitchForm);
-            } else if (selectedMenu === "holdingPressure") {
-              if (holdingMode === "mainMenu")
-                payload = mapHoldingMainMenu(holdMainForm);
-              if (holdingMode === "subMenuGraphic")
-                payload = {
-                  subMenusValues: {
-                    values: holdGraphicValues,
-                    keyUnit: holdGraphicUnits.keyUnit,
-                    valueUnit: holdGraphicUnits.valueUnit,
-                  },
-                };
-            } else if (selectedMenu === "dosing") {
-              if (dosingMode === "mainMenu")
-                payload = mapDosingMainMenu(doseMainForm);
-              if (dosingMode === "subMenuGraphic")
-                payload = {
-                  dosingSpeedsValues: {
-                    values: doseSpeedValues,
-                    keyUnit: doseSpeedUnits.keyUnit,
-                    valueUnit: doseSpeedUnits.valueUnit,
-                  },
-                  dosingPressuresValues: {
-                    values: dosePressureValues,
-                    keyUnit: dosePressureUnits.keyUnit,
-                    valueUnit: dosePressureUnits.valueUnit,
-                  },
-                };
-            } else if (selectedMenu === "cylinderHeating") {
-              payload = mapCylinderHeating(cylinderForm);
-            }
-            // Determine the sub-mode for screenshot keying
-            let subMode: string | undefined;
-            if (selectedMenu === "injection") subMode = injectionMode ?? undefined;
-            else if (selectedMenu === "holdingPressure") subMode = holdingMode ?? undefined;
-            else if (selectedMenu === "dosing") subMode = dosingMode ?? undefined;
-
-            upsertSection(selectedFullScanId, selectedMenu, payload, screenshotBase64 ?? undefined, subMode);
-            onSave();
-          }}
+        <Heading
+          size="lg"
+          className={`mb-4 ${isDark ? "text-typography-50" : "text-typography-900"}`}
         >
-          <ButtonText className={isDark ? "text-typography-900" : undefined}>
-            {t("create") || "Speichern"}
-          </ButtonText>
-        </Button>
-      </HStack>
-    </ScrollView>
+          {t("review")} - {headerLabel}
+        </Heading>
+
+        {selectedMenu === "injection" && injectionMode === "mainMenu" && (
+          <InjectionMainMenuReview
+            isDark={isDark}
+            t={t}
+            injMainForm={injMainForm}
+            setInjMainForm={setInjMainForm}
+          />
+        )}
+
+        {selectedMenu === "injection" && injectionMode === "subMenuGraphic" && (
+          <InjectionSubMenuGraphicReview
+            isDark={isDark}
+            t={t}
+            values={injGraphicValues}
+            setValues={setInjGraphicValues}
+            units={injGraphicUnits}
+          />
+        )}
+
+        {selectedMenu === "injection" && injectionMode === "switchType" && (
+          <InjectionSwitchTypeReview
+            isDark={isDark}
+            t={t}
+            injSwitchForm={injSwitchForm}
+            setInjSwitchForm={setInjSwitchForm}
+          />
+        )}
+
+        {selectedMenu === "holdingPressure" && holdingMode === "mainMenu" && (
+          <HoldingMainMenuReview
+            isDark={isDark}
+            t={t}
+            holdMainForm={holdMainForm}
+            setHoldMainForm={setHoldMainForm}
+          />
+        )}
+
+        {selectedMenu === "holdingPressure" && holdingMode === "subMenuGraphic" && (
+          <HoldingSubMenuGraphicReview
+            isDark={isDark}
+            t={t}
+            values={holdGraphicValues}
+            setValues={setHoldGraphicValues}
+            units={holdGraphicUnits}
+          />
+        )}
+
+        {selectedMenu === "dosing" && dosingMode === "mainMenu" && (
+          <DosingMainMenuReview
+            isDark={isDark}
+            t={t}
+            doseMainForm={doseMainForm}
+            setDoseMainForm={setDoseMainForm}
+          />
+        )}
+
+        {selectedMenu === "dosing" && dosingMode === "subMenuGraphic" && (
+          <DosingSubMenuGraphicReview
+            isDark={isDark}
+            t={t}
+            speedValues={doseSpeedValues}
+            setSpeedValues={setDoseSpeedValues}
+            pressureValues={dosePressureValues}
+            setPressureValues={setDosePressureValues}
+            speedUnits={doseSpeedUnits}
+            pressureUnits={dosePressureUnits}
+          />
+        )}
+
+        {selectedMenu === "cylinderHeating" && (
+          <CylinderHeatingReview
+            isDark={isDark}
+            t={t}
+            cylinderForm={cylinderForm}
+            setCylinderForm={setCylinderForm}
+          />
+        )}
+
+        <HStack className="gap-4 mt-6 items-center justify-between">
+          <Button
+            variant="outline"
+            action="secondary"
+            onPress={() => {
+              setIsScreenLoading(false);
+              onBack();
+            }}
+          >
+            <ButtonText>{t("cancel")}</ButtonText>
+          </Button>
+          <Button
+            action="primary"
+            variant="solid"
+            onPress={() => {
+              if (isScreenLoading) return;
+              if (!selectedMenu || !selectedFullScanId) {
+                onSave();
+                return;
+              }
+              let payload: any = {};
+              if (selectedMenu === "injection") {
+                if (injectionMode === "mainMenu")
+                  payload = mapInjectionMainMenu(injMainForm);
+                if (injectionMode === "subMenuGraphic")
+                  payload = {
+                    subMenuValues: {
+                      values: injGraphicValues,
+                      keyUnit: injGraphicUnits.keyUnit,
+                      valueUnit: injGraphicUnits.valueUnit,
+                    },
+                  };
+                if (injectionMode === "switchType")
+                  payload = mapInjectionSwitchType(injSwitchForm);
+              } else if (selectedMenu === "holdingPressure") {
+                if (holdingMode === "mainMenu")
+                  payload = mapHoldingMainMenu(holdMainForm);
+                if (holdingMode === "subMenuGraphic")
+                  payload = {
+                    subMenusValues: {
+                      values: holdGraphicValues,
+                      keyUnit: holdGraphicUnits.keyUnit,
+                      valueUnit: holdGraphicUnits.valueUnit,
+                    },
+                  };
+              } else if (selectedMenu === "dosing") {
+                if (dosingMode === "mainMenu")
+                  payload = mapDosingMainMenu(doseMainForm);
+                if (dosingMode === "subMenuGraphic")
+                  payload = {
+                    dosingSpeedsValues: {
+                      values: doseSpeedValues,
+                      keyUnit: doseSpeedUnits.keyUnit,
+                      valueUnit: doseSpeedUnits.valueUnit,
+                    },
+                    dosingPressuresValues: {
+                      values: dosePressureValues,
+                      keyUnit: dosePressureUnits.keyUnit,
+                      valueUnit: dosePressureUnits.valueUnit,
+                    },
+                  };
+              } else if (selectedMenu === "cylinderHeating") {
+                payload = mapCylinderHeating(cylinderForm);
+              }
+              // Determine the sub-mode for screenshot keying
+              let subMode: string | undefined;
+              if (selectedMenu === "injection") subMode = injectionMode ?? undefined;
+              else if (selectedMenu === "holdingPressure")
+                subMode = holdingMode ?? undefined;
+              else if (selectedMenu === "dosing")
+                subMode = dosingMode ?? undefined;
+
+              upsertSection(
+                selectedFullScanId,
+                selectedMenu,
+                payload,
+                screenshotBase64 ?? undefined,
+                subMode,
+              );
+              onSave();
+            }}
+            disabled={isScreenLoading}
+          >
+            <ButtonText className={isDark ? "text-typography-900" : undefined}>
+              {t("create") || "Speichern"}
+            </ButtonText>
+          </Button>
+        </HStack>
+      </ScrollView>
+
+      {isScreenLoading && (
+        <Box
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+          className={isDark ? "bg-black/60" : "bg-black/40"}
+        >
+          <Box style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <Spinner color="#ffffff" />
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 }
 

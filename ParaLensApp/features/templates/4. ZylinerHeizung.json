@@ -8,8 +8,8 @@
     "label": "Cylinder Heating Items",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "°C" },
-      "imperial": { "absolute": "°F" }
+      "iso": { "absolute": "°C", "relative": "°C" },
+      "imperial": { "absolute": "°F", "relative": "°F"  }
     }
   }
 ]

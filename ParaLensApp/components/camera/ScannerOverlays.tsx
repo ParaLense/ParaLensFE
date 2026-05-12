@@ -106,16 +106,17 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
     );
   };
     const renderScreenOverlays = () => {
+        const padding = 20;
         if (templateViewport) {
             return (
                 <TemplateOverlay
                     layout={TemplateLayout.ScreenDetection}
                     isActive
                     color="#FF0000"
-                    viewportWidth={templateViewport.width}
-                    viewportHeight={templateViewport.height}
-                    offsetX={templateViewport.offsetX}
-                    offsetY={templateViewport.offsetY}
+                    viewportWidth={templateViewport.width-padding}
+                    viewportHeight={templateViewport.height-padding}
+                    offsetX={templateViewport.offsetX+padding/2}
+                    offsetY={templateViewport.offsetY+padding/2}
                 />
             );
         }
