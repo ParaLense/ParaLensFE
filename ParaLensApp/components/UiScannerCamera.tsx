@@ -133,6 +133,13 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const onScreenshotUpdateRef = useRef(onScreenshotUpdate);
   onScreenshotUpdateRef.current = onScreenshotUpdate;
 
+  const debugLogJS = useRunOnJS(
+    (...args: any[]) => {
+      console.log("[ocr-debug]", ...args);
+    },
+    []
+  );
+
   const ocrTemplate = useMemo(() => loadOcrTemplate(currentLayout), [currentLayout]);
   const templateFieldIds = useMemo(
     () => ocrTemplate.map((entry) => entry?.id).filter(Boolean) as string[],
@@ -278,7 +285,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       if (now - lastFrameTime.value < FRAME_INTERVAL_MS) {
         return;
       }
-       lastFrameTime.value = now;
+      lastFrameTime.value = now;
       const scan = performScan(frame, {
         screenTemplate,
         ocrTemplate,
@@ -295,6 +302,11 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         rotate90CW: SCAN_ROTATE_90_CW,
       });
 
+      debugLogJS("scan", {
+        hasScreen: !!scan?.screen,
+        boxCount: scan?.ocr?.boxes?.length ?? 0,
+      });
+
       if (scan?.screen) {
         setScreenResultJS(scan.screen);
         if (scan.screen.image_base64) {
@@ -302,6 +314,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         }
 
         if (scan.ocr?.boxes?.length) {
+          debugLogJS("boxes", scan.ocr.boxes.map((b) => ({ id: b.id, type: b.type })));
           const map: Record<string, string> = {};
 
           // Build a simple debug map with raw values for each box.
@@ -322,13 +335,24 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
               const tokens: string[] = [];
 
               for (const v of values) {
+                if (typeof v === 'string') {
+                  const trimmed = v.trim();
+                  if (trimmed.length > 0) tokens.push(trimmed);
+                  continue;
+                }
+                if (typeof v === 'number') {
+                  tokens.push(String(v));
+                  continue;
+                }
                 // v ist vom Typ { index: number; text?: string; number?: number; confidence?: number }
-                const {text} = v;
-                const num = v.number;
-                if (typeof text === 'string' && text.trim().length > 0) {
-                  tokens.push(text.trim());
-                } else if (typeof num === 'number') {
-                  tokens.push(String(num));
+                if (v && typeof v === 'object') {
+                  const { text } = v as { text?: string };
+                  const num = (v as { number?: number }).number;
+                  if (typeof text === 'string' && text.trim().length > 0) {
+                    tokens.push(text.trim());
+                  } else if (typeof num === 'number') {
+                    tokens.push(String(num));
+                  }
                 }
               }
 
@@ -337,29 +361,38 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
               }
             }
           }
-          if (Object.keys(map).length > 0) {
-            setOcrMapJS(map);
 
-            // Enrich boxes with template data (sameUnitAs, expectedUnits)
-            const enrichedBoxes = scan.ocr.boxes.map((box: OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult) => {
-              const templateBox = ocrTemplate.find(t => t.id === box.id);
-              return {
-                ...box,
-                sameUnitAs: templateBox?.sameUnitAs,
-                expectedUnits: templateBox?.expectedUnits,
-                expectedKeyUnits: templateBox?.expectedKeyUnits,
-              };
-            });
-
-            // Add full scan result (with complete box information) to OCR history
-            const fullScanResult = {
-              timestamp: Date.now(),
-              boxes: enrichedBoxes,
-              screenDetected: true, // We know screen was detected if we're here
-              accuracy: 0.5, // Default accuracy since we don't have direct access
+          const enrichedBoxes = scan.ocr.boxes.map((box: OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult) => {
+            const templateBox = ocrTemplate.find(t => t.id === box.id);
+            return {
+              ...box,
+              sameUnitAs: templateBox?.sameUnitAs,
+              expectedUnits: templateBox?.expectedUnits,
+              expectedKeyUnits: templateBox?.expectedKeyUnits,
+              options: templateBox?.options,
             };
-            addScanResultJS(fullScanResult);
+          });
+
+          if (Object.keys(map).length > 0) {
+            debugLogJS("ocrMap", map);
+            setOcrMapJS(map);
           }
+
+          debugLogJS("enrichedBoxes", enrichedBoxes.map((b) => ({
+            id: b.id,
+            type: b.type,
+            options: (b as any).options,
+            expectedUnits: (b as any).expectedUnits,
+          })));
+
+          // Add full scan result (with complete box information) to OCR history
+          const fullScanResult = {
+            timestamp: Date.now(),
+            boxes: enrichedBoxes,
+            screenDetected: true, // We know screen was detected if we're here
+            accuracy: 0.5, // Default accuracy since we don't have direct access
+          };
+          addScanResultJS(fullScanResult);
         }
       }
     } catch (error) {

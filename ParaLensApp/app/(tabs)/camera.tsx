@@ -275,10 +275,10 @@ export default function CameraScreen() {
               variant={isReadyToContinue ? "solid" : "outline"}
               action={isReadyToContinue ? "primary" : "secondary"}
               onPress={() => {
-                if (!isReadyToContinue || isNavigating) return;
+                if ( isNavigating) return;
                 goReview();
               }}
-              disabled={!isReadyToContinue || isNavigating}
+              disabled={ isNavigating}
               style={
                 isReadyToContinue
                   ? { backgroundColor: "#3B82F6", borderColor: "#3B82F6" }

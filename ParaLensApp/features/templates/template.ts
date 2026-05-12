@@ -1,4 +1,3 @@
-
 import type { ExpectedUnitConfig } from '@/features/ocr';
 
 interface TemplateBox{
@@ -16,6 +15,7 @@ interface TemplateBox{
     checkboxThreshold?: number;
     readValue?: boolean;
     valueBoxId?: string;
+    single?: boolean;
   };
   sameUnitAs?: string;
   expectedUnits?: string[] | ExpectedUnitConfig;

@@ -12,19 +12,21 @@ export const buildRowsFromScrollbar = (
 ): IndexValuePair[] => {
   if (!scrollbar) return [{ index: "1" }];
 
-  const indices = Object.keys(scrollbar)
+  const segments = scrollbar.segments ?? Object.keys(scrollbar)
     .map((k) => Number(k))
     .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b);
+    .sort((a, b) => a - b)
+    .map((idx) => ({ index: idx, ...scrollbar[idx] }));
 
-  if (indices.length === 0) return [{ index: "1" }];
+  if (segments.length === 0) return [{ index: "1" }];
 
-  return indices.map((idx) => {
-    const seg = scrollbar[idx];
-    const row: IndexValuePair = { index: String(idx + 1), state: seg?.state };
-    const key = seg?.key?.[0];
-    const val = seg?.value?.[0];
-    if (typeof key === "number" && Number.isFinite(key)) {
+  const isSingle = scrollbar.single === true;
+
+  return segments.map((seg) => {
+    const row: IndexValuePair = { index: String(seg.index + 1), state: seg.state };
+    const key = seg.key?.[0];
+    const val = seg.value?.[0];
+    if (!isSingle && typeof key === "number" && Number.isFinite(key)) {
       row.v = formatScrollbarNumber(key);
     }
     if (typeof val === "number" && Number.isFinite(val)) {

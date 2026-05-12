@@ -29,6 +29,7 @@ export type OcrTemplateBox = {
     blackRatioMin?: number;
     readValue?: boolean;
     valueBoxId?: string;
+    single?: boolean;
   };
 };
 

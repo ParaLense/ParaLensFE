@@ -37,9 +37,12 @@ import {
 const isScrollbarFullyFiltered = (scrollbar: ParsedScrollbarValue | undefined): boolean => {
   console.log("isScrollbarFullyFiltered", scrollbar);
   if (!scrollbar) return false;
-  const segments = Object.entries(scrollbar)
+  const segments = scrollbar.segments ?? Object.entries(scrollbar)
     .filter(([key]) => Number.isFinite(Number(key)))
-    .map(([, value]) => value as { state?: string } | undefined);
+    .map(([key, value]) => ({
+      index: Number(key),
+      ...(value as { state?: string } | undefined),
+    }));
 
   console.log("segments", segments);
   if (segments.length === 0) return false;
@@ -374,11 +377,13 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
         if (agg?.scrollbar) {
           const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
           const parsed = best?.parsed;
-          const segments = parsed
-            ? Object.entries(parsed)
-                .filter(([key]) => Number.isFinite(Number(key)))
-                .map(([, value]) => value as { state?: string } | undefined)
-            : [];
+          const segments = parsed?.segments
+            ? parsed.segments
+            : parsed
+                ? Object.entries(parsed)
+                    .filter(([key]) => Number.isFinite(Number(key)))
+                    .map(([, value]) => value as { state?: string } | undefined)
+                : [];
           const totalSegments = segments.length;
           const filteredSegments = segments.filter((segment) => segment?.state === "filtered").length;
           majorityProgress = totalSegments > 0 ? filteredSegments / totalSegments : 0;
