@@ -58,6 +58,8 @@ export default function CameraScreen() {
   const [authorInput, setAuthorInput] = useState("");
   const [latestScreenshot, setLatestScreenshot] = useState<string | null>(null);
 
+  const isReadyToContinue = !!ocrSnapshot?.isReady;
+
   const scanHeaderLabel = useMemo(() => {
     const parts: string[] = [];
     if (selectedMenu) parts.push(t(selectedMenu));
@@ -253,8 +255,19 @@ export default function CameraScreen() {
         selectedMenu === "cylinderHeating") && (
         <Box style={{ position: 'absolute', left: 0, right: 0, bottom: 32, alignItems: 'center' }}>
           <HStack className="gap-4">
-            <Button variant="outline" action="secondary" onPress={goReview}>
-              <Text>{t("continue") ?? "Continue"}</Text>
+            <Button
+              variant={isReadyToContinue ? "solid" : "outline"}
+              action={isReadyToContinue ? "primary" : "secondary"}
+              onPress={goReview}
+              style={
+                isReadyToContinue
+                  ? { backgroundColor: "#3B82F6", borderColor: "#3B82F6" }
+                  : undefined
+              }
+            >
+              <Text style={isReadyToContinue ? { color: "#ffffff" } : undefined}>
+                {t("continue") ?? "Continue"}
+              </Text>
             </Button>
           </HStack>
         </Box>
