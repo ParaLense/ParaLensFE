@@ -20,6 +20,14 @@ export type ExpectedUnitConfig = {
   };
 };
 
+export type ParsedScrollbarSegment = {
+  index: number;
+  key: number[];
+  value: number[];
+  pairs?: Array<{ key: number; value: number }>;
+  state?: ScrollbarRowState;
+};
+
 // Parsed representation of a scrollbar field across multiple scans.
 // Each index (0, 1, 2, ...) represents one key/value-pair of the scrollbar.
 // We keep *all* numeric candidates that passed the filter in arrays so that
@@ -37,6 +45,8 @@ type ParsedScrollbarSegments = Record<
 export type ParsedScrollbarValue = ParsedScrollbarSegments & {
   keyUnit?: string | null;
   valueUnit?: string | null;
+  single?: boolean;
+  segments?: ParsedScrollbarSegment[];
 };
 
 export type OcrFieldResult = {
@@ -57,6 +67,9 @@ export type OcrBox = {
   expectedUnits?: string[] | ExpectedUnitConfig;
   expectedKeyUnits?: string[] | ExpectedUnitConfig;
   sameUnitAs?: string;
+  options?: {
+    single?: boolean;
+  };
   // checkbox specific
   checked?: boolean;
   valueText?: string;

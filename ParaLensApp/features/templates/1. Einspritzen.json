@@ -10,11 +10,11 @@
     "expectedUnits": {
       "iso": {
         "absolute": "bar",
-        "relative": "%"
+        "relative": "bar"
       },
       "imperial": {
         "absolute": "psi",
-        "relative": "%"
+        "relative": "psi"
       }
     }
   },

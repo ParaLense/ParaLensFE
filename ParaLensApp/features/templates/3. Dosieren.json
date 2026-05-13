@@ -8,8 +8,16 @@
     "label": "Dosing Stroke",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "cm^3" },
-      "imperial": { "absolute": "in^3" }
+      "iso":
+      {
+        "absolute": "cm^3",
+        "relative": "mm"
+      },
+      "imperial":
+      {
+        "absolute": "in^3",
+        "relative": "in"
+      }
     }
   },
   {
@@ -21,8 +29,16 @@
     "label": "Dosing Delay Time",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "s" },
-      "imperial": { "absolute": "s" }
+      "iso":
+      {
+        "absolute": "s",
+        "relative": "s"
+      },
+      "imperial":
+      {
+        "absolute": "s",
+        "relative": "s"
+      }
     }
   },
   {
@@ -44,8 +60,16 @@
     "label": "Relieve After Dosing",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "cm^3" },
-      "imperial": { "absolute": "in^3" }
+      "iso":
+      {
+        "absolute": "cm^3",
+        "relative": "mm"
+      },
+      "imperial":
+      {
+        "absolute": "in^3",
+        "relative": "in"
+      }
     }
   },
   {
@@ -57,8 +81,16 @@
     "label": "Discharge Speed Before",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "cm^3/s", "relative": "%" },
-      "imperial": { "absolute": "in^3/s", "relative": "%" }
+      "iso":
+      {
+        "absolute": "cm^3/s",
+        "relative": "%"
+      },
+      "imperial":
+      {
+        "absolute": "in^3/s",
+        "relative": "%"
+      }
     }
   },
   {
@@ -70,8 +102,16 @@
     "label": "Discharge Speed After",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "cm^3/s", "relative": "%" },
-      "imperial": { "absolute": "in^3/s", "relative": "%" }
+      "iso":
+      {
+        "absolute": "cm^3/s",
+        "relative": "%"
+      },
+      "imperial":
+      {
+        "absolute": "in^3/s",
+        "relative": "%"
+      }
     }
   }
 ]

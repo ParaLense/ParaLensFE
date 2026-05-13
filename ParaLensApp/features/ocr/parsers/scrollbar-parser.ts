@@ -23,6 +23,44 @@ const extractExpectedUnitKeywords = (
   return keywords;
 };
 
+const extractNumericTokensAndUnit = (
+  rawTokens: string[],
+  expectedUnits: readonly string[]
+): { tokens: string[]; unit?: string | null } => {
+  const tokens: string[] = [];
+  const keywordVariants = expectedUnits.map((keyword) => ({
+    original: keyword,
+    normalized: keyword.toLowerCase().replace(/[^a-z0-9]/gi, ''),
+  }));
+  let detectedUnit: string | null = null;
+
+  rawTokens.forEach((raw) => {
+    const str = String(raw);
+    const parts = str
+      .split(/[;]+/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+
+    parts.forEach((part) => {
+      const unitMatch = part.match(/[a-zA-Z°]+/);
+      if (unitMatch?.[0]) {
+        const normalizedUnit = unitMatch[0].toLowerCase().replace(/[^a-z0-9]/gi, '');
+        const match = keywordVariants.find((keyword) => keyword.normalized === normalizedUnit);
+        if (match) {
+          detectedUnit = detectedUnit ?? match.original;
+        }
+      }
+
+      const matches = part.matchAll(/-?\d+(?:[\.,]\d+)?/g);
+      for (const match of matches) {
+        if (match[0]) tokens.push(match[0]);
+      }
+    });
+  });
+
+  return { tokens, unit: detectedUnit };
+};
+
 /**
  * Normalise raw scrollbar tokens:
  * - Split values on ';' so "123,3;322,4 bar;76 s" becomes individual tokens
@@ -127,6 +165,55 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
 
   const expectedValueKeywords = extractExpectedUnitKeywords(box.expectedUnits);
   const expectedKeyKeywords = extractExpectedUnitKeywords(box.expectedKeyUnits);
+  const isSingle = box.options?.single === true;
+
+  if (isSingle) {
+    if (__DEV__) {
+      console.log('[scrollbar][single] rawTokens', box.id, rawTokens);
+    }
+
+    const valueKeywords: readonly string[] =
+      expectedValueKeywords.length > 0 ? expectedValueKeywords : END_KEYWORDS;
+
+    const extracted = extractNumericTokensAndUnit(rawTokens, valueKeywords);
+    if (__DEV__) {
+      console.log('[scrollbar][single] extracted', box.id, extracted);
+    }
+    if (extracted.tokens.length === 0) return null;
+
+    const parsed: ParsedScrollbarValue = { single: true };
+
+    for (let i = 0; i < extracted.tokens.length; i += 1) {
+      const token = extracted.tokens[i];
+      if (!isValidNumericToken(token, commaRequired)) continue;
+      const valueNum = normalizeNumber(token);
+      if (valueNum == null || !Number.isFinite(valueNum)) continue;
+      parsed[i] = { key: [], value: [valueNum] };
+    }
+
+    if (__DEV__) {
+      console.log('[scrollbar][single] parsed', box.id, parsed);
+    }
+
+    const singleIndices = Object.keys(parsed)
+      .map((k) => Number(k))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+
+    if (singleIndices.length === 0) return null;
+
+    if (extracted.unit) {
+      parsed.valueUnit = extracted.unit;
+    }
+
+    parsed.segments = singleIndices.map((idx) => ({ index: idx, ...parsed[idx] }));
+
+    if (__DEV__) {
+      console.log('[scrollbar][single] segments', box.id, parsed.segments);
+    }
+    return parsed;
+  }
+
   const fallbackKeywords: readonly string[] =
     expectedValueKeywords.length > 0 ? expectedValueKeywords : END_KEYWORDS;
   const keyKeywords: readonly string[] =
@@ -234,6 +321,12 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
   if (detectedValueUnit) {
     parsed.valueUnit = detectedValueUnit;
   }
+
+  const indices = Object.keys(parsed)
+    .map((k) => Number(k))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  parsed.segments = indices.map((idx) => ({ index: idx, ...parsed[idx] }));
 
   return parsed;
 };

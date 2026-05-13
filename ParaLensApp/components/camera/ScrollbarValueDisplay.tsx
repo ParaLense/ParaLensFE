@@ -64,6 +64,7 @@ export const ScrollbarValueDisplay: React.FC<ScrollbarValueDisplayProps> = ({
 
   const rows = buildRowsFromScrollbar(scrollbarValue);
   const units = extractScrollbarUnits(scrollbarValue);
+  const isSingle = scrollbarValue.single === true;
   const labelTop = box.y + box.height - 24;
 
   return (
@@ -101,12 +102,14 @@ export const ScrollbarValueDisplay: React.FC<ScrollbarValueDisplayProps> = ({
                     .backgroundColor,
                 }}
               >
-                <GluestackText
-                  className={`text-[10px] ${getToneClasses((row.state ?? tone) as ScrollbarTone).text}`}
-                  numberOfLines={1}
-                >
-                  {row.v ?? "-"}
-                </GluestackText>
+                {!isSingle ? (
+                  <GluestackText
+                    className={`text-[10px] ${getToneClasses((row.state ?? tone) as ScrollbarTone).text}`}
+                    numberOfLines={1}
+                  >
+                    {row.v ?? "-"}
+                  </GluestackText>
+                ) : null}
                 <GluestackText
                   className={`text-xs font-medium ${getToneClasses((row.state ?? tone) as ScrollbarTone).valueText}`}
                   numberOfLines={1}
@@ -136,10 +139,3 @@ export const ScrollbarValueDisplay: React.FC<ScrollbarValueDisplayProps> = ({
     </Box>
   );
 };
-
-
-
-
-
-
-

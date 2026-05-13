@@ -17,6 +17,7 @@ export type OcrTemplateBox = {
     cells?: number;
     valuesRegion?: { x: number; y: number; width: number; height: number };
     blackRatioMin?: number;
+    single?: boolean;
   };
 };
 

@@ -20,7 +20,7 @@ import {
   DEFAULT_MAX_HISTORY_PER_FIELD,
   DEFAULT_MIN_OCCURRENCES_FOR_MAJORITY,
   START_KEYWORDS,
-  END_KEYWORDS,
+  END_KEYWORDS, MIN_SCANS_FOR_READY,
 } from '../constants';
 import {
   parseScrollbarFromScan,
@@ -32,6 +32,7 @@ import {
   computeMajorityString,
   computeBestScrollbar,
 } from '../aggregation';
+
 
 type UnitConfig = {
   system?: UnitSystem;
@@ -330,6 +331,96 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
     [fieldAggregations, minOccurrencesForMajority]
   );
 
+  const getReadyStatus = useCallback(
+    (templateFieldIds?: string[]) => {
+      if (!templateFieldIds || templateFieldIds.length === 0) {
+        return {
+          isReady: false,
+          filteredCount: 0,
+          totalRequired: 0,
+          progress: 0,
+          remainingUnits: 0,
+          requiredUnits: 0,
+        };
+      }
+
+      let filteredCount = 0;
+      let readyCount = 0;
+      let progressSum = 0;
+      let remainingUnits = 0;
+      let requiredUnits = 0;
+      const isExcluded = (fieldId: string) => fieldId.endsWith("_end") || fieldId.endsWith("_start");
+      const totalRequired = templateFieldIds.filter((id) => !isExcluded(id)).length;
+
+      for (const fieldId of templateFieldIds) {
+        if (isExcluded(fieldId)) continue;
+        const agg = fieldAggregations[fieldId];
+
+        let majorityProgress = 0;
+        let isFiltered = false;
+
+        if (agg?.scrollbar) {
+          const best = computeBestScrollbar(agg.scrollbar, minOccurrencesForMajority);
+          const parsed = best?.parsed;
+          const segments = parsed?.segments
+            ? parsed.segments
+            : parsed
+                ? Object.entries(parsed)
+                    .filter(([key]) => Number.isFinite(Number(key)))
+                    .map(([, value]) => value as { state?: string } | undefined)
+                : [];
+          const totalSegments = segments.length;
+          const filteredSegments = segments.filter((segment) => segment?.state === "filtered").length;
+          majorityProgress = totalSegments > 0 ? filteredSegments / totalSegments : 0;
+          isFiltered = totalSegments > 0 && filteredSegments === totalSegments;
+
+          requiredUnits += totalSegments;
+          remainingUnits += Math.max(0, totalSegments - filteredSegments);
+        } else {
+          const rawValues = agg?.rawValues ?? [];
+          const majority = computeMajorityString(rawValues, minOccurrencesForMajority);
+          if (majority) {
+            const majorityKey = `${majority.value}|${majority.unit || ""}`;
+            const majorityCount = rawValues.filter(
+              (entry) => `${entry.value}|${entry.unit || ""}` === majorityKey
+            ).length;
+            majorityProgress = Math.min(majorityCount / MIN_SCANS_FOR_READY, 1);
+            isFiltered = true;
+
+            requiredUnits += MIN_SCANS_FOR_READY;
+            remainingUnits += Math.max(0, MIN_SCANS_FOR_READY - majorityCount);
+          } else {
+            requiredUnits += MIN_SCANS_FOR_READY;
+            remainingUnits += MIN_SCANS_FOR_READY;
+          }
+        }
+
+        if (isFiltered) {
+          filteredCount += 1;
+        }
+        if (majorityProgress >= 1) {
+          readyCount += 1;
+        }
+        progressSum += majorityProgress;
+      }
+
+      const progressByUnits = requiredUnits > 0
+        ? Math.min((requiredUnits - remainingUnits) / requiredUnits, 1)
+        : 0;
+      const progress = totalRequired > 0 ? Math.min(progressSum / totalRequired, 1) : 0;
+
+      return {
+        isReady: totalRequired > 0 && readyCount === totalRequired,
+        filteredCount,
+        totalRequired,
+        progress: Math.max(progress, progressByUnits),
+        remainingUnits,
+        requiredUnits,
+      };
+    },
+    [fieldAggregations, minOccurrencesForMajority]
+  );
+
   const unitConfig: UnitConfig = useMemo(() => {
     const systemCounts: Record<UnitSystem, number> = { iso: 0, imperial: 0 };
     const modeCounts: Record<ValueMode, number> = { absolute: 0, relative: 0 };
@@ -407,6 +498,7 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
     getFilteredValue,
     getScrollbarValue,
     getBestFields,
+    getReadyStatus,
     // also export the keyword lists in case callers want to re-use them
     START_KEYWORDS,
     END_KEYWORDS,

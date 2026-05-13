@@ -8,8 +8,15 @@
     "label": "Holding Pressure Time",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "s" },
-      "imperial": { "absolute": "s" }
+      "iso": {
+        "absolute": "s",
+        "relative": "s"
+      },
+      "imperial":
+      {
+        "absolute": "s",
+      "relative": "s"
+      }
     }
   },
   {
@@ -21,8 +28,8 @@
     "label": "Cooling Time",
     "type": "value",
     "expectedUnits": {
-      "iso": { "absolute": "s" },
-      "imperial": { "absolute": "s" }
+      "iso": { "absolute": "s", "relative": "s" },
+      "imperial": { "absolute": "s", "relative": "s" }
     }
   },
   {

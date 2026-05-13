@@ -31,6 +31,14 @@ type ScannerOverlaysProps = {
   ocrHistory: {
     getFieldStats: (fieldId: string) => any;
     getFilteredValue: (fieldId: string) => string | null | undefined;
+    getReadyStatus: (templateFieldIds?: string[]) => {
+      isReady: boolean;
+      filteredCount: number;
+      totalRequired: number;
+      progress: number;
+      remainingUnits: number;
+      requiredUnits: number;
+    };
   };
   mapBoxToViewStyle: (box: RectLike) =>
     | {
@@ -98,32 +106,35 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
     );
   };
     const renderScreenOverlays = () => {
-        if (templateViewport) {
-            return (
-                <TemplateOverlay
-                    layout={TemplateLayout.ScreenDetection}
-                    isActive
-                    color="#FF0000"
-                    viewportWidth={templateViewport.width}
-                    viewportHeight={templateViewport.height}
-                    offsetX={templateViewport.offsetX}
-                    offsetY={templateViewport.offsetY}
-                />
-            );
-        }
+    const padding = 20;
+    if (templateViewport) {
+      const viewportWidth = Math.max(templateViewport.width - padding, 0);
+      const viewportHeight = Math.max(templateViewport.height - padding, 0);
+      return (
+        <TemplateOverlay
+          layout={TemplateLayout.ScreenDetection}
+          isActive
+          color="#FF0000"
+          viewportWidth={viewportWidth}
+          viewportHeight={viewportHeight}
+          offsetX={templateViewport.offsetX + padding / 2}
+          offsetY={templateViewport.offsetY + padding / 2}
+        />
+      );
+    }
 
-        return (
-            <TemplateOverlay
-                layout={TemplateLayout.ScreenDetection}
-                isActive
-                color="#FF0000"
-                widthPercent={widthPercent}
-                aspectRatio={aspectRatio}
-                containerWidth={cameraLayoutSize?.width}
-                containerHeight={cameraLayoutSize?.height}
-            />
-        );
-    };
+    return (
+      <TemplateOverlay
+        layout={TemplateLayout.ScreenDetection}
+        isActive
+        color="#FF0000"
+        widthPercent={widthPercent}
+        aspectRatio={aspectRatio}
+        containerWidth={cameraLayoutSize?.width}
+        containerHeight={cameraLayoutSize?.height}
+      />
+    );
+  };
 
   const roiOverlay = (
     <TemplateOverlay
@@ -270,6 +281,73 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
       },
     ) ?? null;
 
+  const scannProgress = () => {
+    if (!__DEV__) return null;
+    const templateFieldIds = ocrLayoutBoxes.map((box) => box.id).filter(Boolean);
+    const readyStatus = ocrHistory.getReadyStatus(templateFieldIds);
+
+    const totalScans = ocrLayoutBoxes.reduce((sum, box) => {
+      const stats = ocrHistory.getFieldStats(box.id);
+      return sum + (stats?.totalScans ?? 0);
+    }, 0);
+
+    const totalRequired = Math.max(readyStatus.totalRequired, 0);
+    const progressPercent = Math.round((readyStatus.progress ?? 0) * 100);
+
+    return (
+      <>
+        <Box
+          style={{
+            position: "absolute",
+            right: 12,
+            top: 110,
+            zIndex: 350,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 10,
+          }}
+          pointerEvents="none"
+        >
+          <GluestackText className="text-typography-50 text-xs">
+            Scans: {totalScans}
+          </GluestackText>
+          <GluestackText className="text-typography-50 text-xs">
+            Werte: {readyStatus.filteredCount}/{totalRequired}
+          </GluestackText>
+          <GluestackText className="text-typography-50 text-xs">
+            Grau fehlen: {readyStatus.remainingUnits}/{readyStatus.requiredUnits}
+          </GluestackText>
+          <GluestackText className="text-typography-50 text-xs">
+            Progress: {progressPercent}%
+          </GluestackText>
+        </Box>
+        <Box
+          style={{
+            position: "absolute",
+            left: 12,
+            right: 12,
+            bottom: 12,
+            zIndex: 350,
+            height: 10,
+            borderRadius: 6,
+            backgroundColor: "rgba(255,255,255,0.2)",
+            overflow: "hidden",
+          }}
+          pointerEvents="none"
+        >
+          <Box
+            style={{
+              height: "100%",
+              width: `${progressPercent}%`,
+              backgroundColor: progressPercent >= 100 ? "#3B82F6" : "#22C55E",
+            }}
+          />
+        </Box>
+      </>
+    );
+  }
+
   const allDetectedRects =
     screenResult?.all_detected_rects?.map(
       (rect: RectLike, idx: number) => {
@@ -309,6 +387,7 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
   return (
     <>
       {/*renderTemplateOverlays()*/}
+      {scannProgress()}
       {renderScreenOverlays()}
       {roiOverlay}
       {/*screenDebug*/}

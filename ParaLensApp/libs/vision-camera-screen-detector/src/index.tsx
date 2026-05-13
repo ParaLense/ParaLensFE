@@ -29,6 +29,7 @@ export type OcrTemplateBox = {
     blackRatioMin?: number;
     readValue?: boolean;
     valueBoxId?: string;
+    single?: boolean;
   };
 };
 
@@ -242,7 +243,7 @@ export function performScan(
           })),
         }
       : {}),
-    ...(opts.runOcr != null ? { runOcr: !!opts.runOcr } : {}),
+    ...(opts.runOcr != null ? { runOcr: opts.runOcr } : {}),
     ...(opts.screenWidthRatio != null
       ? { screenWidthRatio: +opts.screenWidthRatio }
       : {}),
