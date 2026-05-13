@@ -34,35 +34,26 @@ const extractNumericTokensAndUnit = (
   }));
   let detectedUnit: string | null = null;
 
-  rawTokens.forEach((raw, rawIndex) => {
+  rawTokens.forEach((raw) => {
     const str = String(raw);
     const parts = str
       .split(/[;]+/)
       .map((part) => part.trim())
       .filter((part) => part.length > 0);
 
-    parts.forEach((part, partIndex) => {
-      const isLastPart = rawIndex === rawTokens.length - 1 && partIndex === parts.length - 1;
-      let shouldDropLastNumber = false;
-
-      const unitMatch = part.match(/-?\d+(?:[\.,]\d+)?\s*([a-zA-Z°]+)/);
-      if (unitMatch?.[1]) {
-        const normalizedUnit = unitMatch[1].toLowerCase().replace(/[^a-z0-9]/gi, '');
+    parts.forEach((part) => {
+      const unitMatch = part.match(/[a-zA-Z°]+/);
+      if (unitMatch?.[0]) {
+        const normalizedUnit = unitMatch[0].toLowerCase().replace(/[^a-z0-9]/gi, '');
         const match = keywordVariants.find((keyword) => keyword.normalized === normalizedUnit);
         if (match) {
           detectedUnit = detectedUnit ?? match.original;
-          shouldDropLastNumber = isLastPart;
         }
       }
 
-      const startIndex = tokens.length;
       const matches = part.matchAll(/-?\d+(?:[\.,]\d+)?/g);
       for (const match of matches) {
         if (match[0]) tokens.push(match[0]);
-      }
-
-      if (shouldDropLastNumber && tokens.length > startIndex) {
-        tokens.pop();
       }
     });
   });
@@ -177,13 +168,17 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
   const isSingle = box.options?.single === true;
 
   if (isSingle) {
-    console.log('[scrollbar][single] rawTokens', box.id, rawTokens);
+    if (__DEV__) {
+      console.log('[scrollbar][single] rawTokens', box.id, rawTokens);
+    }
 
     const valueKeywords: readonly string[] =
       expectedValueKeywords.length > 0 ? expectedValueKeywords : END_KEYWORDS;
 
     const extracted = extractNumericTokensAndUnit(rawTokens, valueKeywords);
-    console.log('[scrollbar][single] extracted', box.id, extracted);
+    if (__DEV__) {
+      console.log('[scrollbar][single] extracted', box.id, extracted);
+    }
     if (extracted.tokens.length === 0) return null;
 
     const parsed: ParsedScrollbarValue = { single: true };
@@ -196,20 +191,26 @@ export const parseScrollbarFromScan = (box: OcrBox, commaRequired: boolean): Par
       parsed[i] = { key: [], value: [valueNum] };
     }
 
-    console.log('[scrollbar][single] parsed', box.id, parsed);
-    if (Object.keys(parsed).length <= 1) return null;
-
-    if (extracted.unit) {
-      parsed.valueUnit = extracted.unit;
+    if (__DEV__) {
+      console.log('[scrollbar][single] parsed', box.id, parsed);
     }
 
     const singleIndices = Object.keys(parsed)
       .map((k) => Number(k))
       .filter((n) => Number.isFinite(n))
       .sort((a, b) => a - b);
+
+    if (singleIndices.length === 0) return null;
+
+    if (extracted.unit) {
+      parsed.valueUnit = extracted.unit;
+    }
+
     parsed.segments = singleIndices.map((idx) => ({ index: idx, ...parsed[idx] }));
 
-    console.log('[scrollbar][single] segments', box.id, parsed.segments);
+    if (__DEV__) {
+      console.log('[scrollbar][single] segments', box.id, parsed.segments);
+    }
     return parsed;
   }
 

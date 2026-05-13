@@ -135,6 +135,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   const debugLogJS = useRunOnJS(
     (...args: any[]) => {
+      if (!__DEV__) return;
       console.log("[ocr-debug]", ...args);
     },
     []

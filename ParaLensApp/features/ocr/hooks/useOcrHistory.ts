@@ -34,21 +34,6 @@ import {
 } from '../aggregation';
 
 
-const isScrollbarFullyFiltered = (scrollbar: ParsedScrollbarValue | undefined): boolean => {
-  console.log("isScrollbarFullyFiltered", scrollbar);
-  if (!scrollbar) return false;
-  const segments = scrollbar.segments ?? Object.entries(scrollbar)
-    .filter(([key]) => Number.isFinite(Number(key)))
-    .map(([key, value]) => ({
-      index: Number(key),
-      ...(value as { state?: string } | undefined),
-    }));
-
-  console.log("segments", segments);
-  if (segments.length === 0) return false;
-  return segments.every((segment) => segment?.state === 'filtered');
-};
-
 type UnitConfig = {
   system?: UnitSystem;
   mode?: ValueMode;

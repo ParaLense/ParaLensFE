@@ -20,7 +20,7 @@ export const SCROLLBAR_DECIMALS = 4;
 
 // Default maximum history entries per field
 export const DEFAULT_MAX_HISTORY_PER_FIELD = 30;
-export const MIN_SCANS_FOR_READY = 20;
+export const MIN_SCANS_FOR_READY = 15;
 
 /**
  * OCR Constant for Frame Processor Plugin

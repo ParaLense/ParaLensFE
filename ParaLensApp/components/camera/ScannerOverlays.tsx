@@ -106,33 +106,35 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
     );
   };
     const renderScreenOverlays = () => {
-        const padding = 20;
-        if (templateViewport) {
-            return (
-                <TemplateOverlay
-                    layout={TemplateLayout.ScreenDetection}
-                    isActive
-                    color="#FF0000"
-                    viewportWidth={templateViewport.width-padding}
-                    viewportHeight={templateViewport.height-padding}
-                    offsetX={templateViewport.offsetX+padding/2}
-                    offsetY={templateViewport.offsetY+padding/2}
-                />
-            );
-        }
+    const padding = 20;
+    if (templateViewport) {
+      const viewportWidth = Math.max(templateViewport.width - padding, 0);
+      const viewportHeight = Math.max(templateViewport.height - padding, 0);
+      return (
+        <TemplateOverlay
+          layout={TemplateLayout.ScreenDetection}
+          isActive
+          color="#FF0000"
+          viewportWidth={viewportWidth}
+          viewportHeight={viewportHeight}
+          offsetX={templateViewport.offsetX + padding / 2}
+          offsetY={templateViewport.offsetY + padding / 2}
+        />
+      );
+    }
 
-        return (
-            <TemplateOverlay
-                layout={TemplateLayout.ScreenDetection}
-                isActive
-                color="#FF0000"
-                widthPercent={widthPercent}
-                aspectRatio={aspectRatio}
-                containerWidth={cameraLayoutSize?.width}
-                containerHeight={cameraLayoutSize?.height}
-            />
-        );
-    };
+    return (
+      <TemplateOverlay
+        layout={TemplateLayout.ScreenDetection}
+        isActive
+        color="#FF0000"
+        widthPercent={widthPercent}
+        aspectRatio={aspectRatio}
+        containerWidth={cameraLayoutSize?.width}
+        containerHeight={cameraLayoutSize?.height}
+      />
+    );
+  };
 
   const roiOverlay = (
     <TemplateOverlay
@@ -280,6 +282,7 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
     ) ?? null;
 
   const scannProgress = () => {
+    if (!__DEV__) return null;
     const templateFieldIds = ocrLayoutBoxes.map((box) => box.id).filter(Boolean);
     const readyStatus = ocrHistory.getReadyStatus(templateFieldIds);
 
