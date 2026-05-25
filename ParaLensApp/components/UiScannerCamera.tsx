@@ -339,7 +339,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
               for (const v of values) {
                 if (typeof v === 'string') {
-                  const trimmed = String(v).trim();
+                  const trimmed = v.trim();
                   if (trimmed.length > 0) tokens.push(trimmed);
                   continue;
                 }
