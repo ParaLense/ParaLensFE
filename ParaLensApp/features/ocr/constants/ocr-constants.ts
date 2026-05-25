@@ -26,8 +26,8 @@ export const MIN_SCANS_FOR_READY = 15;
  * OCR Constant for Frame Processor Plugin
  */
 
-export const ROI_INNER = { x: 0.025, y: 0.05, width: 0.95, height: 0.9 } as const;
-export const ROI_OUTER = { x: 0.3, y: 0.225, width: 0.5, height: 0.6 } as const;
+export const ROI_INNER = { x: 0.3, y: 0.225, width: 0.5, height: 0.6 } as const;
+export const ROI_OUTER = { x: 0.025, y: 0.05, width: 0.95, height: 0.9 } as const;
 export const ASPECT_W = 3;
 export const ASPECT_H = 4;
 export const ROTATE_90_CW = true;
