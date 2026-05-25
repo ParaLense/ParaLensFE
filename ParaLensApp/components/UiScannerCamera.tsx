@@ -39,24 +39,26 @@ import {
   Rect,
   toNumber,
 } from "@/features/camera/camera-geometry";
+import {ASPECT_H, ASPECT_W, IMAGE_QUALITY, ROI_INNER, ROI_OUTER, ROTATE_90_CW} from "@/features/ocr/constants";
 
 const TARGET_FPS = 2;
 const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
+
 const SCREEN_WIDTH_RATIO = 0.8;
-const SCREEN_ASPECT_W = 3;
-const SCREEN_ASPECT_H = 4;
+const SCREEN_ASPECT_W = ASPECT_W;
+const SCREEN_ASPECT_H = ASPECT_H;
 const SCREEN_ASPECT_RATIO = SCREEN_ASPECT_W / SCREEN_ASPECT_H;
 
 // Centralized scan constants to keep detector behavior aligned with overlay geometry.
 const SCAN_TEMPLATE_TARGET_W = 1200;
 const SCAN_TEMPLATE_TARGET_H = 1600;
 const SCAN_ACCURACY_THRESHOLD = 0.4;
-const SCAN_IMAGE_QUALITY = 80;
-const SCAN_ROTATE_90_CW = true;
+const SCAN_IMAGE_QUALITY = IMAGE_QUALITY;
+const SCAN_ROTATE_90_CW = ROTATE_90_CW;
 
-const SCAN_ROI_OUTER = { x: 0.025, y: 0.05, width: 0.95, height: 0.9 } as const;
+const SCAN_ROI_OUTER = ROI_OUTER;
 // Keep these values identical to ScannerOverlays inner ROI visualization.
-const SCAN_ROI_INNER = { x: 0.3, y: 0.225, width: 0.5, height: 0.6 } as const;
+const SCAN_ROI_INNER = ROI_INNER;
 
 const SCAN_MIN_ASPECT_W = SCREEN_ASPECT_W;
 const SCAN_MIN_ASPECT_H = SCREEN_ASPECT_H;
@@ -337,7 +339,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
               for (const v of values) {
                 if (typeof v === 'string') {
-                  const trimmed = v.trim();
+                  const trimmed = String(v).trim();
                   if (trimmed.length > 0) tokens.push(trimmed);
                   continue;
                 }

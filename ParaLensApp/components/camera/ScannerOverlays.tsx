@@ -282,7 +282,6 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
     ) ?? null;
 
   const scannProgress = () => {
-    if (!__DEV__) return null;
     const templateFieldIds = ocrLayoutBoxes.map((box) => box.id).filter(Boolean);
     const readyStatus = ocrHistory.getReadyStatus(templateFieldIds);
 
