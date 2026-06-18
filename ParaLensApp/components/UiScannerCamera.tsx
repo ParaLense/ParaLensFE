@@ -1,6 +1,7 @@
 import {
   Camera,
   ReadonlyFrameProcessor,
+  runAsync,
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,8 +42,10 @@ import {
 } from "@/features/camera/camera-geometry";
 import {ASPECT_H, ASPECT_W, IMAGE_QUALITY, ROI_INNER, ROI_OUTER, ROTATE_90_CW} from "@/features/ocr/constants";
 
-const TARGET_FPS = 2;
-const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
+// OCR runs every N-th processed frame; screen detection runs every frame.
+const OCR_EVERY_N = 3;
+// Warped screenshot is captured every N-th processed frame (only needed at Continue tap).
+const SCREENSHOT_EVERY_N = 5;
 
 const SCREEN_WIDTH_RATIO = 0.8;
 const SCREEN_ASPECT_W = ASPECT_W;
@@ -96,9 +99,15 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   const cameraFormat = useMemo(() => {
     if (!device?.formats) return undefined;
-    return device.formats
-      .filter(f => f.maxFps >= 15 && f.videoWidth === 1280 && f.photoHeight >= 1280)
-      .sort((a, b) => a.photoWidth - b.photoWidth)[0];
+    // Prefer the smallest format with ≥1280px video width and ≥15 fps.
+    // Fall back to the widest available format with ≥15 fps so we never
+    // silently get undefined and end up on an unconstrained full-res format.
+    const hd = device.formats
+      .filter(f => f.maxFps >= 15 && f.videoWidth >= 1280)
+      .sort((a, b) => a.videoWidth - b.videoWidth)[0];
+    return hd ?? device.formats
+      .filter(f => f.maxFps >= 15)
+      .sort((a, b) => b.videoWidth - a.videoWidth)[0];
   }, [device]);
 
   const windowDimensions = Dimensions.get('window');
@@ -108,10 +117,8 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
   const [ocrMap, setOcrMap] = useState<Record<string, string>>({});
   const [screenResult, setScreenResult] = useState<ScreenResult | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
-  const lastFrameTime = useSharedValue(0);
-  const setOcrMapJS = useRunOnJS(setOcrMap, []);
-  const setScreenResultJS = useRunOnJS(setScreenResult, []);
-  const setBase64ImageJS = useRunOnJS(setBase64Image, []);
+  // Counts every frame handed off to runAsync — drives OCR and screenshot cadence.
+  const scanFrameCounter = useSharedValue(0);
 
   // Keep a stable ref so the useRunOnJS callback never changes identity
   const onOcrUpdateRef = useRef(onOcrUpdate);
@@ -169,12 +176,24 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     });
   }, []);
 
-  // Function to add full OCR scan (including boxes) to history - wrapped with useRunOnJS
-  const addScanResult = useCallback((scanResult: OcrScanResult) => {
-    // scanResult is shaped like OcrScanResult (timestamp, boxes, screenDetected, accuracy)
-    ocrHistory.addScanResult(scanResult);
-  }, [ocrHistory]);
-  const addScanResultJS = useRunOnJS(addScanResult, []);
+  // Stable ref to the latest ocrHistory so the worklet callback never needs to change identity.
+  const ocrHistoryRef = useRef(ocrHistory);
+  ocrHistoryRef.current = ocrHistory;
+
+  // Single batched JS update per processed frame → one React render instead of four.
+  const setScanFrameJS = useRunOnJS((payload: {
+    screen: ScreenResult;
+    map: Record<string, string>;
+    scanResult: OcrScanResult | null;
+    base64: string | null;
+  }) => {
+    // Only update screenResult when detection succeeded — keeps the last good overlay visible
+    // instead of clearing the blue boxes every time contour detection misses a frame.
+    if (payload.screen.detected) setScreenResult(payload.screen);
+    if (Object.keys(payload.map).length > 0) setOcrMap(payload.map);
+    if (payload.scanResult) ocrHistoryRef.current.addScanResult(payload.scanResult);
+    if (payload.base64) setBase64Image(payload.base64);
+  }, []);
 
   // Whenever OCR history / map change, compute best fields and notify parent (on JS thread)
   useEffect(() => {
@@ -188,13 +207,15 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
       unitConfig: ocrHistory.unitConfig,
       isReady: readyStatus.isReady,
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     ocrHistory.fieldAggregations,
     ocrHistory.unitConfig,
     ocrMap,
     onOcrUpdateJS,
     templateFieldIds,
-    ocrHistory,
+    // Intentionally omit `ocrHistory` — its object identity changes on every render.
+    // fieldAggregations + unitConfig are the stable deps that carry the actual data.
   ]);
 
   // Forward the latest warped base64 screenshot to parent
@@ -283,19 +304,21 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   const frameProcessor = useFrameProcessor(frame => {
     'worklet';
-    try {
-      const now = performance.now();
-      if (now - lastFrameTime.value < FRAME_INTERVAL_MS) {
-        return;
-      }
-      lastFrameTime.value = now;
+    // runAsync drops this frame automatically if the previous scan is still running.
+    runAsync(frame, () => {
+      'worklet';
+      const cnt = scanFrameCounter.value + 1;
+      scanFrameCounter.value = cnt;
+      const doOcr = cnt % OCR_EVERY_N === 0;
+      const doScreenshot = cnt % SCREENSHOT_EVERY_N === 0;
+
       const scan = performScan(frame, {
         screenTemplate,
         ocrTemplate,
-        runOcr: true,
+        runOcr: doOcr,
         templateTargetW: SCAN_TEMPLATE_TARGET_W,
         templateTargetH: SCAN_TEMPLATE_TARGET_H,
-        returnWarpedImage: true,
+        returnWarpedImage: doScreenshot,
         accuracyThreshold: SCAN_ACCURACY_THRESHOLD,
         roiOuter: SCAN_ROI_OUTER,
         roiInner: SCAN_ROI_INNER,
@@ -305,30 +328,30 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         rotate90CW: SCAN_ROTATE_90_CW,
       });
 
-      debugLogJS("scan", {
-        hasScreen: !!scan?.screen,
-        boxCount: scan?.ocr?.boxes?.length ?? 0,
-      });
+      if (__DEV__) {
+        debugLogJS("scan", {
+          hasScreen: !!scan?.screen,
+          boxCount: scan?.ocr?.boxes?.length ?? 0,
+          doOcr,
+          doScreenshot,
+        });
+      }
 
       if (scan?.screen) {
-        setScreenResultJS(scan.screen);
-        if (scan.screen.image_base64) {
-          setBase64ImageJS(scan.screen.image_base64);
-        }
+        const map: Record<string, string> = {};
+        let enrichedBoxes: Array<OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult> = [];
 
-        if (scan.ocr?.boxes?.length) {
-          debugLogJS("boxes", scan.ocr.boxes.map((b) => ({ id: b.id, type: b.type })));
-          const map: Record<string, string> = {};
+        if (doOcr && scan.ocr?.boxes?.length) {
+          if (__DEV__) {
+            debugLogJS("boxes", scan.ocr.boxes.map((b) => ({ id: b.id, type: b.type })));
+          }
 
-          // Build a simple debug map with raw values for each box.
-          // All heavy filtering/majority logic now lives in useOcrHistory.
           for (const b of scan.ocr.boxes) {
             if (!b || !b.id) continue;
             if (b.type === 'value') {
               map[b.id] = (b.number != null ? String(b.number) : (b.text ?? '')) ?? '';
             } else if (b.type === 'checkbox') {
               map[b.id] = b.checked ? 'true' : 'false';
-              // If checkbox has an associated value, also store it
               if (b.checked && b.valueBoxId && (b.valueText || b.valueNumber != null)) {
                 const valueKey = `${b.id}_value`;
                 map[valueKey] = (b.valueNumber != null ? String(b.valueNumber) : (b.valueText ?? '')) ?? '';
@@ -347,7 +370,6 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
                   tokens.push(String(v));
                   continue;
                 }
-                // v ist vom Typ { index: number; text?: string; number?: number; confidence?: number }
                 if (v && typeof v === 'object') {
                   const { text } = v as { text?: string };
                   const num = (v as { number?: number }).number;
@@ -365,7 +387,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
             }
           }
 
-          const enrichedBoxes = scan.ocr.boxes.map((box: OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult) => {
+          enrichedBoxes = scan.ocr.boxes.map((box: OcrValueBoxResult | OcrCheckboxBoxResult | OcrScrollBarResult) => {
             const templateBox = ocrTemplate.find(t => t.id === box.id);
             return {
               ...box,
@@ -376,32 +398,31 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
             };
           });
 
-          if (Object.keys(map).length > 0) {
-            debugLogJS("ocrMap", map);
-            setOcrMapJS(map);
+          if (__DEV__) {
+            if (Object.keys(map).length > 0) debugLogJS("ocrMap", map);
+            debugLogJS("enrichedBoxes", enrichedBoxes.map((b) => ({
+              id: b.id,
+              type: b.type,
+              options: (b as any).options,
+              expectedUnits: (b as any).expectedUnits,
+            })));
           }
+        }
 
-          debugLogJS("enrichedBoxes", enrichedBoxes.map((b) => ({
-            id: b.id,
-            type: b.type,
-            options: (b as any).options,
-            expectedUnits: (b as any).expectedUnits,
-          })));
-
-          // Add full scan result (with complete box information) to OCR history
-          const fullScanResult = {
+        setScanFrameJS({
+          screen: scan.screen,
+          map,
+          scanResult: doOcr ? {
             timestamp: Date.now(),
             boxes: enrichedBoxes,
-            screenDetected: true, // We know screen was detected if we're here
-            accuracy: 0.5, // Default accuracy since we don't have direct access
-          };
-          addScanResultJS(fullScanResult);
-        }
+            screenDetected: scan.screen.detected,
+            accuracy: scan.screen.accuracy,
+          } : null,
+          base64: doScreenshot ? (scan.screen.image_base64 ?? null) : null,
+        });
       }
-    } catch (error) {
-      console.error(`Frame Processor Error: ${error}`);
-    }
-  }, [lastFrameTime, ocrLayoutBoxes, screenTemplate, ocrTemplate, setBase64ImageJS, setOcrMapJS, setScreenResultJS, addScanResultJS, viewHeight, viewWidth]);
+    });
+  }, [scanFrameCounter, screenTemplate, ocrTemplate, setScanFrameJS, debugLogJS]);
   
   type FrameBox = {
     x: number;

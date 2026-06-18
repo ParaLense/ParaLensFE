@@ -94,53 +94,55 @@ object OcrProcessor {
      * Process checkbox detection
      */
     private fun processCheckbox(roi: Mat, box: OcrBox, result: HashMap<String, Any?>) {
-        // Simplified fixed method: adaptive Otsu binarization + black pixel ratio only
-        // 1) Local normalization (CLAHE) + light blur
         val normalized = Mat()
-        try {
-            val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
-            clahe.apply(roi, normalized)
-        } catch (_: Throwable) {
-            roi.copyTo(normalized)
-        }
         val smooth = Mat()
-        Imgproc.GaussianBlur(normalized, smooth, Size(3.0, 3.0), 0.0)
-
-        val w = smooth.cols()
-        val h = smooth.rows()
-        val area = Math.max(1, w * h)
-
-        // 2) Adaptive binarization (Otsu, invert so dark=white) → black ratio
         val bin = Mat()
-        Imgproc.threshold(smooth, bin, 0.0, 255.0, Imgproc.THRESH_BINARY_INV or Imgproc.THRESH_OTSU)
-        val whiteCount = Core.countNonZero(bin)
-        val blackRatio = whiteCount.toDouble() / area.toDouble()
+        try {
+            // 1) Local normalization (CLAHE) + light blur
+            try {
+                val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
+                clahe.apply(roi, normalized)
+            } catch (_: Throwable) {
+                roi.copyTo(normalized)
+            }
+            Imgproc.GaussianBlur(normalized, smooth, Size(3.0, 3.0), 0.0)
 
-        // 3) Decision by single threshold (use Utils.getDouble for consistent parsing)
-        val blackRatioMin = Utils.getDouble(box.options, "blackRatioMin", 0.30).coerceIn(0.0, 1.0)
-        val isChecked = blackRatio >= blackRatioMin
-        
-        // Debug log to verify option is being read
-        Log.d("CheckboxDetection", "Box ${box.id}: options=${box.options}, blackRatioMin=$blackRatioMin (from template)")
+            val w = smooth.cols()
+            val h = smooth.rows()
+            val area = Math.max(1, w * h)
 
-        // Confidence from distance to threshold
-        fun clamp01(v: Double) = Math.max(0.0, Math.min(1.0, v))
-        val confidence = clamp01((blackRatio - blackRatioMin) / 0.40)
+            // 2) Adaptive binarization (Otsu, invert so dark=white) → black ratio
+            Imgproc.threshold(smooth, bin, 0.0, 255.0, Imgproc.THRESH_BINARY_INV or Imgproc.THRESH_OTSU)
+            val whiteCount = Core.countNonZero(bin)
+            val blackRatio = whiteCount.toDouble() / area.toDouble()
 
-        result["type"] = "checkbox"
-        result["checked"] = isChecked
-        result["confidence"] = confidence
-        result["blackRatio"] = blackRatio
-        result["blackRatioMin"] = blackRatioMin
+            // 3) Decision by single threshold
+            val blackRatioMin = Utils.getDouble(box.options, "blackRatioMin", 0.30).coerceIn(0.0, 1.0)
+            val isChecked = blackRatio >= blackRatioMin
 
-        // Enhanced logging with all useful values
-        val mean = Core.mean(smooth).`val`[0]
-        val minMax = Core.minMaxLoc(smooth)
-        Log.d(
-            "CheckboxDetection",
-            "Box ${box.id}: blackRatio=%.3f (threshold=%.2f) | mean=%.1f min=%.1f max=%.1f | checked=%s conf=%.2f"
-                .format(blackRatio, blackRatioMin, mean, minMax.minVal, minMax.maxVal, isChecked, confidence)
-        )
+            Log.d("CheckboxDetection", "Box ${box.id}: options=${box.options}, blackRatioMin=$blackRatioMin (from template)")
+
+            fun clamp01(v: Double) = Math.max(0.0, Math.min(1.0, v))
+            val confidence = clamp01((blackRatio - blackRatioMin) / 0.40)
+
+            result["type"] = "checkbox"
+            result["checked"] = isChecked
+            result["confidence"] = confidence
+            result["blackRatio"] = blackRatio
+            result["blackRatioMin"] = blackRatioMin
+
+            val mean = Core.mean(smooth).`val`[0]
+            val minMax = Core.minMaxLoc(smooth)
+            Log.d(
+                "CheckboxDetection",
+                "Box ${box.id}: blackRatio=%.3f (threshold=%.2f) | mean=%.1f min=%.1f max=%.1f | checked=%s conf=%.2f"
+                    .format(blackRatio, blackRatioMin, mean, minMax.minVal, minMax.maxVal, isChecked, confidence)
+            )
+        } finally {
+            normalized.release()
+            smooth.release()
+            bin.release()
+        }
     }
     
     /**
@@ -152,20 +154,17 @@ object OcrProcessor {
         val cells = (box.options?.get("cells") as? Number)?.toInt() ?: 4 // Default to 4 cells
         
         val allTexts = ArrayList<String>()
-        
+        val rgba = Mat()
         try {
             // Convert Mat to Bitmap for ML Kit
-            val rgba = Mat()
             Imgproc.cvtColor(roi, rgba, Imgproc.COLOR_GRAY2RGBA)
             val bmp = Bitmap.createBitmap(rgba.cols(), rgba.rows(), Bitmap.Config.ARGB_8888)
             OpenCVUtils.matToBitmap(rgba, bmp)
             val image = InputImage.fromBitmap(bmp, 0)
-            
-            // Process with ML Kit OCR
+
             val task = textRecognizer.process(image)
             val visionText = Tasks.await(task)
-            
-            // Extract all text blocks found
+
             for (block in visionText.textBlocks) {
                 for (line in block.lines) {
                     val text = line.text?.trim()
@@ -174,9 +173,10 @@ object OcrProcessor {
                     }
                 }
             }
-            
         } catch (t: Throwable) {
             Log.e("OcrProcessor", "ML Kit OCR for scrollbar failed: ${t.message}", t)
+        } finally {
+            rgba.release()
         }
         
         Log.d("OcrProcessor", "All texts: ${allTexts}")
@@ -191,8 +191,8 @@ object OcrProcessor {
      */
     private fun processValue(roi: Mat, result: HashMap<String, Any?>) {
         result["type"] = "value"
+        val rgba = Mat()
         try {
-            val rgba = Mat()
             Imgproc.cvtColor(roi, rgba, Imgproc.COLOR_GRAY2RGBA)
             val bmp = Bitmap.createBitmap(rgba.cols(), rgba.rows(), Bitmap.Config.ARGB_8888)
             OpenCVUtils.matToBitmap(rgba, bmp)
@@ -201,19 +201,16 @@ object OcrProcessor {
             val visionText = Tasks.await(task)
             val text = visionText.text?.trim() ?: ""
             result["text"] = if (text.isNotEmpty()) text else null
-            
-            // Try parse number (replace comma)
             val numText = text.replace(',', '.').replace("\n", " ").trim()
-            val num = numText.toDoubleOrNull()
-            result["number"] = num
-            result["confidence"] = if (!text.isNullOrEmpty()) 1.0 else 0.0
-            
-            
+            result["number"] = numText.toDoubleOrNull()
+            result["confidence"] = if (text.isNotEmpty()) 1.0 else 0.0
         } catch (t: Throwable) {
             Log.e("OcrProcessor", "ML Kit OCR failed: ${t.message}", t)
             result["text"] = null
             result["number"] = null
             result["confidence"] = 0.0
+        } finally {
+            rgba.release()
         }
     }
     

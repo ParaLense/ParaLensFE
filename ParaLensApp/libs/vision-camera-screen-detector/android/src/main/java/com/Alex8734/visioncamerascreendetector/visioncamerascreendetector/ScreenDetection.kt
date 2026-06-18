@@ -222,12 +222,17 @@ object ScreenDetection {
                 continue
             }
 
+            val edges = Mat()
+            val corners = Mat()
+            val cornerMask = Mat()
+            val gradX = Mat()
+            val gradY = Mat()
+            val magnitude = Mat()
             try {
                 // Extract ROI with padding (so edges are visible)
                 val roi = warped.submat(ry, ry + rh, rx, rx + rw)
 
                 // Method 1: Edge Detection - check for edges at box borders
-                val edges = Mat()
                 Imgproc.Canny(roi, edges, 30.0, 80.0)
 
                 // Check edges at the borders of the inner box
@@ -255,11 +260,9 @@ object ScreenDetection {
                 val borderEdgeRatio = (topEdgeCount + bottomEdgeCount + leftEdgeCount + rightEdgeCount) / totalBorderPixels
 
                 // Method 2: Corner Detection
-                val corners = Mat()
                 Imgproc.cornerHarris(roi, corners, 2, 3, 0.04)
                 val cornerMax = Core.minMaxLoc(corners)
                 val threshold = cornerMax.maxVal * 0.01
-                val cornerMask = Mat()
                 Core.compare(corners, Scalar(threshold), cornerMask, Core.CMP_GT)
 
                 // Check corners near box corners
@@ -289,11 +292,8 @@ object ScreenDetection {
                 val cornerScore = cornersAtBoxEdges.count { it }.toDouble() / 4.0
 
                 // Method 3: Gradient Verification at box borders
-                val gradX = Mat()
-                val gradY = Mat()
                 Imgproc.Sobel(roi, gradX, CvType.CV_64F, 1, 0, 3)
                 Imgproc.Sobel(roi, gradY, CvType.CV_64F, 0, 1, 3)
-                val magnitude = Mat()
                 Core.magnitude(gradX, gradY, magnitude)
 
                 // Check gradients at top and bottom borders
@@ -345,6 +345,13 @@ object ScreenDetection {
             } catch (e: Exception) {
                 // If ROI extraction fails, skip this box
                 matchedArr.add(null)
+            } finally {
+                edges.release()
+                corners.release()
+                cornerMask.release()
+                gradX.release()
+                gradY.release()
+                magnitude.release()
             }
         }
 
