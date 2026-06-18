@@ -119,7 +119,10 @@ export const useOcrHistory = (config?: UseOcrHistoryConfig) => {
   // Add a full OCR scan result (with boxes) and update field aggregations
   const addFullScanResult = useCallback(
     (scanResult: OcrScanResult) => {
-      setScanHistory((prev) => [scanResult, ...prev]);
+      setScanHistory((prev) => {
+        const next = [scanResult, ...prev];
+        return next.length > 30 ? next.slice(0, 30) : next;
+      });
 
       setFieldAggregations((prev) => {
         const next: Record<string, FieldAggregation> = { ...prev };

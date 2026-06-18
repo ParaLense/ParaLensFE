@@ -241,48 +241,34 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
       </Box>
     );
 
-  const matchedBoxes =
-    screenResult?.matched_boxes?.map(
-      (box: RectLike, idx: number) => {
-        if (!box) return null;
-
-        const outputW = Number(
-          screenResult?.template_target_size?.w ?? 1200,
-        );
-        const outputH = Number(
-          screenResult?.template_target_size?.h ?? 1600,
-        );
-        const homography = screenResult?.homography;
-
-        const style = mapWarpedBoxToViewStyle(
-          box,
-          homography,
-          outputW,
-          outputH,
-        );
-        if (!style) return null;
-
-        return (
-          <Box
-            key={`matched_box_${idx}`}
-            style={
-              {
-                position: "absolute",
-                ...style,
-                borderWidth: 2,
-                borderColor: "blue",
-                borderRadius: 4,
-                zIndex: 250,
-              } as StyleProp<ViewStyle>
-            }
-            pointerEvents="none"
-          />
-        );
-      },
-    ) ?? null;
+  const renderMatchedBoxes = () => {
+    if (!screenResult?.detected) return null;
+    return screenResult.matched_boxes?.map((box: RectLike, idx: number) => {
+      if (!box) return null;
+      const outputW = Number(screenResult.template_target_size?.w ?? 1200);
+      const outputH = Number(screenResult.template_target_size?.h ?? 1600);
+      const style = mapWarpedBoxToViewStyle(box, screenResult.homography, outputW, outputH);
+      if (!style) return null;
+      return (
+        <Box
+          key={`matched_box_${idx}`}
+          style={
+            {
+              position: "absolute",
+              ...style,
+              borderWidth: 2,
+              borderColor: "blue",
+              borderRadius: 4,
+              zIndex: 250,
+            } as StyleProp<ViewStyle>
+          }
+          pointerEvents="none"
+        />
+      );
+    }) ?? null;
+  };
 
   const scannProgress = () => {
-    if (!__DEV__) return null;
     const templateFieldIds = ocrLayoutBoxes.map((box) => box.id).filter(Boolean);
     const readyStatus = ocrHistory.getReadyStatus(templateFieldIds);
 
@@ -392,7 +378,7 @@ export const ScannerOverlays: React.FC<ScannerOverlaysProps> = ({
       {roiOverlay}
       {/*screenDebug*/}
       {/*ocrDebug*/}
-      {matchedBoxes}
+      {renderMatchedBoxes()}
       {allDetectedRects}
       {ocrValueLabels}
     </>

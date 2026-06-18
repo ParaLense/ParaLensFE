@@ -71,36 +71,39 @@ object ImageProcessing {
     fun createEdgeMaps(normalized: Mat): Pair<Mat, Mat> {
         val screenBlur = Mat()
         val detailBlur = Mat()
-        
-        // For screen detection: stronger blur, adaptive thresholds
-        Imgproc.GaussianBlur(normalized, screenBlur, Size(5.0, 5.0), 1.5)
-        val mean = Core.mean(screenBlur)
-        val sigma = 0.33
-        val v = mean.`val`[0]
-        val lowerScreen = Math.max(0.0, (1.0 - sigma) * v)
-        val upperScreen = Math.min(255.0, (1.0 + sigma) * v)
-        
-        // For detail/template detection: minimal blur, lower thresholds
-        Imgproc.GaussianBlur(normalized, detailBlur, Size(3.0, 3.0), 1.0)
-        
         val screenEdges = Mat()
         val detailEdges = Mat()
-        
-        // Screen edges: for finding the display outline
-        Imgproc.Canny(screenBlur, screenEdges, lowerScreen, upperScreen, 3, false)
-        
-        // Detail edges: for finding template boxes with dynamic thresholds
-        val detailMean = Core.mean(detailBlur)
-        val detailV = detailMean.`val`[0]
-        val detailLower = Math.max(20.0, detailV * 0.3)
-        val detailUpper = Math.min(200.0, detailV * 0.9)
-        Imgproc.Canny(detailBlur, detailEdges, detailLower, detailUpper, 3, false)
-        
-        // Optional: Light morphological closing on screen edges to connect gaps
-        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
-        Imgproc.morphologyEx(screenEdges, screenEdges, Imgproc.MORPH_CLOSE, kernel)
-        
-        return Pair(screenEdges, detailEdges)
+        try {
+            // For screen detection: stronger blur, adaptive thresholds
+            Imgproc.GaussianBlur(normalized, screenBlur, Size(5.0, 5.0), 1.5)
+            val mean = Core.mean(screenBlur)
+            val sigma = 0.33
+            val v = mean.`val`[0]
+            val lowerScreen = Math.max(0.0, (1.0 - sigma) * v)
+            val upperScreen = Math.min(255.0, (1.0 + sigma) * v)
+
+            // For detail/template detection: minimal blur, lower thresholds
+            Imgproc.GaussianBlur(normalized, detailBlur, Size(3.0, 3.0), 1.0)
+
+            // Screen edges: for finding the display outline
+            Imgproc.Canny(screenBlur, screenEdges, lowerScreen, upperScreen, 3, false)
+
+            // Detail edges: for finding template boxes with dynamic thresholds
+            val detailMean = Core.mean(detailBlur)
+            val detailV = detailMean.`val`[0]
+            val detailLower = Math.max(20.0, detailV * 0.3)
+            val detailUpper = Math.min(200.0, detailV * 0.9)
+            Imgproc.Canny(detailBlur, detailEdges, detailLower, detailUpper, 3, false)
+
+            // Light morphological closing on screen edges to connect gaps
+            val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
+            Imgproc.morphologyEx(screenEdges, screenEdges, Imgproc.MORPH_CLOSE, kernel)
+
+            return Pair(screenEdges, detailEdges)
+        } finally {
+            screenBlur.release()
+            detailBlur.release()
+        }
     }
     
     /**
@@ -109,33 +112,37 @@ object ImageProcessing {
     fun findContourRects(edges: Mat): List<IntArray> {
         val contours = ArrayList<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-        
-        val contourRects = ArrayList<IntArray>()
         val approx = MatOfPoint2f()
         val tmp2f = MatOfPoint2f()
-        
-        for (cnt in contours) {
-            tmp2f.fromArray(*cnt.toArray())
-            val perim = Imgproc.arcLength(tmp2f, true)
-            Imgproc.approxPolyDP(tmp2f, approx, 0.02 * perim, true)
-            if (approx.total().toInt() != 4) continue
-            
-            val pts = approx.toArray()
-            var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
-            var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
-            for (p in pts) { 
-                if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y
-                if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y 
+        try {
+            Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+            val contourRects = ArrayList<IntArray>()
+            for (cnt in contours) {
+                tmp2f.fromArray(*cnt.toArray())
+                val perim = Imgproc.arcLength(tmp2f, true)
+                Imgproc.approxPolyDP(tmp2f, approx, 0.02 * perim, true)
+                if (approx.total().toInt() != 4) continue
+
+                val pts = approx.toArray()
+                var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
+                var maxX = Double.NEGATIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+                for (p in pts) {
+                    if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y
+                    if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y
+                }
+                val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
+                val wpx = min(edges.width() - x, (maxX - minX).toInt())
+                val hpx = min(edges.height() - y, (maxY - minY).toInt())
+                if (wpx <= 0 || hpx <= 0) continue
+                contourRects.add(intArrayOf(x, y, wpx, hpx))
             }
-            val x = max(0, minX.toInt()); val y = max(0, minY.toInt())
-            val wpx = min(edges.width() - x, (maxX - minX).toInt())
-            val hpx = min(edges.height() - y, (maxY - minY).toInt())
-            if (wpx <= 0 || hpx <= 0) continue
-            contourRects.add(intArrayOf(x, y, wpx, hpx))
+            return contourRects
+        } finally {
+            hierarchy.release()
+            approx.release()
+            tmp2f.release()
         }
-        
-        return contourRects
     }
 
     /**

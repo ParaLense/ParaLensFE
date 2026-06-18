@@ -4,178 +4,180 @@
 #import <CoreImage/CoreImage.h>
 #import <opencv2/opencv.hpp>
 
-// Import our refactored modules
 #import "Utils.h"
 #import "ImageProcessing.h"
 #import "ScreenDetection.h"
 #import "OcrProcessor.h"
 
-@interface ScreenDetectorFrameProcessorPlugin : FrameProcessorPlugin
+@interface ScreenDetectorFrameProcessorPlugin : FrameProcessorPlugin {
+    // Per-instance counters — reset on new camera session (plugin re-creation).
+    int _detectionCounter;
+    int _totalFrameCounter;
+}
 @end
 
 @implementation ScreenDetectorFrameProcessorPlugin
 
 - (instancetype _Nonnull)initWithProxy:(VisionCameraProxyHolder*)proxy
                            withOptions:(NSDictionary* _Nullable)options {
-  self = [super initWithProxy:proxy withOptions:options];
-
-  if (options != nil) {
-    NSLog(@"Screen Detector Plugin options: %@", options);
-  }
-
-  return self;
+    self = [super initWithProxy:proxy withOptions:options];
+    if (self) {
+        _detectionCounter = 0;
+        _totalFrameCounter = 0;
+    }
+    if (options != nil) {
+        NSLog(@"Screen Detector Plugin options: %@", options);
+    }
+    return self;
 }
 
 - (id _Nullable)callback:(Frame* _Nonnull)frame
            withArguments:(NSDictionary* _Nullable)arguments {
-  CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer);
-  size_t width = CVPixelBufferGetWidth(pixelBuffer);
-  size_t height = CVPixelBufferGetHeight(pixelBuffer);
+    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer);
+    size_t width  = CVPixelBufferGetWidth(pixelBuffer);
+    size_t height = CVPixelBufferGetHeight(pixelBuffer);
 
-  @try {
-    // Parse arguments using Utils
-    std::vector<SDBOX> templateBoxes = [Utils parseTemplate:arguments options:self.options];
-    int templateTargetW = [Utils getInt:arguments key:@"templateTargetW" defaultValue:[Utils getInt:self.options key:@"templateTargetW" defaultValue:1200]];
-    int templateTargetH = [Utils getInt:arguments key:@"templateTargetH" defaultValue:[Utils getInt:self.options key:@"templateTargetH" defaultValue:1600]];
-    BOOL returnWarpedImage = [Utils getBool:arguments key:@"returnWarpedImage" defaultValue:[Utils getBool:self.options key:@"returnWarpedImage" defaultValue:NO]];
-    int outputW = [Utils getInt:arguments key:@"outputW" defaultValue:templateTargetW];
-    int outputH = [Utils getInt:arguments key:@"outputH" defaultValue:templateTargetH];
-    int imageQuality = [Utils getInt:arguments key:@"imageQuality" defaultValue:80];
-    BOOL runOcr = [Utils getBool:arguments key:@"runOcr" defaultValue:NO];
-    NSArray* ocrTemplate = [OcrProcessor parseOcrTemplate:arguments];
-    double minIouForMatch = [Utils getDouble:arguments key:@"minIouForMatch" defaultValue:[Utils getDouble:self.options key:@"minIouForMatch" defaultValue:0.30]];
-    double accuracyThreshold = [Utils getDouble:arguments key:@"accuracyThreshold" defaultValue:[Utils getDouble:self.options key:@"accuracyThreshold" defaultValue:0.80]];
+    @try {
+        // Parse arguments
+        std::vector<SDBOX> templateBoxes = [Utils parseTemplate:arguments options:self.options];
+        int templateTargetW  = [Utils getInt:arguments key:@"templateTargetW"  defaultValue:[Utils getInt:self.options key:@"templateTargetW"  defaultValue:1200]];
+        int templateTargetH  = [Utils getInt:arguments key:@"templateTargetH"  defaultValue:[Utils getInt:self.options key:@"templateTargetH"  defaultValue:1600]];
+        BOOL returnWarpedImage = [Utils getBool:arguments key:@"returnWarpedImage" defaultValue:[Utils getBool:self.options key:@"returnWarpedImage" defaultValue:NO]];
+        int outputW          = [Utils getInt:arguments key:@"outputW"          defaultValue:templateTargetW];
+        int outputH          = [Utils getInt:arguments key:@"outputH"          defaultValue:templateTargetH];
+        int imageQuality     = [Utils getInt:arguments key:@"imageQuality"     defaultValue:80];
+        BOOL runOcr          = [Utils getBool:arguments key:@"runOcr"          defaultValue:NO];
+        NSArray* ocrTemplate = [OcrProcessor parseOcrTemplate:arguments];
+        double accuracyThreshold = [Utils getDouble:arguments key:@"accuracyThreshold" defaultValue:[Utils getDouble:self.options key:@"accuracyThreshold" defaultValue:0.80]];
+        BOOL rotate90CW      = [Utils getBool:arguments key:@"rotate90CW"      defaultValue:[Utils getBool:self.options key:@"rotate90CW" defaultValue:YES]];
 
-    // ROI config (normalized 0..1)
-    NSDictionary* roiOuterArg = [Utils getMap:arguments key:@"roiOuter"];
-    NSDictionary* roiInnerArg = [Utils getMap:arguments key:@"roiInner"];
-    if (!roiOuterArg) roiOuterArg = @{ @"x": @0.10, @"y": @0.05, @"width": @0.80, @"height": @0.90 };
-    if (!roiInnerArg) roiInnerArg = @{ @"x": @0.30, @"y": @0.20, @"width": @0.45, @"height": @0.60 };
-    int minAspectW = [Utils getInt:arguments key:@"minAspectW" defaultValue:3];
-    int minAspectH = [Utils getInt:arguments key:@"minAspectH" defaultValue:4];
-    double minAspect = (minAspectH != 0) ? ((double)minAspectW / (double)minAspectH) : 0.75;
+        NSDictionary* roiOuterArg = [Utils getMap:arguments key:@"roiOuter"];
+        NSDictionary* roiInnerArg = [Utils getMap:arguments key:@"roiInner"];
+        if (!roiOuterArg) roiOuterArg = @{ @"x": @0.10, @"y": @0.05, @"width": @0.80, @"height": @0.90 };
+        if (!roiInnerArg) roiInnerArg = @{ @"x": @0.30, @"y": @0.20, @"width": @0.45, @"height": @0.60 };
+        int minAspectW = [Utils getInt:arguments key:@"minAspectW" defaultValue:3];
+        int minAspectH = [Utils getInt:arguments key:@"minAspectH" defaultValue:4];
+        double minAspect = (minAspectH != 0) ? ((double)minAspectW / (double)minAspectH) : 0.75;
 
-    // Convert image to grayscale
-    cv::Mat gray = [ImageProcessing createGrayMatFromPixelBuffer:pixelBuffer];
-    cv::Mat rotated;
-    cv::rotate(gray, rotated, cv::ROTATE_90_CLOCKWISE);
-    int frameW = rotated.cols, frameH = rotated.rows;
+        // Convert Y-plane to grayscale
+        cv::Mat gray = [ImageProcessing createGrayMatFromPixelBuffer:pixelBuffer];
 
-    // Resolve ROIs in pixels, enforce min aspect
-    cv::Rect roiOuterPx = [Utils enforceMinAspect:[Utils normToPx:roiOuterArg width:frameW height:frameH]
-                                             width:frameW height:frameH minAspect:minAspect];
-    cv::Rect roiInnerPx = [Utils enforceMinAspect:[Utils normToPx:roiInnerArg width:frameW height:frameH]
-                                             width:frameW height:frameH minAspect:minAspect];
+        // Optional 90° rotation (default YES on iOS — camera delivers landscape)
+        cv::Mat img;
+        if (rotate90CW) {
+            cv::rotate(gray, img, cv::ROTATE_90_CLOCKWISE);
+        } else {
+            img = gray;
+        }
+        int frameW = img.cols, frameH = img.rows;
 
-    // Preprocess image for better edge detection
-    cv::Mat normalized = [ImageProcessing preprocessImage:rotated];
+        cv::Rect roiOuterPx = [Utils enforceMinAspect:[Utils normToPx:roiOuterArg width:frameW height:frameH]
+                                                 width:frameW height:frameH minAspect:minAspect];
+        cv::Rect roiInnerPx = [Utils enforceMinAspect:[Utils normToPx:roiInnerArg width:frameW height:frameH]
+                                                 width:frameW height:frameH minAspect:minAspect];
 
-    // Create edge map
-    cv::Mat edges = [ImageProcessing createEdgeMap:normalized];
+        cv::Mat normalized = [ImageProcessing preprocessImage:img];
 
-    // Find contours
-    std::vector<std::vector<cv::Point>> contours = [ImageProcessing findContours:edges];
+        // Dual edge maps — screen outline + detail (matches Android)
+        cv::Mat screenEdges, detailEdges;
+        [ImageProcessing createEdgeMaps:normalized screenEdges:screenEdges detailEdges:detailEdges];
 
-    // Find best screen candidate
-    struct ScreenCandidate candidate = [ScreenDetection findBestScreenCandidate:contours
-                                                                         roiInner:roiInnerPx
-                                                                         roiOuter:roiOuterPx
-                                                                         frameW:frameW
-                                                                         frameH:frameH];
+        // Find contours on screen edge map
+        std::vector<std::vector<cv::Point>> contours = [ImageProcessing findContours:screenEdges];
 
-    // Build homography matrix
-    cv::Mat H;
-    cv::Mat mask;
-    if (candidate.hasBest) {
-        H = [ScreenDetection buildScreenHomography:candidate.bestQuad
-                                   templateTargetW:templateTargetW
-                                   templateTargetH:templateTargetH];
-    }
+        struct ScreenCandidate candidate = [ScreenDetection findBestScreenCandidate:contours
+                                                                           roiInner:roiInnerPx
+                                                                           roiOuter:roiOuterPx
+                                                                             frameW:frameW
+                                                                             frameH:frameH];
 
-    // Match template boxes
-    struct TemplateMatchResult matchResult = {0.0, [NSMutableArray array], [NSMutableArray array]};
-    if (!H.empty() && !templateBoxes.empty()) {
-        // Convert contours to rectangles for template matching
-        std::vector<cv::Rect> contourRects;
-        for (const auto& cnt : contours) {
-            cv::Rect rect = cv::boundingRect(cnt) & cv::Rect(0,0,frameW,frameH);
-            if (rect.width > 0 && rect.height > 0) {
-                contourRects.push_back(rect);
-            }
+        cv::Mat H;
+        if (candidate.hasBest) {
+            H = [ScreenDetection buildScreenHomography:candidate.bestQuad
+                                       templateTargetW:templateTargetW
+                                       templateTargetH:templateTargetH];
         }
 
-        matchResult = [ScreenDetection matchTemplateBoxes:templateBoxes
-                                               homography:H
-                                             contourRects:contourRects
-                                                   frameW:frameW
-                                                   frameH:frameH
-                                            templateTargetW:templateTargetW
-                                            templateTargetH:templateTargetH
-                                             minIouForMatch:minIouForMatch];
-    }
-
-    BOOL detected = !H.empty() && (
-        templateBoxes.empty() ? YES : (matchResult.accuracy >= accuracyThreshold)
-    );
-
-    // Create warped image for OCR if needed
-    NSString* imageBase64 = nil;
-    if (detected && returnWarpedImage && !H.empty()) {
-        imageBase64 = [ImageProcessing warpAndEncodeToBase64:gray
-                                                  homography:H
-                                                     outputW:outputW
-                                                     outputH:outputH
-                                                imageQuality:imageQuality];
-    }
-
-    // Process OCR if requested
-    NSMutableDictionary* ocrMap = nil;
-    if (detected && runOcr && ocrTemplate && ocrTemplate.count > 0 && !H.empty()) {
+        // Warp image once for template matching + OCR
         cv::Mat warped;
-        cv::warpPerspective(gray, warped, H, cv::Size(outputW, outputH));
+        if (!H.empty()) {
+            cv::Mat Hinv = H.inv();
+            cv::warpPerspective(img, warped, Hinv, cv::Size(outputW, outputH));
+        }
 
-        NSMutableArray* ocrResults = [OcrProcessor processOcrBoxes:warped
-                                                          ocrBoxes:ocrTemplate
-                                                           outputW:outputW
-                                                           outputH:outputH];
-        ocrMap = [@{ @"boxes": ocrResults } mutableCopy];
-    }
-
-    // Create screen data
-    NSMutableArray* allRects = [NSMutableArray array];
-    NSMutableDictionary* screenData = [ScreenDetection createScreenData:detected
-                                                               accuracy:matchResult.accuracy
-                                                       accuracyThreshold:accuracyThreshold
-                                                        detectionCounter:0
-                                                         totalFrameCounter:0
-                                                                frameW:frameW
-                                                                frameH:frameH
-                                                              srcWidth:width
-                                                             srcHeight:height
-                                                        templateTargetW:templateTargetW
-                                                        templateTargetH:templateTargetH
-                                                           homography:H
-                                                                mask:mask
-                                                           roiOuterPx:roiOuterPx
-                                                           roiInnerPx:roiInnerPx
-                                                            bestRect:candidate.bestRect
-                                                           hasBestRect:candidate.hasBest
-                                                            allRects:allRects
-                                                   templatePixelRects:matchResult.templatePixelRectsArr
-                                                           matchedArr:matchResult.matchedArr
-                                                     warpedImageBase64:imageBase64
+        // Match template boxes in warped space (matches Android matchTemplateBoxesInWarped)
+        struct TemplateMatchResult matchResult = {0.0, [NSMutableArray array], [NSMutableArray array]};
+        if (!H.empty() && !templateBoxes.empty() && !warped.empty()) {
+            matchResult = [ScreenDetection matchTemplateBoxesInWarped:templateBoxes
+                                                               warped:warped
                                                               outputW:outputW
-                                                              outputH:outputH];
+                                                              outputH:outputH
+                                                       paddingPercent:1.0
+                                                    minScoreForMatch:0.4];
+        }
 
-    if (ocrMap) {
-        return @{ @"screen": screenData, @"ocr": ocrMap };
-    } else {
-        return @{ @"screen": screenData };
+        BOOL detected = !H.empty() && (
+            templateBoxes.empty() ? YES : (matchResult.accuracy >= accuracyThreshold)
+        );
+
+        _totalFrameCounter++;
+        if (detected) _detectionCounter++;
+
+        // Screenshot — only when detected and requested
+        NSString* imageBase64 = nil;
+        if (detected && returnWarpedImage && !H.empty()) {
+            cv::Mat Hinv = H.inv();
+            imageBase64 = [ImageProcessing warpAndEncodeToBase64:img
+                                                       homography:Hinv
+                                                          outputW:outputW
+                                                          outputH:outputH
+                                                     imageQuality:imageQuality];
+        }
+
+        // OCR — in warped space (reuse already-warped image)
+        NSMutableDictionary* ocrMap = nil;
+        if (detected && runOcr && ocrTemplate && ocrTemplate.count > 0 && !warped.empty()) {
+            NSMutableArray* ocrResults = [OcrProcessor processOcrBoxes:warped
+                                                              ocrBoxes:ocrTemplate
+                                                               outputW:outputW
+                                                               outputH:outputH];
+            ocrMap = [@{ @"boxes": ocrResults } mutableCopy];
+        }
+
+        NSMutableArray* allRects = [NSMutableArray array];
+        NSMutableDictionary* screenData = [ScreenDetection createScreenData:detected
+                                                                   accuracy:matchResult.accuracy
+                                                           accuracyThreshold:accuracyThreshold
+                                                            detectionCounter:_detectionCounter
+                                                             totalFrameCounter:_totalFrameCounter
+                                                                    frameW:frameW
+                                                                    frameH:frameH
+                                                                  srcWidth:width
+                                                                 srcHeight:height
+                                                            templateTargetW:templateTargetW
+                                                            templateTargetH:templateTargetH
+                                                               homography:H
+                                                                    mask:cv::Mat()
+                                                               roiOuterPx:roiOuterPx
+                                                               roiInnerPx:roiInnerPx
+                                                                bestRect:candidate.bestRect
+                                                               hasBestRect:candidate.hasBest
+                                                                allRects:allRects
+                                                       templatePixelRects:matchResult.templatePixelRectsArr
+                                                               matchedArr:matchResult.matchedArr
+                                                         warpedImageBase64:imageBase64
+                                                                  outputW:outputW
+                                                                  outputH:outputH];
+
+        if (ocrMap) {
+            return @{ @"screen": screenData, @"ocr": ocrMap };
+        } else {
+            return @{ @"screen": screenData };
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Screen detection error: %@", exception.reason);
+        return nil;
     }
-  } @catch (NSException *exception) {
-    NSLog(@"Screen detection error: %@", exception.reason);
-    return nil;
-  }
 }
 
 VISION_EXPORT_FRAME_PROCESSOR(ScreenDetectorFrameProcessorPlugin, detectScreen)
