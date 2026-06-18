@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
                    templateTargetW:(int)templateTargetW
                    templateTargetH:(int)templateTargetH;
 
-// Template matching
+// Template matching — legacy contour-IoU path
 + (struct TemplateMatchResult)matchTemplateBoxes:(const std::vector<SDBOX>&)templateBoxes
                                         homography:(const cv::Mat&)H
                                       contourRects:(const std::vector<cv::Rect>&)contourRects
@@ -34,6 +34,14 @@ NS_ASSUME_NONNULL_BEGIN
                                    templateTargetW:(int)templateTargetW
                                    templateTargetH:(int)templateTargetH
                                     minIouForMatch:(double)minIouForMatch;
+
+// Template matching — warped-space edge/corner/gradient path (matches Android)
++ (struct TemplateMatchResult)matchTemplateBoxesInWarped:(const std::vector<SDBOX>&)templateBoxes
+                                                  warped:(const cv::Mat&)warped
+                                                 outputW:(int)outputW
+                                                 outputH:(int)outputH
+                                          paddingPercent:(double)paddingPercent
+                                       minScoreForMatch:(double)minScoreForMatch;
 
 // Screen data creation
 + (NSMutableDictionary*)createScreenData:(BOOL)detected

@@ -38,6 +38,33 @@
     return normalized;
 }
 
++ (void)createEdgeMaps:(const cv::Mat&)normalized
+           screenEdges:(cv::Mat&)screenEdges
+           detailEdges:(cv::Mat&)detailEdges {
+    cv::Mat screenBlur, detailBlur;
+
+    // Screen edges: stronger blur, adaptive thresholds based on mean intensity
+    cv::GaussianBlur(normalized, screenBlur, cv::Size(5, 5), 1.5);
+    cv::Scalar meanVal = cv::mean(screenBlur);
+    double v = meanVal[0];
+    double sigma = 0.33;
+    double lowerScreen = std::max(0.0, (1.0 - sigma) * v);
+    double upperScreen = std::min(255.0, (1.0 + sigma) * v);
+    cv::Canny(screenBlur, screenEdges, lowerScreen, upperScreen, 3, false);
+
+    // Morphological closing to connect gaps in screen outline
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(screenEdges, screenEdges, cv::MORPH_CLOSE, kernel);
+
+    // Detail edges: lighter blur, lower thresholds for template box edges
+    cv::GaussianBlur(normalized, detailBlur, cv::Size(3, 3), 1.0);
+    cv::Scalar detailMean = cv::mean(detailBlur);
+    double detailV = detailMean[0];
+    double detailLower = std::max(20.0, detailV * 0.3);
+    double detailUpper = std::min(200.0, detailV * 0.9);
+    cv::Canny(detailBlur, detailEdges, detailLower, detailUpper, 3, false);
+}
+
 + (cv::Mat)createEdgeMap:(const cv::Mat&)normalized {
     cv::Mat edges;
     cv::Canny(normalized, edges, 50.0, 150.0);

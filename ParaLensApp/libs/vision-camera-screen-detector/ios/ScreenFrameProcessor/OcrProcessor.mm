@@ -94,33 +94,39 @@
                                 options:(NSDictionary* _Nullable)options
                                    boxId:(NSString*)boxId {
     NSMutableDictionary* result = [NSMutableDictionary dictionary];
-    
-    // Simple checkbox heuristic: dark pixel ratio threshold
-    cv::Mat blur;
-    cv::GaussianBlur(roi, blur, cv::Size(3,3), 0.0);
-    cv::Mat th;
-    cv::threshold(blur, th, 0.0, 255.0, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-    
-    int nonZero = cv::countNonZero(th);
-    int total = th.rows * th.cols;
-    double ratio = total > 0 ? ((double)nonZero / (double)total) : 0.0;
-    
-    double threshold = [Utils getDouble:options key:@"checkboxThreshold" defaultValue:0.5];
-    threshold = std::max(0.05, std::min(0.95, threshold));
-    
-    BOOL readValue = [Utils getBool:options key:@"readValue" defaultValue:NO];
-    NSString* valueBoxId = [options[@"valueBoxId"] isKindOfClass:[NSString class]] ? (NSString*)options[@"valueBoxId"] : nil;
-    
-    result[@"type"] = @"checkbox";
-    result[@"checked"] = @(ratio >= threshold);
-    result[@"confidence"] = @(fabs(ratio - threshold));
-    
-    if (ratio >= threshold && readValue && valueBoxId) {
-        result[@"valueBoxId"] = valueBoxId;
-        result[@"valueText"] = [NSNull null];
-        result[@"valueNumber"] = [NSNull null];
+
+    cv::Mat normalized, smooth, bin;
+
+    // 1) Local normalization (CLAHE) + light blur — same as Android
+    @try {
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+        clahe->apply(roi, normalized);
+    } @catch (...) {
+        roi.copyTo(normalized);
     }
-    
+    cv::GaussianBlur(normalized, smooth, cv::Size(3, 3), 0.0);
+
+    int area = std::max(1, smooth.rows * smooth.cols);
+
+    // 2) Adaptive binarization (Otsu, invert so dark=white) → black ratio
+    cv::threshold(smooth, bin, 0.0, 255.0, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+    int whiteCount = cv::countNonZero(bin);
+    double blackRatio = (double)whiteCount / (double)area;
+
+    // 3) Decision by threshold — use blackRatioMin key (aligned with Android)
+    double blackRatioMin = [Utils getDouble:options key:@"blackRatioMin" defaultValue:0.30];
+    blackRatioMin = std::max(0.0, std::min(1.0, blackRatioMin));
+    BOOL isChecked = blackRatio >= blackRatioMin;
+
+    auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+    double confidence = clamp01((blackRatio - blackRatioMin) / 0.40);
+
+    result[@"type"]         = @"checkbox";
+    result[@"checked"]      = @(isChecked);
+    result[@"confidence"]   = @(confidence);
+    result[@"blackRatio"]   = @(blackRatio);
+    result[@"blackRatioMin"] = @(blackRatioMin);
+
     return result;
 }
 

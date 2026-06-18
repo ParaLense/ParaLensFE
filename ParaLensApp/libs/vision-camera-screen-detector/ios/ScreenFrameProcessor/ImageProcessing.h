@@ -19,7 +19,12 @@ NS_ASSUME_NONNULL_BEGIN
 // Image preprocessing
 + (cv::Mat)preprocessImage:(const cv::Mat&)img;
 
-// Edge detection
+// Edge detection — dual maps: screen outline (strong blur) + detail (light blur)
++ (void)createEdgeMaps:(const cv::Mat&)normalized
+           screenEdges:(cv::Mat&)screenEdges
+           detailEdges:(cv::Mat&)detailEdges;
+
+// Single edge map (legacy)
 + (cv::Mat)createEdgeMap:(const cv::Mat&)normalized;
 
 // Contour detection
