@@ -3,9 +3,6 @@ package com.alex8734.visioncamerascreendetector.visioncamerascreendetector
 import android.media.Image
 import android.util.Log
 import com.alex8734.visioncamerascreendetector.BuildConfig
-import com.mrousavy.camera.frameprocessors.Frame
-import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
-import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 import java.util.HashMap
 import java.util.ArrayList
 import org.opencv.core.Core
@@ -16,19 +13,27 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.core.Scalar
 import com.alex8734.visioncamerascreendetector.visioncamerascreendetector.DebugHttpStreamer
 
-class ScreenDetectorFrameProcessorPlugin(
-  proxy: VisionCameraProxy,
+/**
+ * Core screen-detection / OCR pipeline. Decoupled from VisionCamera: it operates
+ * on a plain [Image] plus an argument map, so it can be driven from the V5 Nitro
+ * HybridObject (see HybridScreenDetector) without depending on the old (removed)
+ * FrameProcessorPlugin API. All OpenCV/OCR logic below is unchanged.
+ */
+class ScreenDetectorProcessor(
   options: Map<String, Any>?
-) : FrameProcessorPlugin() {
+) {
   private val pluginOptions = options
 
   // Per-instance counters — reset on new camera session (plugin re-creation).
   private var detectionCounter = 0
   private var totalFrameCounter = 0
 
-  override fun callback(frame: Frame, arguments: Map<String, Any>?): HashMap<String, Any?>? {
+  init {
+    ensureOpenCv()
+  }
+
+  fun processImage(mediaImage: Image, arguments: Map<String, Any>?): HashMap<String, Any?>? {
     val data = HashMap<String, Any?>()
-    val mediaImage: Image = frame.image
     val srcWidth = mediaImage.width
     val srcHeight = mediaImage.height
 
@@ -265,6 +270,36 @@ class ScreenDetectorFrameProcessorPlugin(
       screenHierarchy?.release()
       H?.release()
       warped?.release()
+    }
+  }
+
+  companion object {
+    @Volatile private var openCvReady = false
+    @Volatile private var debugStarted = false
+
+    /**
+     * Lazily initialize OpenCV (and, in debug builds, the debug HTTP streamer)
+     * the first time a processor is created. Previously this lived in the
+     * ReactPackage init, which no longer drives plugin registration under the
+     * VisionCamera v5 / Nitro autolinking model.
+     */
+    @Synchronized
+    fun ensureOpenCv() {
+      if (!openCvReady) {
+        try {
+          val ok = org.opencv.android.OpenCVLoader.initLocal()
+          Log.d("ScreenDetector", "OpenCV initLocal: $ok")
+        } catch (t: Throwable) {
+          Log.e("ScreenDetector", "OpenCV init failed: ${t.message}", t)
+        }
+        openCvReady = true
+      }
+      if (BuildConfig.DEBUG && !debugStarted) {
+        try {
+          DebugHttpStreamer.start(8082)
+        } catch (_: Throwable) {}
+        debugStarted = true
+      }
     }
   }
 }

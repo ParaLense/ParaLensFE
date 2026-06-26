@@ -1,0 +1,24 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["screendetector"],
+  "ios": {
+    "iosModuleName": "VisionCameraScreenDetector"
+  },
+  "android": {
+    "androidNamespace": ["screendetector"],
+    "androidCxxLibName": "VisionCameraScreenDetector"
+  },
+  "autolinking": {
+    "ScreenDetector": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridScreenDetector"
+      },
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridScreenDetector"
+      }
+    }
+  },
+  "ignorePaths": ["**/node_modules", "**/android/build", "**/lib"]
+}

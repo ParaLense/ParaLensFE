@@ -2,3 +2,4 @@
 ./ParaLensApp/android/
 ./ParaLensApp/ios/
 node_modules/
+graphify-out/

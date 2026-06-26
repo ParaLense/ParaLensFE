@@ -1,9 +1,6 @@
 import {
   Camera,
-  ReadonlyFrameProcessor,
-  runAsync,
-  runAtTargetFps,
-  useFrameProcessor,
+  useFrameOutput,
 } from 'react-native-vision-camera';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,7 +20,7 @@ import {
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { Text as GluestackText } from '@/components/ui/text';
-import { useRunOnJS } from 'react-native-worklets-core';
+import { scheduleOnRN } from 'react-native-worklets';
 import { TemplateLayout, useTemplateLayout } from '@/features/templates/use-template-layout';
 import { loadTemplateConfig } from '@/features/templates/template';
 import { loadOcrTemplate } from '@/features/templates/ocr-template';
@@ -43,12 +40,31 @@ import {
 } from "@/features/camera/camera-geometry";
 import {ASPECT_H, ASPECT_W, IMAGE_QUALITY, ROI_INNER, ROI_OUTER, ROTATE_90_CW} from "@/features/ocr/constants";
 
-// Cap how often the heavy OpenCV/OCR scan runs. The native scan holds the camera
-// frame buffer for its whole (long) duration; without this cap the camera exhausts
-// its image buffers ("maxImages (6) has already been acquired") and the native
-// pipeline segfaults (SIGSEGV) — especially in release builds where frames arrive
-// faster. Throttling to a few FPS keeps buffers flowing back to the camera.
-const SCAN_TARGET_FPS = 4;
+/**
+ * Compatibility shim for the old worklets-core `useRunOnJS(fn, deps)` hook.
+ *
+ * Returns a worklet-safe callback that hops `fn` back onto the JS thread via
+ * react-native-worklets' `scheduleOnRN`. Calling `scheduleOnRN(fn, ...args)`
+ * from inside the worklet is the documented pattern for VisionCamera 5 /
+ * Reanimated 4; it avoids the "tried to synchronously call a non-worklet
+ * function on the UI thread" error you get when a captured JS closure (e.g. one
+ * that calls `console.log`) is invoked directly on the worklet runtime.
+ */
+function useRunOnJS<Args extends unknown[]>(
+  fn: (...args: Args) => void,
+  deps: React.DependencyList,
+): (...args: Args) => void {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFn = useCallback(fn, deps);
+  return useCallback(
+    (...args: Args) => {
+      'worklet';
+      scheduleOnRN(stableFn, ...args);
+    },
+    [stableFn],
+  );
+}
+
 // OCR runs every N-th processed frame; screen detection runs every frame.
 const OCR_EVERY_N = 3;
 // Warped screenshot is captured every N-th processed frame (only needed at Continue tap).
@@ -104,18 +120,12 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   const [cameraLayoutSize, setCameraLayoutSize] = useState<{ width: number; height: number } | null>(null);
 
-  const cameraFormat = useMemo(() => {
-    if (!device?.formats) return undefined;
-    // Prefer the smallest format with ≥1280px video width and ≥15 fps.
-    // Fall back to the widest available format with ≥15 fps so we never
-    // silently get undefined and end up on an unconstrained full-res format.
-    const hd = device.formats
-      .filter(f => f.maxFps >= 15 && f.videoWidth >= 1280)
-      .sort((a, b) => a.videoWidth - b.videoWidth)[0];
-    return hd ?? device.formats
-      .filter(f => f.maxFps >= 15)
-      .sort((a, b) => b.videoWidth - a.videoWidth)[0];
-  }, [device]);
+  // VisionCamera v5 negotiates the frame resolution from a target (no more
+  // explicit `format`). VisionCamera prioritizes the aspect ratio over exact
+  // pixel count, so we request 3:4 to match the scan template / ROI geometry
+  // (ASPECT_W=3, ASPECT_H=4). A 16:9 target would shift the normalized ROIs onto
+  // a differently-cropped frame. ~960x1280 keeps the OpenCV/OCR scan fast.
+  const targetResolution = useMemo(() => ({ width: 864, height: 1152 }), []);
 
   const windowDimensions = Dimensions.get('window');
   const viewWidth = cameraLayoutSize?.width ?? windowDimensions.width;
@@ -309,17 +319,19 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
     offsetY: templateViewport?.offsetY,
   });
 
-  const frameProcessor = useFrameProcessor(frame => {
-    'worklet';
-    // Throttle the heavy scan so the camera always gets its frame buffers back in
-    // time — prevents the "maxImages acquired" buffer exhaustion that segfaults the
-    // native camera pipeline (notably in release builds).
-    runAtTargetFps(SCAN_TARGET_FPS, () => {
+  const frameOutput = useFrameOutput({
+    targetResolution,
+    // YUV is OpenCV/MLKit's native input — no conversion in the camera pipeline.
+    pixelFormat: 'yuv',
+    // Drop frames while the (heavy) scan is busy instead of queueing them up.
+    dropFramesWhileBusy: true,
+    onFrame: frame => {
       'worklet';
-      // runAsync drops this frame automatically if the previous scan is still running.
-      runAsync(frame, () => {
-        'worklet';
-      const cnt = scanFrameCounter.value + 1;
+      // The scan runs synchronously on the camera worklet thread. The frame
+      // buffer MUST be disposed before returning, otherwise the camera pipeline
+      // runs out of buffers and stalls.
+      try {
+        const cnt = scanFrameCounter.value + 1;
       scanFrameCounter.value = cnt;
       const doOcr = cnt % OCR_EVERY_N === 0;
       const doScreenshot = cnt % SCREENSHOT_EVERY_N === 0;
@@ -432,10 +444,12 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           } : null,
           base64: doScreenshot ? (scan.screen.image_base64 ?? null) : null,
         });
+        }
+      } finally {
+        frame.dispose();
       }
-      });
-    });
-  }, [scanFrameCounter, screenTemplate, ocrTemplate, setScanFrameJS, debugLogJS]);
+    },
+  });
   
   type FrameBox = {
     x: number;
@@ -499,10 +513,9 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
         {...restCameraProps}
         style={StyleSheet.absoluteFill}
         device={device}
+        isActive={true}
         resizeMode="contain"
-        androidPreviewViewType="texture-view"
-        frameProcessor={frameProcessor as ReadonlyFrameProcessor}
-        format={cameraFormat}
+        outputs={[frameOutput]}
       />
 
       <ScannerOverlays

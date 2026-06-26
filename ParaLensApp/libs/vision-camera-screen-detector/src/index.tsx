@@ -1,9 +1,14 @@
-import { type Frame, VisionCameraProxy } from 'react-native-vision-camera';
+import { type Frame } from 'react-native-vision-camera';
+import { NitroModules } from 'react-native-nitro-modules';
+import type { ScreenDetector } from './specs/ScreenDetector.nitro';
 
 /**
- * Initialize the screen detector frame processor plugin
+ * VisionCamera v5 / Nitro screen detector plugin.
+ *
+ * Created once on the JS thread; Nitro HybridObjects are runtime-agnostic, so
+ * this instance can be called directly from the camera worklet.
  */
-const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectScreen', {});
+const plugin = NitroModules.createHybridObject<ScreenDetector>('ScreenDetector');
 
 export type TemplateBox = {
   id?: string;
@@ -290,7 +295,9 @@ export function performScan(
     ...(opts.rotate90CW != null ? { rotate90CW: opts.rotate90CW } : {}),
   } as const;
 
-  // Typcast auf any, da template ein Array von Objekten ist und die nativen Plugins dies erwarten.
-  // Die Typen der nativen Seite sind korrekt, TS meckert nur wegen der Record-Signatur.
-  return plugin.call(frame, args as any) as { screen: any; ocr?: any } | null;
+  // Options/results are transported as JSON strings across the Nitro ABI (see
+  // ScreenDetector.nitro.ts). Parse the result back into the rich ScanResult shape.
+  const resultJson = plugin.detectScreen(frame, JSON.stringify(args));
+  if (resultJson == null) return null;
+  return JSON.parse(resultJson) as { screen: any; ocr?: any };
 }

@@ -4,31 +4,21 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.uimanager.ViewManager
-import android.util.Log
-import com.alex8734.visioncamerascreendetector.BuildConfig
-import org.opencv.android.OpenCVLoader
+import com.margelo.nitro.screendetector.VisionCameraScreenDetectorOnLoad
 
+/**
+ * ReactPackage entry point for React Native autolinking.
+ *
+ * Under VisionCamera v5 / Nitro the screen-detector plugin (HybridScreenDetector)
+ * is a Nitro HybridObject. Loading the native C++ library here (via the
+ * Nitrogen-generated OnLoad) runs its JNI_OnLoad, which registers the
+ * HybridObject in the Nitro registry so `createHybridObject('ScreenDetector')`
+ * works. OpenCV (and the debug streamer) are initialized lazily on first use in
+ * [ScreenDetectorProcessor].
+ */
 class ScreenDetectorFrameProcessorPluginPackage : ReactPackage {
-
   init {
-      // Neu: Debug-HTTP-Server Port aus Optionen lesen (0 = aus)
-    if (BuildConfig.DEBUG) {
-      DebugHttpStreamer.start(8082)
-    }
-    try {
-      val ok = OpenCVLoader.initDebug()
-      Log.d("ScreenDetector", "OpenCV initDebug: $ok")
-    } catch (t: Throwable) {
-      Log.e("ScreenDetector", "OpenCV init failed: ${t.message}", t)
-    }
-
-    // Ensure frame processor registry is loaded so the plugin is registered
-    try {
-      Class.forName("com.alex8734.visioncamerascreendetector.visioncamerascreendetector.ScreenDetectorFrameProcessorPluginRegistry")
-      Log.d("ScreenDetector", "Registry loaded")
-    } catch (t: Throwable) {
-      Log.e("ScreenDetector", "Failed loading registry: ${t.message}", t)
-    }
+    VisionCameraScreenDetectorOnLoad.initializeNative()
   }
 
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
