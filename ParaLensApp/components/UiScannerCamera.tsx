@@ -2,6 +2,7 @@ import {
   Camera,
   ReadonlyFrameProcessor,
   runAsync,
+  runAtTargetFps,
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,6 +43,12 @@ import {
 } from "@/features/camera/camera-geometry";
 import {ASPECT_H, ASPECT_W, IMAGE_QUALITY, ROI_INNER, ROI_OUTER, ROTATE_90_CW} from "@/features/ocr/constants";
 
+// Cap how often the heavy OpenCV/OCR scan runs. The native scan holds the camera
+// frame buffer for its whole (long) duration; without this cap the camera exhausts
+// its image buffers ("maxImages (6) has already been acquired") and the native
+// pipeline segfaults (SIGSEGV) — especially in release builds where frames arrive
+// faster. Throttling to a few FPS keeps buffers flowing back to the camera.
+const SCAN_TARGET_FPS = 4;
 // OCR runs every N-th processed frame; screen detection runs every frame.
 const OCR_EVERY_N = 3;
 // Warped screenshot is captured every N-th processed frame (only needed at Continue tap).
@@ -304,9 +311,14 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
 
   const frameProcessor = useFrameProcessor(frame => {
     'worklet';
-    // runAsync drops this frame automatically if the previous scan is still running.
-    runAsync(frame, () => {
+    // Throttle the heavy scan so the camera always gets its frame buffers back in
+    // time — prevents the "maxImages acquired" buffer exhaustion that segfaults the
+    // native camera pipeline (notably in release builds).
+    runAtTargetFps(SCAN_TARGET_FPS, () => {
       'worklet';
+      // runAsync drops this frame automatically if the previous scan is still running.
+      runAsync(frame, () => {
+        'worklet';
       const cnt = scanFrameCounter.value + 1;
       scanFrameCounter.value = cnt;
       const doOcr = cnt % OCR_EVERY_N === 0;
@@ -421,6 +433,7 @@ const UiScannerCamera: React.FC<UiScannerCameraProps> = ({
           base64: doScreenshot ? (scan.screen.image_base64 ?? null) : null,
         });
       }
+      });
     });
   }, [scanFrameCounter, screenTemplate, ocrTemplate, setScanFrameJS, debugLogJS]);
   
